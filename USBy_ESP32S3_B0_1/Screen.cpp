@@ -39,6 +39,9 @@ void Screen::start(){
   digitalWrite(DISPLAY_CS_3, LOW);
 
   tft.init();
+  tft.writecommand(ST7789_TEON); //Enable tearing effect signal
+  tft.writedata(0x00);
+  
   img.createSprite(240, 240);
   pcimg.createSprite(33, 29);
   pcimg.setSwapBytes(true);
@@ -275,6 +278,21 @@ void Screen::updateScreen(chScreenData Screen){
     }
     pcimg.pushToSprite(&img, 65, 0, TFT_WHITE);
   }
+
+  //startup counter
+  if(Screen.startup_cnt > 0){
+    img.loadFont(aptossb52l);  
+    img.setTextSize(2);
+    img.setTextColor(TFT_GREEN);
+    img.fillRoundRect(7, 40, 226, 90, 10, TFT_BLACK);
+    cval = ((Screen.startup_timer-Screen.startup_cnt) * 226) / Screen.startup_timer;
+    img.fillRoundRect(7, 40, cval, 90, 10, 0x7BF2);
+    //aux = String((Screen.startup_cnt+9)/10) + "/" + String((Screen.startup_timer+10)/10);
+    aux = String((float)(Screen.startup_cnt)/10) + "s";
+    img.drawCentreString(aux, 120, 65, 4); //**
+    img.unloadFont();
+  }
+
 
   /*
   //test counter

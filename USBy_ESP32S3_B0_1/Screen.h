@@ -52,6 +52,8 @@ struct chScreenData {
   bool pwr_en;
   uint8_t ilim;
   bool pconnected;
+  int startup_timer;
+  int startup_cnt;
 };
 
 
