@@ -1,0 +1,180 @@
+//LICENCE
+
+#ifndef DATATYPES_H
+#define DATATYPES_H
+
+#include <Arduino.h>
+#include <Wire.h>
+#include "BaseMCU.h"
+#include "PAC194x.h"
+#include "Screen.h"
+
+#define DATATYPES_VER 1
+
+#define APP_CORE 1
+#define DISPLAY_REFRESH_PERIOD 50 //note that for each screen the effective rate is 150ms
+//------------ Start Pin definitions ------------
+
+//STEMMA
+#define STEMMA_SCL  7
+#define STEMMA_SDA  8
+
+//I2C Pins
+#define B2B_SCL    33
+#define B2B_SDA    34
+
+//Interrupt Pins
+#define PAC_ALERT  35
+#define MCU_INT    18
+
+//Buttons
+#define BUTTON_3   37
+#define BUTTON_2   38
+#define BUTTON_1   39
+//#define SETUP      18 //For B0 hardware
+#define SETUP      36 //For C0 hardware
+
+//Other
+#define VBUS_MONITOR   1
+#define HUB_RESET     21
+#define AUX_LED       45
+
+//--------------End pin definitions -------------
+
+//System->currentView;
+#define DEFAULT_VIEW  1
+#define SETTINGS_VIEW 2
+
+//Feature State ->wifistate
+#define WIFI_UNKNOWN   0
+#define WIFI_DISABLED   1
+#define AP_DISCONNECTED 2
+#define AP_CONNECTED    3
+#define SEARCHING       4
+#define CONNECTED       5
+#define DISCONNECTED    6
+
+//Features Config->starupMode
+#define PERSISTANCE   0
+#define START_ON      1
+#define START_OFF     2
+#define STARTUP_SEC   3
+
+//Screen Config Rotation
+#define ROT_0_DEG     0
+#define ROT_90_DEG    1
+#define ROT_180_DEG   2
+#define ROT_270_DEG   3
+
+//State BaseMCUExtra vx_cc
+#define UNKNOWN    0
+#define MINIMAL    1
+#define C_1_5A     2
+#define C_3_0A     3
+
+//State BaseMCUExtra vx_stat
+#define NO_PULLUPS    0
+#define CC1_PULLUP    1
+#define CC2_PULLUP    2
+#define BOTH_PULLUPS  3
+
+//State BaseMCUExtra pwr
+#define VHOST   false
+#define VEXT    true
+
+
+struct System {
+  uint8_t currentView;  
+};
+
+struct FeaturesState {
+  bool startUpActive;
+  bool pcConnected;
+  float vbusVoltage;
+  uint8_t wifiState;
+  String wifiIP;
+  String wifiAPIP;      
+};
+
+struct FeaturesConfig {
+  uint8_t startView; 
+  uint8_t startUpmode;  
+  bool wifi_enabled;    
+};
+
+struct StartupState { 
+  int startup_cnt;
+};
+
+struct StartupConfig {
+  int startup_timer;
+};
+
+struct ScreenConfig {
+  uint8_t rotation;
+  uint16_t brightness;
+};
+
+struct MeterState {
+  float AvgVoltage;
+  float AvgCurrent;
+  bool fwdAlertSet;
+  bool backAlertSet;
+};
+
+struct MeterConfig {
+  float fwdCLim;
+  float backCLim;
+};
+
+struct USBInfoState {
+  int numDev;
+  String Dev1_Name;
+  String Dev2_Name;
+  int usbType;
+};
+
+struct BaseMCUStateIn {
+  bool fault; 
+};
+
+struct BaseMCUStateOut {
+  uint8_t ilim;
+  bool data_en;
+  bool pwr_en;  
+};
+
+
+struct BaseMCUExtraState { 
+  uint8_t vext_cc;
+  uint8_t vhost_cc;
+  uint8_t vext_stat;
+  uint8_t vhost_stat;
+  bool pwr_source;
+  bool usb3_mux_out_en;
+  bool usb3_mux_sel_pos;
+  uint8_t base_ver;
+};
+
+//all the volatile variables that change constantly during operation and do need persistance
+struct GlobalState {
+    System system;
+    FeaturesState features;
+    StartupState startup[3];
+    MeterState meter[3];
+    USBInfoState usbInfo[3];
+    BaseMCUStateIn baseMCUIn[3];    
+    BaseMCUStateOut baseMCUOut[3];    
+    BaseMCUExtraState baseMCUExtra;
+};
+
+//all the configuration variables that change only with configuration changes or need persistance
+struct GlobalConfig {
+    FeaturesConfig features;
+    StartupConfig startup[3];
+    ScreenConfig screen[3];
+    MeterConfig meter[3];
+    //BaseMCUConfig baseMCU[3];
+};
+
+#endif // DATATYPES_H

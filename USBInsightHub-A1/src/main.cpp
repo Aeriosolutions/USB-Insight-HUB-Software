@@ -12,15 +12,28 @@
  *   the terms of the LGPL v3 license. See the LICENSE file for details.
  **/
 
+
+#include <Arduino.h>
+
 #include <ESP32SvelteKit.h>
-//#include <LightMqttSettingsService.h>
-//#include <LightStateService.h>
 #include <PsychicHttpServer.h>
 #include <MasterStateService.h>
+
+#include "datatypes.h"
+#include "GlobalStateManager.h"
+#include "Intercomms.h"
+#include "Extercomms.h"
+#include "DefaultView.h"
+#include "Powerstartup.h"
+
 
 #include <ArduinoJson.h>
 
 #define SERIAL_BAUD_RATE 115200
+
+GlobalState globalState ={};
+GlobalConfig globalConfig ={};
+Screen screen;
 
 JsonDocument masterState;
 
@@ -28,39 +41,34 @@ PsychicHttpServer server;
 
 ESP32SvelteKit esp32sveltekit(&server, 120);
 
-/*
-LightMqttSettingsService lightMqttSettingsService = LightMqttSettingsService(&server,
-                                                                             esp32sveltekit.getFS(),
-                                                                             esp32sveltekit.getSecurityManager());
-
-LightStateService lightStateService = LightStateService(&server,
-                                                        esp32sveltekit.getSocket(),
-                                                        esp32sveltekit.getSecurityManager(),
-                                                        esp32sveltekit.getMqttClient(),
-                                                        &lightMqttSettingsService);
-*/
 MasterStateService masterStateService = MasterStateService(&server,
                                                         esp32sveltekit.getSocket(),
                                                         esp32sveltekit.getSecurityManager());                                                        
 
 void setup()
 {
+
     // start serial and filesystem
-    Serial.begin(SERIAL_BAUD_RATE);
+    //Serial.begin(SERIAL_BAUD_RATE);
+    
+    globalStateInitializer(&globalState,&globalConfig);
+    delay(100); //to give time to print
+    iniExtercomms(&globalState);
+    iniIntercomms(&globalState, &globalConfig);
+    iniButtons();
+    iniDefaultView(&globalState,&globalConfig, &screen);
+    iniPowerStartUp(&globalState,&globalConfig);    
 
     // start ESP32-SvelteKit
-    esp32sveltekit.begin();
+    esp32sveltekit.begin();    
 
-    // load the initial light settings
-    //lightStateService.begin();
-    // start the light service
-    //lightMqttSettingsService.begin();
     masterStateService.begin();
     deserializeJson(masterState, "{\"power_on\":\"false\",\"switch_on\":\"false\"}");   
 }
 
 void loop()
 {
+    
     JsonObject masterStateObj =masterState.as<JsonObject>();
 
     //read
@@ -75,5 +83,5 @@ void loop()
     //update
     masterStateService.update(masterStateObj,MasterState::update,"main");
     delay(1000);
-
+    
 }
