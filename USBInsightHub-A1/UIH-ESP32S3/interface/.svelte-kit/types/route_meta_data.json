@@ -1,0 +1,54 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/connections": [
+		"src/routes/connections/+page.ts",
+		"src/routes/+layout.ts"
+	],
+	"/connections/mqtt": [
+		"src/routes/connections/mqtt/+page.ts",
+		"src/routes/+layout.ts"
+	],
+	"/connections/ntp": [
+		"src/routes/connections/ntp/+page.ts",
+		"src/routes/+layout.ts"
+	],
+	"/demo": [
+		"src/routes/demo/+page.ts",
+		"src/routes/+layout.ts"
+	],
+	"/system": [
+		"src/routes/system/+page.ts",
+		"src/routes/+layout.ts"
+	],
+	"/system/metrics": [
+		"src/routes/system/metrics/+page.ts",
+		"src/routes/+layout.ts"
+	],
+	"/system/status": [
+		"src/routes/system/status/+page.ts",
+		"src/routes/+layout.ts"
+	],
+	"/system/update": [
+		"src/routes/system/update/+page.ts",
+		"src/routes/+layout.ts"
+	],
+	"/user": [
+		"src/routes/user/+page.ts",
+		"src/routes/+layout.ts"
+	],
+	"/wifi": [
+		"src/routes/wifi/+page.ts",
+		"src/routes/+layout.ts"
+	],
+	"/wifi/ap": [
+		"src/routes/wifi/ap/+page.ts",
+		"src/routes/+layout.ts"
+	],
+	"/wifi/sta": [
+		"src/routes/wifi/sta/+page.ts",
+		"src/routes/+layout.ts"
+	]
+}

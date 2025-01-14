@@ -1,4 +1,4 @@
-# ESP32 SvelteKit - Create Amazing IoT Projects
+# USB Insight HUB - Harware project
 
 <div style="flex">
 <img src="/docs/media/Screenshot_light.png" style="height:320px"> 
