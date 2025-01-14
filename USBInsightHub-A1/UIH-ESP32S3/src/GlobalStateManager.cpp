@@ -34,6 +34,10 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
            ESP_LOGW(TAG,"Template in NVM is version %u. This version supports version %u", tver,DATATYPES_VER);
            setDefaultGlobalConfig(globalState,globalConfig);
            flashstorage.putInt("TemplateVer",DATATYPES_VER);
+           //clear previous template keys
+           flashstorage.remove("ConfigBlob");
+           flashstorage.remove("MCUBlob");
+           //create keys again with new lengths (if is the case) and default values
            flashstorage.putBytes("ConfigBlob",globalConfig,sizeof(*globalConfig));
            flashstorage.putBytes("MCUBlob",&(globalState->baseMCUOut),sizeof(globalState->baseMCUOut));
            flashstorage.end();            
@@ -41,7 +45,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
         }
         else {
             //Load configuration from NVM
-            //setDefaultGlobalConfig(globalState,globalConfig); //to allocate initial mmeory
+            
             if(flashstorage.getBytes("ConfigBlob",globalConfig,sizeof(*globalConfig))==sizeof(*globalConfig)){
                 ESP_LOGI(TAG,"Config loaded correctly");
             } else {
@@ -142,6 +146,7 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
 
         globalConfig->meter[i].backCLim = 20; //mA
         globalConfig->meter[i].fwdCLim = 1000; //mA
+        globalConfig->meter[i].filterType = FILTER_TYPE_MEDIAN;
 
         globalState->baseMCUOut[i].ilim = ILIM_1_0;
         globalState->baseMCUOut[i].data_en = true;

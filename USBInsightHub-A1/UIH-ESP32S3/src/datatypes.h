@@ -9,7 +9,7 @@
 #include "PAC194x.h"
 #include "Screen.h"
 
-#define DATATYPES_VER 1
+#define DATATYPES_VER 2
 
 #define APP_CORE 1
 #define DISPLAY_REFRESH_PERIOD 50 //note that for each screen the effective rate is 150ms
@@ -82,6 +82,9 @@
 #define VHOST   false
 #define VEXT    true
 
+//Meter Config
+#define FILTER_MOVING_AVG 0
+#define FILTER_MEDIAN 1
 
 struct System {
   uint8_t currentView;  
@@ -125,6 +128,7 @@ struct MeterState {
 struct MeterConfig {
   float fwdCLim;
   float backCLim;
+  int filterType;
 };
 
 struct USBInfoState {

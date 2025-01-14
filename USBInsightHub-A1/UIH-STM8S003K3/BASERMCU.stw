@@ -1,0 +1,12 @@
+;	STMicroelectronics Workspace file
+
+[Version]
+Keyword=ST7Workspace-V0.7
+
+[Project0]
+Filename=basermcu.stp
+Dependencies=
+[Options]
+ActiveProject=basermcu
+ActiveConfig=Debug
+AddSortedElements=0

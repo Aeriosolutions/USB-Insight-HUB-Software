@@ -56,7 +56,8 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
         I2CB2B.setTimeOut(20);
             
         delay(20);
-        if(bMCU.begin(&I2CB2B)) ESP_LOGI(TAG, "Base MCU initialized OK");
+        //if(bMCU.begin(&I2CB2B)) ESP_LOGI(TAG, "Base MCU initialized OK");
+        bMCU.begin(&I2CB2B) ? ESP_LOGI(TAG, "Base MCU initialized OK") : ESP_LOGE(TAG, "Base MCU initialization FAILED!");
         delay(30); //required time after powerup to write to meter
         if(bMeter.begin(&I2CB2B)) ESP_LOGI(TAG, "Power Meter initialized OK");
         //clear any interrupt flag
@@ -146,13 +147,6 @@ void taskIntercomms(void *pvParameters){
   ESP_LOGI(TAG,"Intercomms started on Core %u",xPortGetCoreID());
   for(;;){
 
-    //read bMCU
-    interMcuReadAll();
-
-    //update globalState with bMCU readings
-    for(int i=0; i<3; i++){
-      glState->baseMCUIn[i].fault = bMCU.chArr[i].fault;
-    }  
 
     //check if there is any change in GlobalConfig to update the MCU
     if( memcmp(&prevMCUConfig,&(glState->baseMCUOut),sizeof(prevMCUConfig)) != 0 ){
@@ -169,10 +163,22 @@ void taskIntercomms(void *pvParameters){
       interMcuWriteAll();
       //ESP_LOGV(TAG, "memcpy baseMCU");
       //save current state for later comparison
-      saveMCUState();    
+      if(bMCU.initiated) saveMCUState();          
       memcpy(prevMCUConfig,glState->baseMCUOut,sizeof(prevMCUConfig));
     }
-    
+
+    //read bMCU
+    interMcuReadAll();
+
+    //update globalState with bMCU readings
+    for(int i=0; i<3; i++){
+      glState->baseMCUIn[i].fault = bMCU.chArr[i].fault;
+      glState->baseMCUOut[i].pwr_en = bMCU.chArr[i].pwr_en;
+      glState->baseMCUOut[i].data_en = bMCU.chArr[i].data_en;
+      glState->baseMCUOut[i].ilim = bMCU.chArr[i].ilim;
+    }  
+
+    vTaskDelay(pdMS_TO_TICKS(5));
     
     //check if there is any change in GlobalConfig to update the Meter
     if(memcmp(&prevMeterConfig,&(glConfig->meter),sizeof(prevMeterConfig))!=0){

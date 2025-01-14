@@ -15,6 +15,9 @@
 #define FULLSCALE_15mOHM 3333.333 //Full scale is 50mV/0.015
 #define FULLSCALE_20mOHM 2500 //Full scale is 50mV/0.020
 #define FULLSCALE_10mOHM 5000 //Full scale is 50mV/0.010
+
+#define FILTER_TYPE_MOVING_AVG 0
+#define FILTER_TYPE_MEDIAN 1
 #define AVG_WINDOW_SIZE 10
 
 //define configurations
@@ -127,6 +130,7 @@ struct meter {
   float AvgCurrent;
   bool fwdAlertSet;
   bool backAlertSet;
+  int filterType;
 };
 
 struct meter_averager {
@@ -143,9 +147,9 @@ class PAC194x {
 
   public:
     //These values should be initialized when the class is created as some of them may be in non-volatile storage
-    meter chMeterArr[3]={ {FULLSCALE_20mOHM,DEFAULT_FWD_C_LIM,DEFAULT_BACK_C_LIM,0,0,0,0,false,false},
-                          {FULLSCALE_20mOHM,DEFAULT_FWD_C_LIM,DEFAULT_BACK_C_LIM,0,0,0,0,false,false},
-                          {FULLSCALE_20mOHM,DEFAULT_FWD_C_LIM,DEFAULT_BACK_C_LIM,0,0,0,0,false,false}
+    meter chMeterArr[3]={ {FULLSCALE_20mOHM,DEFAULT_FWD_C_LIM,DEFAULT_BACK_C_LIM,0,0,0,0,false,false,FILTER_TYPE_MEDIAN},
+                          {FULLSCALE_20mOHM,DEFAULT_FWD_C_LIM,DEFAULT_BACK_C_LIM,0,0,0,0,false,false,FILTER_TYPE_MEDIAN},
+                          {FULLSCALE_20mOHM,DEFAULT_FWD_C_LIM,DEFAULT_BACK_C_LIM,0,0,0,0,false,false,FILTER_TYPE_MEDIAN}
                         };
     meter_averager chAverager[3];
     bool begin(TwoWire *theWire);    
@@ -160,7 +164,13 @@ class PAC194x {
   private:
     void write24(uint8_t reg_address,uint8_t lowByte, uint8_t midByte, uint8_t highByte);
     void write16(uint8_t reg_address,uint8_t lowByte, uint8_t highByte);
-    void write8(uint8_t reg_address,uint8_t data); 
+    void write8(uint8_t reg_address,uint8_t data);
+    void voltageMovingAverageFilter(int i);
+    void currentMovingAverageFilter(int i);
+    void voltageMedianFilter(int i);
+    void currentMedianFilter(int i);
+    float medianFunction(float arr[], int n);
+
     TwoWire *I2C;
     bool initiated = false;
     int filterIndex = 0;

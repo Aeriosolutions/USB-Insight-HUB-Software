@@ -52,20 +52,20 @@ class BaseMCU {
     bool begin(TwoWire *theWire);
     void readAll();
     void writeAll();
+    bool initiated = false;
 
-    Channel chArr[3];
-    uint8_t vextCC;
-    uint8_t extState;
-    uint8_t vhostCC;
-    uint8_t hostState;
+    Channel chArr[3]={{false, false,false,ILIM_0_5},{false, false,false,ILIM_0_5},{false, false,false,ILIM_0_5}};
+    uint8_t vextCC = UNKNOWNPWR;
+    uint8_t extState = NOPULLUP;
+    uint8_t vhostCC = UNKNOWNPWR;
+    uint8_t hostState =  NOPULLUP;
 
-    bool pwrsource; //false vhost used, true vext used
-    bool muxoe;     //false disabled, true enabled
-    bool muxsel;    //false pos 1, true pos 2  
+    bool pwrsource = false; //false vhost used, true vext used
+    bool muxoe = false;     //false disabled, true enabled
+    bool muxsel = false;    //false pos 1, true pos 2  
   
   private: 
     TwoWire *I2C;
-    bool initiated = false;
     Channel parseCHREG(uint8_t data);
     uint8_t encodeCHREG(Channel ch);
 };

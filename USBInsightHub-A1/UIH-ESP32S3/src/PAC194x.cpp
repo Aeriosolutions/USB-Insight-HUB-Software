@@ -14,7 +14,7 @@ bool PAC194x::begin(TwoWire *theWire){
   theWire->write(PAC194X_PRODUCT_ID_ADDR); //Product ID
   err = theWire->endTransmission(false);
   //delayMicroseconds(20);  
-  theWire->requestFrom(PAC194x_ADDR,1);
+  err = theWire->requestFrom(PAC194x_ADDR,1);
   if(theWire->available())
   {
     if(theWire->read()==PAC1943_PRODUCT_ID) {
@@ -153,10 +153,10 @@ void PAC194x::readAvgMeter(){
     chMeterArr[i].AvgVoltageRaw = msb*256 + lsb;
     chMeterArr[i].AvgVoltage = ((float)(chMeterArr[i].AvgVoltageRaw)/65536.0)*9000.0; //in mV
 
-    chAverager[i].VoltageTotal=chAverager[i].VoltageTotal-chAverager[i].VoltageBuf[filterIndex]; // Remove the oldest entry from the sum
-    chAverager[i].VoltageBuf[filterIndex] = chMeterArr[i].AvgVoltage; // Add the newest reading to the window
-    chAverager[i].VoltageTotal = chAverager[i].VoltageTotal + chMeterArr[i].AvgVoltage; // Add the newest reading to the sum
-    chAverager[i].VoltageAveraged = chAverager[i].VoltageTotal/AVG_WINDOW_SIZE;
+    
+    if(chMeterArr[i].filterType==FILTER_TYPE_MOVING_AVG) voltageMovingAverageFilter(i);
+    if(chMeterArr[i].filterType==FILTER_TYPE_MEDIAN) voltageMedianFilter(i);
+    
   }
   
   for(i =0; i < 3; i++)
@@ -175,10 +175,8 @@ void PAC194x::readAvgMeter(){
 
     chMeterArr[i].AvgCurrent = sign*((float)(aux16)/32768.0)*chMeterArr[i].FullScale;  //in mA
 
-    chAverager[i].CurrentTotal=chAverager[i].CurrentTotal-chAverager[i].CurrentBuf[filterIndex]; // Remove the oldest entry from the sum
-    chAverager[i].CurrentBuf[filterIndex] = chMeterArr[i].AvgCurrent; // Add the newest reading to the window
-    chAverager[i].CurrentTotal = chAverager[i].CurrentTotal + chMeterArr[i].AvgCurrent; // Add the newest reading to the sum
-    chAverager[i].CurrentAveraged = chAverager[i].CurrentTotal/AVG_WINDOW_SIZE;
+    if(chMeterArr[i].filterType==FILTER_TYPE_MOVING_AVG) currentMovingAverageFilter(i);
+    if(chMeterArr[i].filterType==FILTER_TYPE_MEDIAN) currentMedianFilter(i);
 
   }
   
@@ -253,7 +251,7 @@ uint16_t PAC194x::read16(uint8_t address){
   I2C->beginTransmission(PAC194x_ADDR);
   I2C->write(address); //Alert Status
   int err = I2C->endTransmission(false);
-  I2C->requestFrom(PAC194x_ADDR,2);
+  err = I2C->requestFrom(PAC194x_ADDR,2);
   uint8_t msb=I2C->read();
   uint8_t lsb=I2C->read();
 
@@ -261,3 +259,97 @@ uint16_t PAC194x::read16(uint8_t address){
   return val;
 }
 
+
+void PAC194x::voltageMovingAverageFilter(int i){  
+  chAverager[i].VoltageTotal=chAverager[i].VoltageTotal-chAverager[i].VoltageBuf[filterIndex]; // Remove the oldest entry from the sum  
+  chAverager[i].VoltageBuf[filterIndex] = chMeterArr[i].AvgVoltage; // Add the newest reading to the window
+  chAverager[i].VoltageTotal = chAverager[i].VoltageTotal + chMeterArr[i].AvgVoltage; // Add the newest reading to the sum
+  chAverager[i].VoltageAveraged = chAverager[i].VoltageTotal/AVG_WINDOW_SIZE;  //Compute average
+}
+
+void PAC194x::currentMovingAverageFilter(int i){     
+  chAverager[i].CurrentTotal=chAverager[i].CurrentTotal-chAverager[i].CurrentBuf[filterIndex]; // Remove the oldest entry from the sum    
+  chAverager[i].CurrentBuf[filterIndex] = chMeterArr[i].AvgCurrent; // Add the newest reading to the window 
+  chAverager[i].CurrentTotal = chAverager[i].CurrentTotal + chMeterArr[i].AvgCurrent; // Add the newest reading to the sum
+  chAverager[i].CurrentAveraged = chAverager[i].CurrentTotal/AVG_WINDOW_SIZE;  //Compute average
+}
+
+void PAC194x::voltageMedianFilter(int i){
+  
+  chAverager[i].VoltageBuf[filterIndex] = chMeterArr[i].AvgVoltage; // Add the newest reading to the window
+  chAverager[i].VoltageAveraged = medianFunction(chAverager[i].VoltageBuf, AVG_WINDOW_SIZE);
+
+  //sort the new array
+  /*
+  for (int j =0; j < AVG_WINDOW_SIZE - 1; j++){
+    for(int k = 0; k < AVG_WINDOW_SIZE - j - 1; k++){
+      if(chAverager[i].VoltageBuf[k] > chAverager[i].VoltageBuf[k+1]){
+        //swap k and k+1
+        float temp = chAverager[i].VoltageBuf[k];
+        chAverager[i].VoltageBuf[k] = chAverager[i].VoltageBuf[k+1];
+        chAverager[i].VoltageBuf[k+1] = temp;
+      }
+    }
+  }
+
+  
+  //find the position to insert the new value
+  while(pos < AVG_WINDOW_SIZE && chAverager[i].VoltageBuf[pos] < chMeterArr[i].AvgVoltage){
+    pos++;
+  }
+  //shift elements to insert the new value
+  for(int j=AVG_WINDOW_SIZE-1; j > pos; --j){
+     chAverager[i].VoltageBuf[j] = chAverager[i].VoltageBuf[j-1];
+  }
+  //insert new value
+  chAverager[i].VoltageBuf[pos] = chMeterArr[i].AvgVoltage;
+  */
+
+  //chAverager[i].VoltageAveraged = chAverager[i].VoltageBuf[int(AVG_WINDOW_SIZE/2)];
+
+}
+
+void PAC194x::currentMedianFilter(int i){     
+
+  chAverager[i].CurrentBuf[filterIndex] = chMeterArr[i].AvgCurrent; // Add the newest reading to the window
+  chAverager[i].CurrentAveraged = medianFunction(chAverager[i].CurrentBuf, AVG_WINDOW_SIZE);
+
+  /*int pos = 0;
+  //place the new value in a an ascending sorting list.
+
+  //find the position to insert the new value
+  while(pos < AVG_WINDOW_SIZE && chAverager[i].CurrentBuf[pos] < chMeterArr[i].AvgCurrent){
+    pos++;
+  }
+  //shift elements to insert the new value
+  for(int j=AVG_WINDOW_SIZE-1; j > pos; --j){
+     chAverager[i].CurrentBuf[j] = chAverager[i].CurrentBuf[j-1];
+  }
+  //insert new value
+  chAverager[i].CurrentBuf[pos] = chMeterArr[i].AvgCurrent;
+
+  chAverager[i].CurrentAveraged = chAverager[i].CurrentBuf[int(AVG_WINDOW_SIZE/2)];
+  */
+
+}
+
+float PAC194x::medianFunction(float arr[], int n){
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = 0; j < n - i - 1; j++) {
+            if (arr[j] > arr[j + 1]) {
+                // Swap arr[j] and arr[j+1]
+                float temp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = temp;
+            }
+        }
+    }
+
+    if(n%2==0){
+      return (arr[int(n/2)]+arr[int(n/2)+1])/2; //if even average between moddle points
+    }
+    else{
+      return arr[int(n/2)+1]; //if odd take the middle value
+    }  
+      
+}
