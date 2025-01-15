@@ -29,6 +29,38 @@ bool BaseMCU::begin(TwoWire *theWire){
   return ret;
 }
 
+bool BaseMCU::readStart(int address, int start, int numBytes){
+  
+  if(initiated){
+    int err=0;
+    unsigned long i2cwd_timer = 0;
+    
+    I2C->beginTransmission(address);
+    I2C->write(start);
+    err = I2C->endTransmission(false); 
+    i2cwd_timer = millis();  //*probably this protection is not longer necessary
+    err = I2C->requestFrom(address,numBytes); //*
+    if(millis()-i2cwd_timer > SLOWDOWN_TIMEOUT){ //*workaround for sudden drop in I2C speed, reported here https://github.com/espressif/arduino-esp32/issues/8480
+      //Serial.println("I2C Slow down on bMCU detected!!");//*
+      ESP_LOGW(TAG,"I2C Slow down on bMCU detected!!");
+      I2C->flush(); //*
+      I2C->setClock(100000); //*
+      I2C->setClock(400000); //*
+      return false; //*
+    } 
+
+    if(err==0) {
+      //Serial.println("BaseMCU Fail to read bytes");
+      ESP_LOGW(TAG,"BaseMCU Fail to read bytes");
+      return false;
+    }
+
+    return true;
+
+  }  
+  return false;
+}
+
 void BaseMCU::readAll(){
   
   uint8_t data;
@@ -36,7 +68,8 @@ void BaseMCU::readAll(){
   int err=0;
   unsigned long i2cwd_timer = 0;
 
-  if(initiated){
+  if(readStart(BASEMCU_ADDR,CH1REG,5)){  
+  /*if(initiated){
     I2C->beginTransmission(BASEMCU_ADDR);
     I2C->write(CH1REG);
     err = I2C->endTransmission(false); 
@@ -55,7 +88,7 @@ void BaseMCU::readAll(){
       //Serial.println("BaseMCU Fail to read bytes");
       ESP_LOGW(TAG,"BaseMCU Fail to read bytes");
       return;
-    }
+    }*/
 
     while(I2C->available()){
       data=I2C->read();
@@ -80,7 +113,7 @@ void BaseMCU::readAll(){
         //Serial.println(String(pwrsource)+" "+String(muxoe)+" "+String(muxsel));
       }
       byteCnt++;
-    }
+     }
   }
 }
 
@@ -130,4 +163,26 @@ uint8_t BaseMCU::encodeCHREG(Channel ch){
   //data = ch.fault ? (data | 0x80) : (data & 0x7F); 
   //Serial.println(String(data));
   return data;
+}
+
+void BaseMCU::readVersion(void){
+
+  if(readStart(BASEMCU_ADDR,VERSION,1)){ 
+      
+      if(I2C->available()){
+        baseMCUVer = I2C->read(); 
+      }      
+  }
+}
+
+void BaseMCU::setUSB3Enable(bool set){
+  int err=0;
+  uint8_t data;
+  if(initiated){  
+    I2C->beginTransmission(BASEMCU_ADDR);
+    I2C->write(MUXOECTR);    
+    set ? data = 0x01 : data = 0x00;  
+    I2C->write(data);  
+  }
+    err = I2C->endTransmission();
 }

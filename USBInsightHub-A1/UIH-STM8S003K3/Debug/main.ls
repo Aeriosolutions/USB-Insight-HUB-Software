@@ -47,13 +47,13 @@
  122  0011 cd0000        	call	_millis
  124  0014 ae0000        	ldw	x,#_currentTime
  125  0017 cd0000        	call	c_rtol
- 127                     ; 66 		if(currentTime >= WAIT_I2C_AT_START || comActive) 
+ 127                     ; 66 		if(currentTime >= WAIT_MUXOE_AT_START || muxoeReceived) 
  129  001a ae0000        	ldw	x,#_currentTime
  130  001d cd0000        	call	c_ltor
  132  0020 ae0000        	ldw	x,#L6
  133  0023 cd0000        	call	c_lcmp
  135  0026 2404          	jruge	L72
- 137  0028 3d00          	tnz	_comActive
+ 137  0028 3d00          	tnz	_muxoeReceived
  138  002a 2704          	jreq	L52
  139  002c               L72:
  140                     ; 67 			waitEnd = TRUE;
@@ -211,7 +211,7 @@
  453                     	xdef	_lastCCScan
  454                     	xdef	_lastBlink
  455                     	xdef	_currentTime
- 456                     	xref.b	_comActive
+ 456                     	xref.b	_muxoeReceived
  457                     	xref.b	_r26_MUXOECTR
  458                     	xref.b	_r23_CCSUM
  459                     	xref	_Update_CC_signals

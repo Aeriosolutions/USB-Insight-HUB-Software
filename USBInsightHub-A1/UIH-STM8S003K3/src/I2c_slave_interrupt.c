@@ -28,7 +28,7 @@
   u8 MessageBegin;
 	u8 reg_address;
 
-	bool comActive = FALSE; //i2C communication detected
+	bool muxoeReceived = FALSE; //i2C communication detected
 
 	u8 r10_WHOAMI=0x10;
 	u8 r12_VERSION= 0x12;
@@ -72,7 +72,6 @@
 	void I2C_byte_received(u8 u8_RxData)
 	{
 		//if (MessageBegin == TRUE  &&  u8_RxData < MAX_BUFFER) {
-		comActive = TRUE;
 		if (MessageBegin == TRUE) {			
 			//u8_MyBuffp= &u8_My_Buffer[u8_RxData];
 			reg_address= u8_RxData;
@@ -123,6 +122,7 @@
 		}
 		else if(reg_address == MUXOECTR){
 			r26_MUXOECTR = 0x01 & u8_RxData;
+			muxoeReceived = TRUE;
 		}
 	}
 

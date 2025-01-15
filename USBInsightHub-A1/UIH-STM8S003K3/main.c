@@ -19,7 +19,7 @@
 #define IOSCAN_INTERVAL 1 //in ms
 #define CCDEBOUNCE 3 //in CCSCAN interval cycles
 #define FAULTDEB 2 //in IOSCAN INTERVALs
-#define WAIT_I2C_AT_START 1000 //in ms wait first communication with ESP32
+#define WAIT_MUXOE_AT_START 1000 //in ms wait ESP32 to send r26_MUXOECTR
 
 extern u8 r20_CH1REG;
 extern u8 r21_CH2REG;
@@ -27,7 +27,7 @@ extern u8 r22_CH3REG;
 extern u8 r23_CCSUM;
 extern u8 r26_MUXOECTR;
 
-extern bool comActive; //i2C communication detected
+extern bool muxoeReceived; //muxoe instruction received
 
 uint32_t currentTime = 0;
 uint32_t lastBlink = 0;
@@ -63,7 +63,7 @@ void main(void)
     
 		currentTime = millis();
 		
-		if(currentTime >= WAIT_I2C_AT_START || comActive) 
+		if(currentTime >= WAIT_MUXOE_AT_START || muxoeReceived) 
 			waitEnd = TRUE;
 			
     if(currentTime - lastBlink >= BLINK_INTERVAL)

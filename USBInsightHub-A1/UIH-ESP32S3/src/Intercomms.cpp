@@ -57,7 +57,15 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
             
         delay(20);
         //if(bMCU.begin(&I2CB2B)) ESP_LOGI(TAG, "Base MCU initialized OK");
-        bMCU.begin(&I2CB2B) ? ESP_LOGI(TAG, "Base MCU initialized OK") : ESP_LOGE(TAG, "Base MCU initialization FAILED!");
+        if(bMCU.begin(&I2CB2B))
+        {
+          bMCU.readVersion();
+          ESP_LOGI(TAG, "Base MCU initialized OK version %u",bMCU.baseMCUVer);
+          bMCU.setUSB3Enable(glConfig->features.hubMode);          
+        }
+        else 
+          ESP_LOGE(TAG, "Base MCU initialization FAILED!");
+        
         delay(30); //required time after powerup to write to meter
         if(bMeter.begin(&I2CB2B)) ESP_LOGI(TAG, "Power Meter initialized OK");
         //clear any interrupt flag
@@ -176,6 +184,12 @@ void taskIntercomms(void *pvParameters){
       glState->baseMCUOut[i].pwr_en = bMCU.chArr[i].pwr_en;
       glState->baseMCUOut[i].data_en = bMCU.chArr[i].data_en;
       glState->baseMCUOut[i].ilim = bMCU.chArr[i].ilim;
+      glState->baseMCUExtra.base_ver = bMCU.baseMCUVer;
+      glState->baseMCUExtra.pwr_source = bMCU.pwrsource;
+      glState->baseMCUExtra.usb3_mux_out_en = bMCU.muxoe;
+      glState->baseMCUExtra.usb3_mux_sel_pos = bMCU.muxsel;
+      glState->baseMCUExtra.vext_stat = bMCU.extState;
+      glState->baseMCUExtra.vhost_stat = bMCU.hostState;
     }  
 
     vTaskDelay(pdMS_TO_TICKS(5));

@@ -137,6 +137,7 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
     globalConfig->features.startUpmode = PERSISTANCE;
     //globalConfig->features.startUpmode = STARTUP_SEC;
     globalConfig->features.wifi_enabled = true;
+    globalConfig->features.hubMode = USB3;
 
     for(int i=0; i<3; i++){
         globalConfig->startup[i].startup_timer = 1;

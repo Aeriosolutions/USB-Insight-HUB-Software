@@ -2,7 +2,7 @@
    2                     ; Parser V4.12.9 - 19 Apr 2023
    3                     ; Generator (Limited) V4.5.6 - 18 Jul 2023
   14                     	bsct
-  15  0000               _comActive:
+  15  0000               _muxoeReceived:
   16  0000 00            	dc.b	0
   17  0001               _r10_WHOAMI:
   18  0001 10            	dc.b	16
@@ -50,203 +50,203 @@
  119  0005               _I2C_transaction_end:
  123                     ; 70 	}
  126  0005 81            	ret
- 164                     ; 72 	void I2C_byte_received(u8 u8_RxData)
- 164                     ; 73 	{
- 165                     	switch	.text
- 166  0006               _I2C_byte_received:
- 168  0006 88            	push	a
- 169       00000000      OFST:	set	0
- 172                     ; 75 		comActive = TRUE;
- 174  0007 35010000      	mov	_comActive,#1
- 175                     ; 76 		if (MessageBegin == TRUE) {			
- 177  000b b604          	ld	a,_MessageBegin
- 178  000d a101          	cp	a,#1
- 179  000f 2608          	jrne	L74
- 180                     ; 78 			reg_address= u8_RxData;
- 182  0011 7b01          	ld	a,(OFST+1,sp)
- 183  0013 b703          	ld	_reg_address,a
- 184                     ; 79 			MessageBegin = FALSE;
- 186  0015 3f04          	clr	_MessageBegin
- 188  0017 200b          	jra	L15
- 189  0019               L74:
- 190                     ; 83 			Writable_Registers(reg_address, u8_RxData);
- 192  0019 7b01          	ld	a,(OFST+1,sp)
- 193  001b 97            	ld	xl,a
- 194  001c b603          	ld	a,_reg_address
- 195  001e 95            	ld	xh,a
- 196  001f cd00b8        	call	_Writable_Registers
- 198                     ; 84 			reg_address++;
- 200  0022 3c03          	inc	_reg_address
- 201  0024               L15:
- 202                     ; 87 	}
- 205  0024 84            	pop	a
- 206  0025 81            	ret
- 244                     ; 89 	u8 I2C_byte_write(void)
- 244                     ; 90 	{
- 245                     	switch	.text
- 246  0026               _I2C_byte_write:
- 250                     ; 93 		if(reg_address == WHOAMI) 				return WHOAMI_ID;
- 252  0026 b603          	ld	a,_reg_address
- 253  0028 a110          	cp	a,#16
- 254  002a 2603          	jrne	L36
- 257  002c a635          	ld	a,#53
- 260  002e 81            	ret
- 261  002f               L36:
- 262                     ; 94 		else if(reg_address == VERSION) 	return VERNUM;
- 264  002f b603          	ld	a,_reg_address
- 265  0031 a112          	cp	a,#18
- 266  0033 2603          	jrne	L76
- 269  0035 a603          	ld	a,#3
- 272  0037 81            	ret
- 273  0038               L76:
- 274                     ; 95 		else if(reg_address == CH1REG) 		return r20_CH1REG;
- 276  0038 b603          	ld	a,_reg_address
- 277  003a a120          	cp	a,#32
- 278  003c 2603          	jrne	L37
- 281  003e b603          	ld	a,_r20_CH1REG
- 284  0040 81            	ret
- 285  0041               L37:
- 286                     ; 96 		else if(reg_address == CH2REG) 		return r21_CH2REG;
- 288  0041 b603          	ld	a,_reg_address
- 289  0043 a121          	cp	a,#33
- 290  0045 2603          	jrne	L77
- 293  0047 b604          	ld	a,_r21_CH2REG
- 296  0049 81            	ret
- 297  004a               L77:
- 298                     ; 97 		else if(reg_address == CH3REG) 		return r22_CH3REG;
- 300  004a b603          	ld	a,_reg_address
- 301  004c a122          	cp	a,#34
- 302  004e 2603          	jrne	L301
- 305  0050 b605          	ld	a,_r22_CH3REG
- 308  0052 81            	ret
- 309  0053               L301:
- 310                     ; 98 		else if(reg_address == CCSUM) 		return r23_CCSUM;
- 312  0053 b603          	ld	a,_reg_address
- 313  0055 a123          	cp	a,#35
- 314  0057 2603          	jrne	L701
- 317  0059 b606          	ld	a,_r23_CCSUM
- 320  005b 81            	ret
- 321  005c               L701:
- 322                     ; 99 		else if(reg_address == AUXREG) 		return r24_AUXREG;
- 324  005c b603          	ld	a,_reg_address
- 325  005e a124          	cp	a,#36
- 326  0060 2603          	jrne	L311
- 329  0062 b607          	ld	a,_r24_AUXREG
- 332  0064 81            	ret
- 333  0065               L311:
- 334                     ; 100 		else if(reg_address == MUXOECTR) 	return r26_MUXOECTR;
- 336  0065 b603          	ld	a,_reg_address
- 337  0067 a126          	cp	a,#38
- 338  0069 2603          	jrne	L711
- 341  006b b608          	ld	a,_r26_MUXOECTR
- 344  006d 81            	ret
- 345  006e               L711:
- 346                     ; 101 		else if(reg_address == VEXTCC1L) 	return r30_VEXTCC1L;
- 348  006e b603          	ld	a,_reg_address
- 349  0070 a130          	cp	a,#48
- 350  0072 2603          	jrne	L321
- 353  0074 b609          	ld	a,_r30_VEXTCC1L
- 356  0076 81            	ret
- 357  0077               L321:
- 358                     ; 102 		else if(reg_address == VEXTCC1H) 	return r31_VEXTCC1H;
- 360  0077 b603          	ld	a,_reg_address
- 361  0079 a131          	cp	a,#49
- 362  007b 2603          	jrne	L721
- 365  007d b60a          	ld	a,_r31_VEXTCC1H
- 368  007f 81            	ret
- 369  0080               L721:
- 370                     ; 103 		else if(reg_address == VEXTCC2L) 	return r32_VEXTCC2L;
- 372  0080 b603          	ld	a,_reg_address
- 373  0082 a132          	cp	a,#50
- 374  0084 2603          	jrne	L331
- 377  0086 b60b          	ld	a,_r32_VEXTCC2L
- 380  0088 81            	ret
- 381  0089               L331:
- 382                     ; 104 		else if(reg_address == VEXTCC2H) 	return r33_VEXTCC2H;
- 384  0089 b603          	ld	a,_reg_address
- 385  008b a133          	cp	a,#51
- 386  008d 2603          	jrne	L731
- 389  008f b60c          	ld	a,_r33_VEXTCC2H
- 392  0091 81            	ret
- 393  0092               L731:
- 394                     ; 105 		else if(reg_address == VHOSTCC1L) return r34_VHOSTCC1L;
- 396  0092 b603          	ld	a,_reg_address
- 397  0094 a134          	cp	a,#52
- 398  0096 2603          	jrne	L341
- 401  0098 b60d          	ld	a,_r34_VHOSTCC1L
- 404  009a 81            	ret
- 405  009b               L341:
- 406                     ; 106 		else if(reg_address == VHOSTCC1H) return r35_VHOSTCC1H;
- 408  009b b603          	ld	a,_reg_address
- 409  009d a135          	cp	a,#53
- 410  009f 2603          	jrne	L741
- 413  00a1 b60e          	ld	a,_r35_VHOSTCC1H
- 416  00a3 81            	ret
- 417  00a4               L741:
- 418                     ; 107 		else if(reg_address == VHOSTCC2L) return r36_VHOSTCC2L;
- 420  00a4 b603          	ld	a,_reg_address
- 421  00a6 a136          	cp	a,#54
- 422  00a8 2603          	jrne	L351
- 425  00aa b60f          	ld	a,_r36_VHOSTCC2L
- 428  00ac 81            	ret
- 429  00ad               L351:
- 430                     ; 108 		else if(reg_address == VHOSTCC2H) return r37_VHOSTCC2H;		
- 432  00ad b603          	ld	a,_reg_address
- 433  00af a137          	cp	a,#55
- 434  00b1 2603          	jrne	L751
- 437  00b3 b610          	ld	a,_r37_VHOSTCC2H
- 440  00b5 81            	ret
- 441  00b6               L751:
- 442                     ; 109 		else return 0x00;
- 444  00b6 4f            	clr	a
- 447  00b7 81            	ret
- 494                     ; 112 	void Writable_Registers(u8 reg_address, u8 u8_RxData)
- 494                     ; 113 	{
- 495                     	switch	.text
- 496  00b8               _Writable_Registers:
- 498  00b8 89            	pushw	x
- 499       00000000      OFST:	set	0
- 502                     ; 114 		if(reg_address==CH1REG){
- 504  00b9 9e            	ld	a,xh
- 505  00ba a120          	cp	a,#32
- 506  00bc 260a          	jrne	L502
- 507                     ; 116 			r20_CH1REG = (r20_CH1REG | 0x7F ) & u8_RxData; 
- 509  00be b603          	ld	a,_r20_CH1REG
- 510  00c0 aa7f          	or	a,#127
- 511  00c2 1402          	and	a,(OFST+2,sp)
- 512  00c4 b703          	ld	_r20_CH1REG,a
- 514  00c6 202c          	jra	L702
- 515  00c8               L502:
- 516                     ; 118 		else if(reg_address ==CH2REG){
- 518  00c8 7b01          	ld	a,(OFST+1,sp)
- 519  00ca a121          	cp	a,#33
- 520  00cc 260a          	jrne	L112
- 521                     ; 119 			r21_CH2REG = (r21_CH2REG | 0x7F ) & u8_RxData;
- 523  00ce b604          	ld	a,_r21_CH2REG
- 524  00d0 aa7f          	or	a,#127
- 525  00d2 1402          	and	a,(OFST+2,sp)
- 526  00d4 b704          	ld	_r21_CH2REG,a
- 528  00d6 201c          	jra	L702
- 529  00d8               L112:
- 530                     ; 121 		else if(reg_address ==CH3REG){
- 532  00d8 7b01          	ld	a,(OFST+1,sp)
- 533  00da a122          	cp	a,#34
- 534  00dc 260a          	jrne	L512
- 535                     ; 122 			r22_CH3REG = (r22_CH3REG | 0x7F ) & u8_RxData;
- 537  00de b605          	ld	a,_r22_CH3REG
- 538  00e0 aa7f          	or	a,#127
- 539  00e2 1402          	and	a,(OFST+2,sp)
- 540  00e4 b705          	ld	_r22_CH3REG,a
- 542  00e6 200c          	jra	L702
- 543  00e8               L512:
- 544                     ; 124 		else if(reg_address == MUXOECTR){
- 546  00e8 7b01          	ld	a,(OFST+1,sp)
- 547  00ea a126          	cp	a,#38
- 548  00ec 2606          	jrne	L702
- 549                     ; 125 			r26_MUXOECTR = 0x01 & u8_RxData;
- 551  00ee 7b02          	ld	a,(OFST+2,sp)
- 552  00f0 a401          	and	a,#1
- 553  00f2 b708          	ld	_r26_MUXOECTR,a
+ 163                     ; 72 	void I2C_byte_received(u8 u8_RxData)
+ 163                     ; 73 	{
+ 164                     	switch	.text
+ 165  0006               _I2C_byte_received:
+ 167  0006 88            	push	a
+ 168       00000000      OFST:	set	0
+ 171                     ; 75 		if (MessageBegin == TRUE) {			
+ 173  0007 b604          	ld	a,_MessageBegin
+ 174  0009 a101          	cp	a,#1
+ 175  000b 2608          	jrne	L74
+ 176                     ; 77 			reg_address= u8_RxData;
+ 178  000d 7b01          	ld	a,(OFST+1,sp)
+ 179  000f b703          	ld	_reg_address,a
+ 180                     ; 78 			MessageBegin = FALSE;
+ 182  0011 3f04          	clr	_MessageBegin
+ 184  0013 200b          	jra	L15
+ 185  0015               L74:
+ 186                     ; 82 			Writable_Registers(reg_address, u8_RxData);
+ 188  0015 7b01          	ld	a,(OFST+1,sp)
+ 189  0017 97            	ld	xl,a
+ 190  0018 b603          	ld	a,_reg_address
+ 191  001a 95            	ld	xh,a
+ 192  001b cd00b4        	call	_Writable_Registers
+ 194                     ; 83 			reg_address++;
+ 196  001e 3c03          	inc	_reg_address
+ 197  0020               L15:
+ 198                     ; 86 	}
+ 201  0020 84            	pop	a
+ 202  0021 81            	ret
+ 240                     ; 88 	u8 I2C_byte_write(void)
+ 240                     ; 89 	{
+ 241                     	switch	.text
+ 242  0022               _I2C_byte_write:
+ 246                     ; 92 		if(reg_address == WHOAMI) 				return WHOAMI_ID;
+ 248  0022 b603          	ld	a,_reg_address
+ 249  0024 a110          	cp	a,#16
+ 250  0026 2603          	jrne	L36
+ 253  0028 a635          	ld	a,#53
+ 256  002a 81            	ret
+ 257  002b               L36:
+ 258                     ; 93 		else if(reg_address == VERSION) 	return VERNUM;
+ 260  002b b603          	ld	a,_reg_address
+ 261  002d a112          	cp	a,#18
+ 262  002f 2603          	jrne	L76
+ 265  0031 a603          	ld	a,#3
+ 268  0033 81            	ret
+ 269  0034               L76:
+ 270                     ; 94 		else if(reg_address == CH1REG) 		return r20_CH1REG;
+ 272  0034 b603          	ld	a,_reg_address
+ 273  0036 a120          	cp	a,#32
+ 274  0038 2603          	jrne	L37
+ 277  003a b603          	ld	a,_r20_CH1REG
+ 280  003c 81            	ret
+ 281  003d               L37:
+ 282                     ; 95 		else if(reg_address == CH2REG) 		return r21_CH2REG;
+ 284  003d b603          	ld	a,_reg_address
+ 285  003f a121          	cp	a,#33
+ 286  0041 2603          	jrne	L77
+ 289  0043 b604          	ld	a,_r21_CH2REG
+ 292  0045 81            	ret
+ 293  0046               L77:
+ 294                     ; 96 		else if(reg_address == CH3REG) 		return r22_CH3REG;
+ 296  0046 b603          	ld	a,_reg_address
+ 297  0048 a122          	cp	a,#34
+ 298  004a 2603          	jrne	L301
+ 301  004c b605          	ld	a,_r22_CH3REG
+ 304  004e 81            	ret
+ 305  004f               L301:
+ 306                     ; 97 		else if(reg_address == CCSUM) 		return r23_CCSUM;
+ 308  004f b603          	ld	a,_reg_address
+ 309  0051 a123          	cp	a,#35
+ 310  0053 2603          	jrne	L701
+ 313  0055 b606          	ld	a,_r23_CCSUM
+ 316  0057 81            	ret
+ 317  0058               L701:
+ 318                     ; 98 		else if(reg_address == AUXREG) 		return r24_AUXREG;
+ 320  0058 b603          	ld	a,_reg_address
+ 321  005a a124          	cp	a,#36
+ 322  005c 2603          	jrne	L311
+ 325  005e b607          	ld	a,_r24_AUXREG
+ 328  0060 81            	ret
+ 329  0061               L311:
+ 330                     ; 99 		else if(reg_address == MUXOECTR) 	return r26_MUXOECTR;
+ 332  0061 b603          	ld	a,_reg_address
+ 333  0063 a126          	cp	a,#38
+ 334  0065 2603          	jrne	L711
+ 337  0067 b608          	ld	a,_r26_MUXOECTR
+ 340  0069 81            	ret
+ 341  006a               L711:
+ 342                     ; 100 		else if(reg_address == VEXTCC1L) 	return r30_VEXTCC1L;
+ 344  006a b603          	ld	a,_reg_address
+ 345  006c a130          	cp	a,#48
+ 346  006e 2603          	jrne	L321
+ 349  0070 b609          	ld	a,_r30_VEXTCC1L
+ 352  0072 81            	ret
+ 353  0073               L321:
+ 354                     ; 101 		else if(reg_address == VEXTCC1H) 	return r31_VEXTCC1H;
+ 356  0073 b603          	ld	a,_reg_address
+ 357  0075 a131          	cp	a,#49
+ 358  0077 2603          	jrne	L721
+ 361  0079 b60a          	ld	a,_r31_VEXTCC1H
+ 364  007b 81            	ret
+ 365  007c               L721:
+ 366                     ; 102 		else if(reg_address == VEXTCC2L) 	return r32_VEXTCC2L;
+ 368  007c b603          	ld	a,_reg_address
+ 369  007e a132          	cp	a,#50
+ 370  0080 2603          	jrne	L331
+ 373  0082 b60b          	ld	a,_r32_VEXTCC2L
+ 376  0084 81            	ret
+ 377  0085               L331:
+ 378                     ; 103 		else if(reg_address == VEXTCC2H) 	return r33_VEXTCC2H;
+ 380  0085 b603          	ld	a,_reg_address
+ 381  0087 a133          	cp	a,#51
+ 382  0089 2603          	jrne	L731
+ 385  008b b60c          	ld	a,_r33_VEXTCC2H
+ 388  008d 81            	ret
+ 389  008e               L731:
+ 390                     ; 104 		else if(reg_address == VHOSTCC1L) return r34_VHOSTCC1L;
+ 392  008e b603          	ld	a,_reg_address
+ 393  0090 a134          	cp	a,#52
+ 394  0092 2603          	jrne	L341
+ 397  0094 b60d          	ld	a,_r34_VHOSTCC1L
+ 400  0096 81            	ret
+ 401  0097               L341:
+ 402                     ; 105 		else if(reg_address == VHOSTCC1H) return r35_VHOSTCC1H;
+ 404  0097 b603          	ld	a,_reg_address
+ 405  0099 a135          	cp	a,#53
+ 406  009b 2603          	jrne	L741
+ 409  009d b60e          	ld	a,_r35_VHOSTCC1H
+ 412  009f 81            	ret
+ 413  00a0               L741:
+ 414                     ; 106 		else if(reg_address == VHOSTCC2L) return r36_VHOSTCC2L;
+ 416  00a0 b603          	ld	a,_reg_address
+ 417  00a2 a136          	cp	a,#54
+ 418  00a4 2603          	jrne	L351
+ 421  00a6 b60f          	ld	a,_r36_VHOSTCC2L
+ 424  00a8 81            	ret
+ 425  00a9               L351:
+ 426                     ; 107 		else if(reg_address == VHOSTCC2H) return r37_VHOSTCC2H;		
+ 428  00a9 b603          	ld	a,_reg_address
+ 429  00ab a137          	cp	a,#55
+ 430  00ad 2603          	jrne	L751
+ 433  00af b610          	ld	a,_r37_VHOSTCC2H
+ 436  00b1 81            	ret
+ 437  00b2               L751:
+ 438                     ; 108 		else return 0x00;
+ 440  00b2 4f            	clr	a
+ 443  00b3 81            	ret
+ 491                     ; 111 	void Writable_Registers(u8 reg_address, u8 u8_RxData)
+ 491                     ; 112 	{
+ 492                     	switch	.text
+ 493  00b4               _Writable_Registers:
+ 495  00b4 89            	pushw	x
+ 496       00000000      OFST:	set	0
+ 499                     ; 113 		if(reg_address==CH1REG){
+ 501  00b5 9e            	ld	a,xh
+ 502  00b6 a120          	cp	a,#32
+ 503  00b8 260a          	jrne	L502
+ 504                     ; 115 			r20_CH1REG = (r20_CH1REG | 0x7F ) & u8_RxData; 
+ 506  00ba b603          	ld	a,_r20_CH1REG
+ 507  00bc aa7f          	or	a,#127
+ 508  00be 1402          	and	a,(OFST+2,sp)
+ 509  00c0 b703          	ld	_r20_CH1REG,a
+ 511  00c2 2030          	jra	L702
+ 512  00c4               L502:
+ 513                     ; 117 		else if(reg_address ==CH2REG){
+ 515  00c4 7b01          	ld	a,(OFST+1,sp)
+ 516  00c6 a121          	cp	a,#33
+ 517  00c8 260a          	jrne	L112
+ 518                     ; 118 			r21_CH2REG = (r21_CH2REG | 0x7F ) & u8_RxData;
+ 520  00ca b604          	ld	a,_r21_CH2REG
+ 521  00cc aa7f          	or	a,#127
+ 522  00ce 1402          	and	a,(OFST+2,sp)
+ 523  00d0 b704          	ld	_r21_CH2REG,a
+ 525  00d2 2020          	jra	L702
+ 526  00d4               L112:
+ 527                     ; 120 		else if(reg_address ==CH3REG){
+ 529  00d4 7b01          	ld	a,(OFST+1,sp)
+ 530  00d6 a122          	cp	a,#34
+ 531  00d8 260a          	jrne	L512
+ 532                     ; 121 			r22_CH3REG = (r22_CH3REG | 0x7F ) & u8_RxData;
+ 534  00da b605          	ld	a,_r22_CH3REG
+ 535  00dc aa7f          	or	a,#127
+ 536  00de 1402          	and	a,(OFST+2,sp)
+ 537  00e0 b705          	ld	_r22_CH3REG,a
+ 539  00e2 2010          	jra	L702
+ 540  00e4               L512:
+ 541                     ; 123 		else if(reg_address == MUXOECTR){
+ 543  00e4 7b01          	ld	a,(OFST+1,sp)
+ 544  00e6 a126          	cp	a,#38
+ 545  00e8 260a          	jrne	L702
+ 546                     ; 124 			r26_MUXOECTR = 0x01 & u8_RxData;
+ 548  00ea 7b02          	ld	a,(OFST+2,sp)
+ 549  00ec a401          	and	a,#1
+ 550  00ee b708          	ld	_r26_MUXOECTR,a
+ 551                     ; 125 			muxoeReceived = TRUE;
+ 553  00f0 35010000      	mov	_muxoeReceived,#1
  554  00f4               L702:
  555                     ; 127 	}
  558  00f4 85            	popw	x
@@ -335,7 +335,7 @@
  726  0166 a184          	cp	a,#132
  727  0168 2608          	jrne	L372
  728                     ; 182 		I2C->DR = I2C_byte_write();
- 730  016a cd0026        	call	_I2C_byte_write
+ 730  016a cd0022        	call	_I2C_byte_write
  732  016d c75216        	ld	21014,a
  733                     ; 183 		reg_address++;
  735  0170 3c03          	inc	_reg_address
@@ -345,7 +345,7 @@
  740  0174 a580          	bcp	a,#128
  741  0176 2708          	jreq	L572
  742                     ; 188 		I2C->DR = I2C_byte_write();
- 744  0178 cd0026        	call	_I2C_byte_write
+ 744  0178 cd0022        	call	_I2C_byte_write
  746  017b c75216        	ld	21014,a
  747                     ; 189 		reg_address++;		
  749  017e 3c03          	inc	_reg_address
@@ -412,7 +412,7 @@
 1055                     	xdef	_r20_CH1REG
 1056                     	xdef	_r12_VERSION
 1057                     	xdef	_r10_WHOAMI
-1058                     	xdef	_comActive
+1058                     	xdef	_muxoeReceived
 1059                     	switch	.ubsct
 1060  0003               _reg_address:
 1061  0003 00            	ds.b	1

@@ -78,28 +78,50 @@ void Update_GPIO_from_I2CRegisters(void){
 	//First version does not use Ignore flags. The master MCU is fully responsible 
 	//Map register fields to GPIOs
 	
-	if(r20_CH1REG & ILIMH_MASK)GPIO_WriteLow(CH1_ILIM_H); else GPIO_WriteHigh(CH1_ILIM_H); //Active Low
-	if(r20_CH1REG & ILIML_MASK)GPIO_WriteLow(CH1_ILIM_L); else GPIO_WriteHigh(CH1_ILIM_L); //Active Low  				
-	if(r20_CH1REG & PWREN_MASK)GPIO_WriteHigh(CH1_PWR_EN); else GPIO_WriteLow(CH1_PWR_EN); //Active High
-	if(r20_CH1REG & DATAEN_MASK)GPIO_WriteLow(CH1_DATA_EN); else GPIO_WriteHigh(CH1_DATA_EN); //Active Low
-	if(GPIO_ReadInputPin(CH1_FAULT))r20_CH1REG &= 0x7F; else r20_CH1REG |= 0x80; 
+	if(r20_CH1REG & ILIMH_MASK)GPIO_WriteLow(CH1_ILIM_H); 
+	else GPIO_WriteHigh(CH1_ILIM_H); //Active Low
+	if(r20_CH1REG & ILIML_MASK)GPIO_WriteLow(CH1_ILIM_L); 
+	else GPIO_WriteHigh(CH1_ILIM_L); //Active Low  				
+	if(r20_CH1REG & PWREN_MASK)GPIO_WriteHigh(CH1_PWR_EN); 
+	else GPIO_WriteLow(CH1_PWR_EN); //Active High
+	if(r20_CH1REG & DATAEN_MASK)GPIO_WriteLow(CH1_DATA_EN); 
+	else GPIO_WriteHigh(CH1_DATA_EN); //Active Low
+	if(GPIO_ReadInputPin(CH1_FAULT))r20_CH1REG &= 0x7F; 
+	else r20_CH1REG |= 0x80; 
 	
-	if(r21_CH2REG & ILIMH_MASK)GPIO_WriteLow(CH2_ILIM_H); else GPIO_WriteHigh(CH2_ILIM_H);
-	if(r21_CH2REG & ILIML_MASK)GPIO_WriteLow(CH2_ILIM_L); else GPIO_WriteHigh(CH2_ILIM_L);  				
-	if(r21_CH2REG & PWREN_MASK)GPIO_WriteHigh(CH2_PWR_EN); else GPIO_WriteLow(CH2_PWR_EN);
-	if(r21_CH2REG & DATAEN_MASK)GPIO_WriteLow(CH2_DATA_EN); else GPIO_WriteHigh(CH2_DATA_EN);
-	if(GPIO_ReadInputPin(CH2_FAULT))r21_CH2REG &= 0x7F; else r21_CH2REG |= 0x80; 		
+	if(r21_CH2REG & ILIMH_MASK)GPIO_WriteLow(CH2_ILIM_H); 
+	else GPIO_WriteHigh(CH2_ILIM_H);
+	if(r21_CH2REG & ILIML_MASK)GPIO_WriteLow(CH2_ILIM_L); 
+	else GPIO_WriteHigh(CH2_ILIM_L);  				
+	if(r21_CH2REG & PWREN_MASK)GPIO_WriteHigh(CH2_PWR_EN); 
+	else GPIO_WriteLow(CH2_PWR_EN);
+	if(r21_CH2REG & DATAEN_MASK)GPIO_WriteLow(CH2_DATA_EN); 
+	else GPIO_WriteHigh(CH2_DATA_EN);
+	if(GPIO_ReadInputPin(CH2_FAULT))r21_CH2REG &= 0x7F; 
+	else r21_CH2REG |= 0x80; 		
 	
-	if(r22_CH3REG & ILIMH_MASK)GPIO_WriteLow(CH3_ILIM_H); else GPIO_WriteHigh(CH3_ILIM_H);
-	if(r22_CH3REG & ILIML_MASK)GPIO_WriteLow(CH3_ILIM_L); else GPIO_WriteHigh(CH3_ILIM_L);  				
-	if(r22_CH3REG & PWREN_MASK)GPIO_WriteHigh(CH3_PWR_EN); else GPIO_WriteLow(CH3_PWR_EN);
-	if(r22_CH3REG & DATAEN_MASK)GPIO_WriteLow(CH3_DATA_EN); else GPIO_WriteHigh(CH3_DATA_EN);		
-	if(GPIO_ReadInputPin(CH3_FAULT))r22_CH3REG &= 0x7F; else r22_CH3REG |= 0x80; 
+	if(r22_CH3REG & ILIMH_MASK)GPIO_WriteLow(CH3_ILIM_H); 
+	else GPIO_WriteHigh(CH3_ILIM_H);
+	if(r22_CH3REG & ILIML_MASK)GPIO_WriteLow(CH3_ILIM_L); 
+	else GPIO_WriteHigh(CH3_ILIM_L);  				
+	if(r22_CH3REG & PWREN_MASK)GPIO_WriteHigh(CH3_PWR_EN); 
+	else GPIO_WriteLow(CH3_PWR_EN);
+	if(r22_CH3REG & DATAEN_MASK)GPIO_WriteLow(CH3_DATA_EN); 
+	else GPIO_WriteHigh(CH3_DATA_EN);		
+	if(GPIO_ReadInputPin(CH3_FAULT))r22_CH3REG &= 0x7F; 
+	else r22_CH3REG |= 0x80; 
 	
 	//Read VHOST or VEXT present signals
-	if(GPIO_ReadInputPin(VHOST_PRESENT))r24_AUXREG |= 0x01; else r24_AUXREG &= 0xFE;  
-	if(GPIO_ReadInputPin(VEXT_PRESENT))r24_AUXREG |= 0x02; else r24_AUXREG &= 0xFD;  
-	
+	if(GPIO_ReadInputPin(VHOST_PRESENT))r24_AUXREG 	|= 0x01; 
+	else r24_AUXREG &= 0xFE;  
+	if(GPIO_ReadInputPin(VEXT_PRESENT))r24_AUXREG 	|= 0x02; 
+	else r24_AUXREG &= 0xFD;
+	//Read the current status of USB3_MUX_OE 
+	if(GPIO_ReadInputPin(USB3_MUX_OE))r24_AUXREG 		|= 0x04; 
+	else r24_AUXREG &= 0xFB;	
+	//Read the direction selected
+	if(GPIO_ReadInputPin(USB3_MUX_SEL))r24_AUXREG 	|= 0x08; 
+	else r24_AUXREG &= 0xF7;	
 }
 
 void Update_CC_signals(void) {

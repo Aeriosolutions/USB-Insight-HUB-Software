@@ -37,7 +37,7 @@ void iniExtercomms(GlobalState* globalState){
     gloState = globalState;
 
     //Hardware Serial Ini
-    HWSerial.begin(115200); //Debug Serial
+    //HWSerial.begin(115200); //Debug Serial
     USB.onEvent(usbEventCallback);
     usbSerial.onEvent(usbEventCallback);
 

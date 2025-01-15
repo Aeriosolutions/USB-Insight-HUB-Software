@@ -9,7 +9,7 @@
 #include "PAC194x.h"
 #include "Screen.h"
 
-#define DATATYPES_VER 2
+#define DATATYPES_VER 3
 
 #define APP_CORE 1
 #define DISPLAY_REFRESH_PERIOD 50 //note that for each screen the effective rate is 150ms
@@ -46,7 +46,7 @@
 #define SETTINGS_VIEW 2
 
 //Feature State ->wifistate
-#define WIFI_UNKNOWN   0
+#define WIFI_UNKNOWN    0
 #define WIFI_DISABLED   1
 #define AP_DISCONNECTED 2
 #define AP_CONNECTED    3
@@ -59,6 +59,10 @@
 #define START_ON      1
 #define START_OFF     2
 #define STARTUP_SEC   3
+
+//Features Config->hubMode
+#define USB2  0
+#define USB3  1
 
 //Screen Config Rotation
 #define ROT_0_DEG     0
@@ -102,7 +106,8 @@ struct FeaturesState {
 struct FeaturesConfig {
   uint8_t startView; 
   uint8_t startUpmode;  
-  bool wifi_enabled;    
+  bool wifi_enabled;
+  bool hubMode;    
 };
 
 struct StartupState { 

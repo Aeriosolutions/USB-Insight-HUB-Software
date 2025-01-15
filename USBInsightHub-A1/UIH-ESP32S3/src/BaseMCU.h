@@ -12,11 +12,13 @@
 
 //BaseMCU register addresses
 #define WHOAMI   0x10  //BASE MCU ID
+#define VERSION  0x12  //VERSION 
 #define CH1REG   0x20  //CH1 Fault, Power enable and current settings
 #define CH2REG   0x21  //CH2 Fault, Power enable and current settings
 #define CH3REG   0x22  //CH3 Fault, Power enable and current settings
 #define CCSUM    0x23  //VEXT and VOST CC lines summary
 #define AUXREG   0x24  //USB3 and Power Muxer values
+#define MUXOECTR 0x26  //Control muxer signal enable to work as USB 2.0 or USB 3.0 Hub
 #define VEXTCC1  0x30  //VEXT CC1 voltage reading: 30-L byte 31-H byte
 #define VEXTCC2  0x32  //VEXT CC2 voltage reading: 32-L byte 33-H byte
 #define VHOSTCC1 0x34  //VHOST CC1 voltage reading: 34-L byte 35-H byte
@@ -52,6 +54,8 @@ class BaseMCU {
     bool begin(TwoWire *theWire);
     void readAll();
     void writeAll();
+    void readVersion();
+    void setUSB3Enable(bool set);
     bool initiated = false;
 
     Channel chArr[3]={{false, false,false,ILIM_0_5},{false, false,false,ILIM_0_5},{false, false,false,ILIM_0_5}};
@@ -59,6 +63,7 @@ class BaseMCU {
     uint8_t extState = NOPULLUP;
     uint8_t vhostCC = UNKNOWNPWR;
     uint8_t hostState =  NOPULLUP;
+    uint8_t baseMCUVer = 0;
 
     bool pwrsource = false; //false vhost used, true vext used
     bool muxoe = false;     //false disabled, true enabled
@@ -68,6 +73,7 @@ class BaseMCU {
     TwoWire *I2C;
     Channel parseCHREG(uint8_t data);
     uint8_t encodeCHREG(Channel ch);
+    bool readStart(int address, int start, int numBytes);
 };
 
 #endif //BASEMCU
