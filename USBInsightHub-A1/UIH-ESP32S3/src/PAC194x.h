@@ -7,7 +7,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-#define SLOWDOWN_TIMEOUT 3
+#define SLOWDOWN_TIMEOUT 4
 
 #define PAC194x_ADDR 0x10 //set in the base board by a resistor 
 #define PAC1943_PRODUCT_ID 0x6A //for PAC1943 (3 channels)

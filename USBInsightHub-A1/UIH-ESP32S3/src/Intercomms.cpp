@@ -135,11 +135,16 @@ void interSetCurrentLimits(void){
       ESP_LOGV(TAG,"Set current");
       for(int i=0; i<3; i++)
       {
-        bMeter.chMeterArr[i].fwdCLim = glConfig->meter[i].fwdCLim;
-        //glState->system.bMeter.chMeterArr[i].backCLim = glConfig->meter[i].backCLim;
-        bMeter.setCurrentLimit(glConfig->meter[i].fwdCLim, FORWARD, i);
-        ESP_LOGV(TAG,"Fwd Current %i: %s",i,String(glConfig->meter[i].fwdCLim));
-        //glState->system.bMeter.setCurrentLimit(glConfig->meter[i].backCLim, BACKWARD, i);
+        if(prevMeterConfig[i].fwdCLim !=glConfig->meter[i].fwdCLim){
+          bMeter.chMeterArr[meterBoardMap[i]].fwdCLim = glConfig->meter[i].fwdCLim;          
+          bMeter.setCurrentLimit(glConfig->meter[i].fwdCLim, FORWARD, meterBoardMap[i]);
+          ESP_LOGV(TAG,"Fwd Current %i: %s",i,String(glConfig->meter[i].fwdCLim));
+        }        
+        if(prevMeterConfig[i].backCLim != glConfig->meter[i].backCLim){
+          bMeter.chMeterArr[meterBoardMap[i]].backCLim = glConfig->meter[i].backCLim;          
+          bMeter.setCurrentLimit(glConfig->meter[i].backCLim, BACKWARD, meterBoardMap[i]);
+          ESP_LOGV(TAG,"Back Current %i: %s",i,String(glConfig->meter[i].backCLim));
+        }                         
       }
       bMeter.enableAlerts(true);
       xSemaphoreGive(i2c_Semaphore);
@@ -154,6 +159,20 @@ void taskIntercomms(void *pvParameters){
   TickType_t xLastWakeTime = xTaskGetTickCount();
   ESP_LOGI(TAG,"Intercomms started on Core %u",xPortGetCoreID());
   for(;;){
+
+    //handle automatic selection of the hardware current limit based on forward current limit
+    for(int i=0; i<3; i++){
+
+      if(glConfig->meter[i].fwdCLim <= 500) 
+        glState->baseMCUOut[i].ilim = 0;
+      if(glConfig->meter[i].fwdCLim > 500 && glConfig->meter[i].fwdCLim <= 1000) 
+        glState->baseMCUOut[i].ilim = 1;
+      if(glConfig->meter[i].fwdCLim > 1000 && glConfig->meter[i].fwdCLim <= 1500) 
+        glState->baseMCUOut[i].ilim = 2;
+      if(glConfig->meter[i].fwdCLim > 1500) 
+        glState->baseMCUOut[i].ilim = 3;
+
+    }
 
 
     //check if there is any change in GlobalConfig to update the MCU
@@ -205,7 +224,7 @@ void taskIntercomms(void *pvParameters){
     }
 
     //read Meter
-    //ESP_LOGV(TAG, "Meter read");
+    
     interAvgMeterRead();
     //Serial.println("%.2f %.2f %.2f",bMeter.chMeterArr[0].AvgVoltage,bMeter.chMeterArr[1].AvgVoltage,bMeter.chMeterArr[2].AvgVoltage);
     //Serial.println(String(bMeter.chMeterArr[0].AvgVoltage) +","+String(bMeter.chMeterArr[1].AvgVoltage)+","+String(bMeter.chMeterArr[2].AvgVoltage));

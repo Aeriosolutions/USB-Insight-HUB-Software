@@ -17,11 +17,16 @@ void defaultScreenSlowDataUpdate();
 void taskDefaultViewLoop(void *pvParameters);
 void taskDefaultScreenLoop(void *pvParameters);
 
+bool defaultViewActive = false;
+SemaphoreHandle_t screen_Semaphore;
+
 void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Screen *screen){
 
   gState = globalState;
   gConfig = globalConfig;
   iScreen = screen;
+  
+  screen_Semaphore = xSemaphoreCreateMutex();
 
   ESP_LOGI(TAG,"Started on Core %u",xPortGetCoreID());
 
@@ -31,20 +36,33 @@ void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Scree
   
   defaultScreenFastDataUpdate();
 
-  ESP_LOGV(TAG, "Before Screen ini");
-  
-  iScreen->start();
-  for (int i=0; i<3; i++) {
-    iScreen->updateDefaultScreen(ScreenArr[i]);
+    
+  if(xSemaphoreTake(screen_Semaphore,( TickType_t ) 20 ) == pdTRUE){
+    
+    iScreen->start();
+    for (int i=0; i<3; i++) {
+      iScreen->screenDefaultRender(ScreenArr[i]);
+    }
+    
+    analogWrite(DLIT_1,800);
+    analogWrite(DLIT_2,800);
+    analogWrite(DLIT_3,800);
+    xSemaphoreGive(screen_Semaphore);
+    defaultViewStart();
+
+  } 
+  else {
+    ESP_LOGE(TAG, "Screen resource taken, could not initialize");
   }
-  ESP_LOGV(TAG, "After Screen ini");
 
-  analogWrite(DLIT_1,800);
-  analogWrite(DLIT_2,800);
-  analogWrite(DLIT_3,800);
-  xTaskCreatePinnedToCore(taskDefaultScreenLoop, "Default Screen", 2048, NULL, 4, NULL,APP_CORE);
-  xTaskCreatePinnedToCore(taskDefaultViewLoop, "Default View", 2048, NULL, 3, NULL,APP_CORE);
+}
 
+void defaultViewStart(void){
+  if(!defaultViewActive){
+    defaultViewActive = true;
+    xTaskCreatePinnedToCore(taskDefaultScreenLoop, "Default Screen", 2048, NULL, 4, NULL,APP_CORE);
+    xTaskCreatePinnedToCore(taskDefaultViewLoop, "Default View", 2048, NULL, 3, NULL,APP_CORE);      
+  }
 }
 
 void taskDefaultViewLoop(void *pvParameters){  
@@ -88,23 +106,19 @@ void taskDefaultViewLoop(void *pvParameters){
       if (btnShortCheck(3)) {
         
         ESP_LOGI(TAG,"Setup button short press");
-        float oclimit=2000;
+        uint16_t oclimit=2000;
         for (int i=0; i<3 ; i++){
           switch(gState->baseMCUOut[i].ilim){
-              case 0: 
-                gState->baseMCUOut[i].ilim = 1;
+              case 0:                 
                 oclimit=1000;
                 break;
-              case 1: 
-                gState->baseMCUOut[i].ilim = 2;
+              case 1:                 
                 oclimit=1500;
                 break;
-              case 2: 
-                gState->baseMCUOut[i].ilim = 3;
+              case 2:                 
                 oclimit=2000;
                 break;
-              case 3: 
-                gState->baseMCUOut[i].ilim = 0;
+              case 3:                 
                 oclimit=500;
                 break;              
               default:
@@ -122,14 +136,10 @@ void taskDefaultViewLoop(void *pvParameters){
       if (btnLongCheck(3)){
         
         ESP_LOGI(TAG,"Setup button long press");
-        /*if(demoIsActive) {
-          demoIsActive= false;
-          parseDataPC();
-        }
-        else demoIsActive= true;
-        mcuWriteAll(); */
+
         //To change the screen rotation
 
+        /*
         for(int i=0;i<3;i++){
           switch(gConfig->screen[i].rotation){
               case 0: 
@@ -145,11 +155,18 @@ void taskDefaultViewLoop(void *pvParameters){
                 gConfig->screen[i].rotation = 0;
                 break;
           }                  
-        }       
+        } */
+
+        defaultViewActive=false;
+        menuViewStart(gState,gConfig,iScreen);
+        ESP_LOGI(TAG,"Delete Task Loop");
+        vTaskDelete(NULL);
+
       }       
     }
     vTaskDelay(pdMS_TO_TICKS(DEFAULT_VIEW_PERIOD));
   }
+    
 }
 
 void taskDefaultScreenLoop(void *pvParameters){
@@ -157,24 +174,37 @@ void taskDefaultScreenLoop(void *pvParameters){
   int slowCnt=0;
   TickType_t xLastWakeTime = xTaskGetTickCount();
   ESP_LOGI(TAG,"Loop Screen on Core %u",xPortGetCoreID());
-  for(;;){
-    
-    defaultScreenFastDataUpdate();
-    slowCnt++;
-    if(slowCnt==SLOW_DATA_DOWNSAMPLES){
-      slowCnt=0;
-      defaultScreenSlowDataUpdate();      
-    }
-    //update screen only if something changed
-    
-    if(memcmp(&prevScreenArr[iScnt],&(ScreenArr[iScnt]),sizeof(prevScreenArr[iScnt])) != 0 ){
-      iScreen->updateDefaultScreen(ScreenArr[iScnt]);
-      prevScreenArr[iScnt] = ScreenArr[iScnt];      
-    }
-    iScnt++;
-    if(iScnt==3) iScnt=0;    
+  if(xSemaphoreTake(screen_Semaphore,( TickType_t ) 10 ) == pdTRUE)
+  {
+    for(;;){
+      
+      defaultScreenFastDataUpdate();
+      slowCnt++;
+      if(slowCnt==SLOW_DATA_DOWNSAMPLES){
+        slowCnt=0;
+        defaultScreenSlowDataUpdate();      
+      }
+      //update screen only if something changed
+      
+      if(memcmp(&prevScreenArr[iScnt],&(ScreenArr[iScnt]),sizeof(prevScreenArr[iScnt])) != 0 ){
+        iScreen->screenDefaultRender(ScreenArr[iScnt]);
+        prevScreenArr[iScnt] = ScreenArr[iScnt];      
+      }
+      iScnt++;
+      if(iScnt==3) iScnt=0;    
 
-    vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(DISPLAY_REFRESH_PERIOD));
+      if(!defaultViewActive){
+        ESP_LOGI(TAG,"Delete Screen Loop");
+        xSemaphoreGive(screen_Semaphore);
+        vTaskDelete(NULL);
+      } 
+
+      vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(DISPLAY_REFRESH_PERIOD));
+    }
+  }
+  else {
+    ESP_LOGE(TAG,"Screen resource bussy, can't create Screen Loop Task");
+    vTaskDelete(NULL);
   }
 
 }

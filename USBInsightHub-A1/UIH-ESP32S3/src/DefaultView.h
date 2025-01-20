@@ -5,11 +5,15 @@
 #include "Buttons.h"
 #include "datatypes.h"
 #include "Screen.h"
+#include "MenuView.h"
 
 #define DEFAULT_VIEW_PERIOD      40 //in ms
 #define SLOW_DATA_DOWNSAMPLES    10 //500ms //multiples of DISPLAY_REFRESH_PERIOD 
 
 
 void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig, Screen *screen);
+void defaultViewStart(void);
+
+extern SemaphoreHandle_t screen_Semaphore;
 
 #endif

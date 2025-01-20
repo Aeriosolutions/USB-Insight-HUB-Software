@@ -9,7 +9,7 @@
 #include "PAC194x.h"
 #include "Screen.h"
 
-#define DATATYPES_VER 3
+#define DATATYPES_VER 4
 
 #define APP_CORE 1
 #define DISPLAY_REFRESH_PERIOD 50 //note that for each screen the effective rate is 150ms
@@ -61,8 +61,20 @@
 #define STARTUP_SEC   3
 
 //Features Config->hubMode
-#define USB2  0
-#define USB3  1
+#define USB2_3  0
+#define USB2    1
+#define USB3    2
+
+#define DISABLE 0
+#define ENABLE  1
+
+//Features Config->refreshRate
+#define S0_5 0
+#define S1_0 1
+
+//Features Config->filterType
+#define FILTER_MOVING_AVG 0
+#define FILTER_MEDIAN 1
 
 //Screen Config Rotation
 #define ROT_0_DEG     0
@@ -86,10 +98,6 @@
 #define VHOST   false
 #define VEXT    true
 
-//Meter Config
-#define FILTER_MOVING_AVG 0
-#define FILTER_MEDIAN 1
-
 struct System {
   uint8_t currentView;  
 };
@@ -106,8 +114,10 @@ struct FeaturesState {
 struct FeaturesConfig {
   uint8_t startView; 
   uint8_t startUpmode;  
-  bool wifi_enabled;
-  bool hubMode;    
+  uint8_t wifi_enabled;
+  uint8_t hubMode;
+  uint8_t filterType;    
+  uint8_t refreshRate;
 };
 
 struct StartupState { 
@@ -131,9 +141,8 @@ struct MeterState {
 };
 
 struct MeterConfig {
-  float fwdCLim;
-  float backCLim;
-  int filterType;
+  uint16_t fwdCLim;
+  uint16_t backCLim;
 };
 
 struct USBInfoState {

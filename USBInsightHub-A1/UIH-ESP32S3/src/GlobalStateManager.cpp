@@ -136,8 +136,10 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
     globalConfig->features.startView = DEFAULT_VIEW;
     globalConfig->features.startUpmode = PERSISTANCE;
     //globalConfig->features.startUpmode = STARTUP_SEC;
-    globalConfig->features.wifi_enabled = true;
-    globalConfig->features.hubMode = USB3;
+    globalConfig->features.wifi_enabled = ENABLE;
+    globalConfig->features.hubMode = USB2_3;
+    globalConfig->features.filterType = FILTER_TYPE_MEDIAN;
+    globalConfig->features.refreshRate = S0_5;
 
     for(int i=0; i<3; i++){
         globalConfig->startup[i].startup_timer = 1;
@@ -146,8 +148,7 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
         globalConfig->screen[i].brightness = 800;  
 
         globalConfig->meter[i].backCLim = 20; //mA
-        globalConfig->meter[i].fwdCLim = 1000; //mA
-        globalConfig->meter[i].filterType = FILTER_TYPE_MEDIAN;
+        globalConfig->meter[i].fwdCLim = 1000; //mA        
 
         globalState->baseMCUOut[i].ilim = ILIM_1_0;
         globalState->baseMCUOut[i].data_en = true;
