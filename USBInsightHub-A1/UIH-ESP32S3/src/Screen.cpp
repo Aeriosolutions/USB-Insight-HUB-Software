@@ -15,7 +15,6 @@ void Screen::start(){
   pinMode(DISPLAY_ALL_DRES, OUTPUT);
 
   //tft = TFT_eSPI();       // Invoke custom library
-  
 
   //PWM signals for backlight control
   //On Espressif library 2.0.14

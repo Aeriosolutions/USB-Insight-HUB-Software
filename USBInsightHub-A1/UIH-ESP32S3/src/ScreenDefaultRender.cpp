@@ -16,7 +16,7 @@ void Screen::screenDefaultRender(chScreenData Screen){
   img.loadFont(SMALLFONT);
   //analogWrite(Screen.dProp.dl_pin,Screen.dProp.brightness);
 
-  digitalWrite(Screen.dProp.cs_pin, LOW);
+  digitalWrite(Screen.dProp.cs_pin, LOW); 
   tft.setRotation(Screen.dProp.rotation);  
   img.fillScreen(TFT_BLACK);
   img.setTextColor(TFT_WHITE);  
@@ -103,31 +103,6 @@ void Screen::screenDefaultRender(chScreenData Screen){
   aux = String(Screen.mProp.fwdCLim/1000,1);
   aux.concat("A");
   cbarmax = (long)(Screen.mProp.fwdCLim);
-  /*
-  switch(Screen.ilim+1)
-  {
-    case 1: 
-      aux = "0.5A";
-      cbarmax = 500;
-      break;
-    case 2: 
-      aux = "1.0A";
-      cbarmax = 1000;
-      break;
-    case 3: 
-      aux = "1.5A";
-      cbarmax = 1500;
-      break;
-    case 4: 
-      aux = "2.0A";
-      cbarmax = 2000;
-      break;
-    default:
-      aux = "?.?A";
-      cbarmax = 2000;
-      break;
-  }
-  */
  
   //current limit value
   img.drawString(aux, 2, 220, 4);

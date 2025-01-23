@@ -30,9 +30,13 @@ void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Scree
 
   ESP_LOGI(TAG,"Started on Core %u",xPortGetCoreID());
 
-  ScreenArr[0].dProp = {DISPLAY_CS_1, DLIT_1, 2, 800};
-  ScreenArr[1].dProp = {DISPLAY_CS_2, DLIT_2, 2, 800};
-  ScreenArr[2].dProp = {DISPLAY_CS_3, DLIT_3, 2, 800};
+  iScreen->dProp[0] = {DISPLAY_CS_1, DLIT_1, ROT_180_DEG, 800};
+  iScreen->dProp[1] = {DISPLAY_CS_2, DLIT_2, ROT_180_DEG, 800};
+  iScreen->dProp[2] = {DISPLAY_CS_3, DLIT_3, ROT_180_DEG, 800};
+
+  ScreenArr[0].dProp = {DISPLAY_CS_1, DLIT_1, ROT_180_DEG, 800};
+  ScreenArr[1].dProp = {DISPLAY_CS_2, DLIT_2, ROT_180_DEG, 800};
+  ScreenArr[2].dProp = {DISPLAY_CS_3, DLIT_3, ROT_180_DEG, 800};
   
   defaultScreenFastDataUpdate();
 
@@ -225,6 +229,8 @@ void defaultScreenFastDataUpdate(){
       ScreenArr[i].tProp.Dev2_Name  = gState->usbInfo[i].Dev2_Name;
       ScreenArr[i].tProp.usbType    = gState->usbInfo[i].usbType;      
       ScreenArr[i].pconnected       = gState->features.pcConnected;
+      iScreen->dProp[i].brightness  = gConfig->screen[i].brightness;
+      iScreen->dProp[i].rotation    = gConfig->screen[i].rotation;
       ScreenArr[i].dProp.brightness = gConfig->screen[i].brightness;
       ScreenArr[i].dProp.rotation   = gConfig->screen[i].rotation;
       ScreenArr[i].startup_cnt      = gState->startup[i].startup_cnt;

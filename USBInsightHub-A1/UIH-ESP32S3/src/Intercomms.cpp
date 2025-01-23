@@ -61,7 +61,10 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
         {
           bMCU.readVersion();
           ESP_LOGI(TAG, "Base MCU initialized OK version %u",bMCU.baseMCUVer);
-          bMCU.setUSB3Enable(glConfig->features.hubMode);          
+          if(glConfig->features.hubMode==USB2_3 ||glConfig->features.hubMode==USB3)
+            bMCU.setUSB3Enable(true);
+          if(glConfig->features.hubMode==USB2)
+            bMCU.setUSB3Enable(false);
         }
         else 
           ESP_LOGE(TAG, "Base MCU initialization FAILED!");

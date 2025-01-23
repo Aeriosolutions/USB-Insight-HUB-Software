@@ -17,30 +17,30 @@ Menu CH1Config = {
     TYPE_ROOT,
     "CH1 Config.",
     {
-        {TYPE_RANGE,"Over Current",   {},{"100","2000","100"},"",H_OC},
-        {TYPE_RANGE,"Reverse Current",{},{"1","200","10"},"",H_RC},
-        {TYPE_RANGE,"Startup Timer",  {},{"1","100","5"},"",H_CHSTUP}
-    },{"0"},"",H_CHxCONF
+        {TYPE_RANGE,"Over Current",   {},{"100","2000","100"},"mA",{H_OC}},
+        {TYPE_RANGE,"Back Current",{},{"1","200","10"},"mA",{H_RC}},
+        {TYPE_RANGE,"Startup Timer",  {},{"1","100","5"},"s",{H_CHSTUP}}
+    },{"0"},"",{H_CHxCONF}
 };
 
 Menu CH2Config = {
     TYPE_ROOT,
     "CH2 Config.",
     {
-        {TYPE_RANGE,"Over Current",   {},{"100","2000","100"},"",H_OC},
-        {TYPE_RANGE,"Reverse Current",{},{"1","200","10"},"",H_RC},
-        {TYPE_RANGE,"Startup Timer",  {},{"1","100","5"},"",H_CHSTUP}
-    },{"1"},"",H_CHxCONF
+        {TYPE_RANGE,"Over Current",   {},{"100","2000","100"},"mA",{H_OC}},
+        {TYPE_RANGE,"Back Current",{},{"1","200","10"},"mA",{H_RC}},
+        {TYPE_RANGE,"Startup Timer",  {},{"1","100","5"},"s",{H_CHSTUP}}
+    },{"1"},"",{H_CHxCONF}
 };
 
 Menu CH3Config = {
     TYPE_ROOT,
     "CH3 Config.",
     {
-        {TYPE_RANGE,"Over Current",   {},{"100","2000","100"},"",H_OC},
-        {TYPE_RANGE,"Reverse Current",{},{"1","200","10"},"",H_RC},
-        {TYPE_RANGE,"Startup Timer",  {},{"1","100","5"},"",H_CHSTUP}
-    },{"2"},"",H_CHxCONF
+        {TYPE_RANGE,"Over Current",   {},{"100","2000","100"},"mA",{H_OC}},
+        {TYPE_RANGE,"Back Current",{},{"1","200","10"},"mA",{H_RC}},
+        {TYPE_RANGE,"Startup Timer",  {},{"1","100","5"},"s",{H_CHSTUP}}
+    },{"2"},"",{H_CHxCONF}
 };
 
 Menu generalConfig = {
@@ -48,22 +48,24 @@ Menu generalConfig = {
     "Global Config.",
     {
         {TYPE_ROOT, "Wi-Fi",{
-            {TYPE_INFO,"WiFI Information",{},{},"",H_NONE},
-            {TYPE_SELECT,"WiFi Reset",{},{"No Action", "Reset"},"",H_WIRES},
-            {TYPE_SELECT,"WiFi Enable",{},{"Disable", "Enable"},"",H_WIEN}
-        },{},"",H_WIGEN},
-        {TYPE_SELECT, "Startup Mode",{},{"Persistance", "On at startup", "Off at startup", "Timed sequence"},"",H_GLSTUP},
+            {TYPE_INFO,"WiFi Info",{},{},"",{H_NONE}},
+            {TYPE_SELECT,"WiFi Reset",{},{"No Action", "Reset"},"",{H_WIRES,H_WIRESNA,H_WIRESRES}},
+            {TYPE_SELECT,"WiFi Enable",{},{"Disable", "Enable"},"",{H_WIEN,H_WIENNO,H_WIENYES}}
+        },{},"",{H_WIGEN}},
+        {TYPE_SELECT, "Startup Mode",{},{"Persistance", "On at startup", "Off at startup", "Timed"},"",
+        {H_GLSTUP,H_GLSTUPPER,H_GLSTUPON,H_GLSTUPOFF,H_GLSTUPTMR}},
         {TYPE_ROOT, "Meter",{
-            {TYPE_SELECT,"Refresh Rate",{},{"0.5s","1.0s"},"",H_METREF},
-            {TYPE_SELECT,"Filter Type",{},{"Moving Average","Median"},"",H_METFILT}
-        },{},"",H_SCREEN},        
+            {TYPE_SELECT,"Refresh Rate",{},{"0.5s","1.0s"},"",{H_METREF,H_METREF,H_METREF}},
+            {TYPE_SELECT,"Filter Type",{},{"Moving Avg.","Median"},"",{H_METFILT,H_METFILTMA,H_METFILTMED}}
+        },{},"",{H_METER}},        
         {TYPE_ROOT, "Screen",{
-            {TYPE_SELECT,"Rotation",{},{"0","90","180","270"},"",0},
-            {TYPE_RANGE,"Brightness",{},{"100","1000","50"},"",0}
-        },{},"",H_SCREEN},
-        {TYPE_SELECT, "HUB Mode",{},{"USB2 and USB3", "USB2 Only", "USB3 Only"},"",H_USBTYP}
+            {TYPE_SELECT,"Rotation",{},{"0","90","180","270"},"DEG",{H_SCRROT,H_SCRROT,H_NONE,H_NONE,H_NONE}},
+            {TYPE_RANGE,"Brightness",{},{"100","1000","50"},"%",{H_SCRBRI}}
+        },{},"",{H_SCREEN}},
+        {TYPE_SELECT, "HUB Mode",{},{"USB2 & USB3", "USB2 Only", "USB3 Only"},"",
+        {H_USBTYP,H_USBTYP23,H_USBTYP2,H_USBTYP3}}
     },
-    {"0"},"", H_GLOCONF
+    {"0"},"", {H_GLOCONF}
 };
 
 Menu mainMenu = {
@@ -75,7 +77,7 @@ Menu mainMenu = {
         CH3Config,
         generalConfig
     },
-    {"0"},"", 0
+    {"0"},"", {}
 };
 
 uint16_t  getParamValue(String parameter,String channel="0");
@@ -95,7 +97,6 @@ void menuViewStart(GlobalState* globalState, GlobalConfig* globalConfig, Screen 
     iScr = screen;
 
     xTaskCreatePinnedToCore(taskMenuViewLoop, "MenuScreen", 4096, NULL, 4, NULL,APP_CORE);
-
 }
 
 void taskMenuViewLoop(void *pvParameters){
@@ -222,12 +223,12 @@ void taskMenuViewLoop(void *pvParameters){
 
 }
 
-
 void rootLayout(Menu* root, int index){
     
     ESP_LOGI("","-------------");
     ESP_LOGI("","%s",root->name.c_str());  
-    //ESP_LOGI("","Type: %u",root->menuType);  
+    //ESP_LOGI("","Type: %u",root->menuType);
+    screenMenuIntroRender(root,iScr);  
     ESP_LOGI("","-------------");
     for(int i=0; i< root->submenus.size(); i++){
         if(index == i)
@@ -235,19 +236,22 @@ void rootLayout(Menu* root, int index){
         else  
             ESP_LOGI(""," %s",root->submenus[i].name.c_str());
     }
+    screenMenuListRender(root,iScr,index,-1);
+
     ESP_LOGI("","-------------");
-    ESP_LOGI("","Help Index: %u", root->submenus[index].helpReference);
-    
+    ESP_LOGI("","Help Index: %u", root->submenus[index].helpReference[0]);
+    screenMenuInfoRender(root,iScr,index);
 }
 
 void selectLayout(Menu* root, int index){
 
     ESP_LOGI("","-------------");
-    ESP_LOGI("","%s",root->name.c_str());    
+    ESP_LOGI("","%s",root->name.c_str());
+    screenMenuIntroRender(root,iScr);     
     ESP_LOGI("","-------------");
     if(root->menuType == TYPE_SELECT){
 
-        uint16_t sel = getParamValue(root->name);
+        int sel = (int)(getParamValue(root->name));
         String strm ="";
         for(int i=0; i< root->params.size(); i++){            
             strm=root->params[i];
@@ -257,20 +261,26 @@ void selectLayout(Menu* root, int index){
             else  
                 ESP_LOGI(""," %s" , strm.c_str());
         }
+        screenMenuListRender(root,iScr,index,sel);
     }
+
     ESP_LOGI("","-------------");
-    ESP_LOGI("","Help Index: %u", root->helpReference);
+    ESP_LOGI("","Help Index: %u", root->helpReference[0]);
+    screenMenuInfoRender(root,iScr,index);
 }
 
 void rangeLayout(Menu* root, String channel){
     
     uint16_t sel = getParamValue(root->name, channel);
     ESP_LOGI("","-------------");
-    ESP_LOGI("","%s",root->name.c_str());    
+    ESP_LOGI("","%s",root->name.c_str());
+    screenMenuIntroRender(root,iScr);     
     ESP_LOGI("","-------------");
     ESP_LOGI("","<< %u >>",sel);
+    screenMenuRangeRender(sel,root->paramUnits,iScr);
     ESP_LOGI("","-------------");
-    ESP_LOGI("","Help Index: %u", root->helpReference);
+    ESP_LOGI("","Help Index: %u", root->helpReference[0]);
+    screenMenuInfoRender(root,iScr);
 }
 
 
@@ -279,7 +289,7 @@ uint16_t getParamValue(String param, String channel){
     if(param =="Over Current") {    
         return ((uint16_t)(gCon->meter[channel.toInt()].fwdCLim));
     }
-    if(param =="Reverse Current") {    
+    if(param =="Back Current") {    
         return ((uint16_t)(gCon->meter[channel.toInt()].backCLim));
     }
     if(param =="Startup Timer") {    
@@ -315,7 +325,7 @@ void setParamValue(String param, uint16_t value, String channel){
         gCon->meter[channel.toInt()].fwdCLim = value;
         return;
     }
-    if(param =="Reverse Current") {    
+    if(param =="Back Current") {    
         gCon->meter[channel.toInt()].backCLim = value;
         return;
     }

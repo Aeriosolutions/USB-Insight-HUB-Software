@@ -14,6 +14,7 @@
 #include "icons.h"
 
 
+
 #define DISPLAY_CS_1 6
 #define DISPLAY_CS_2 16
 #define DISPLAY_CS_3 12
@@ -69,11 +70,13 @@ class Screen{
     //void start(TFT_eSPI *r_tft, TFT_eSprite *r_img);
     void start();
     void screenDefaultRender(chScreenData Screen);
-    
-  private:
-  
+
+    displayProp dProp[3];
     TFT_eSPI tft       = TFT_eSPI();       // Invoke custom library
     TFT_eSprite img    = TFT_eSprite(&tft);
+
+  private:    
+
     TFT_eSprite pcimg  = TFT_eSprite(&tft);
     TFT_eSprite warimg = TFT_eSprite(&tft);
 
