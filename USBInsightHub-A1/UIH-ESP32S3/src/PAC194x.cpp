@@ -54,7 +54,7 @@ bool PAC194x::begin(TwoWire *theWire){
         chAverager[i].VoltageAveraged=0;
         chAverager[i].CurrentAveraged=0;
 
-        for (int j=0; j<AVG_WINDOW_SIZE; j++)
+        for (int j=0; j<MAX_FILTER_WINDOW_SIZE; j++)
         {
           chAverager[i].VoltageBuf[j]=0;
           chAverager[i].CurrentBuf[j]=0;
@@ -152,11 +152,9 @@ void PAC194x::readAvgMeter(){
     lsb=I2C->read();
     chMeterArr[i].AvgVoltageRaw = msb*256 + lsb;
     chMeterArr[i].AvgVoltage = ((float)(chMeterArr[i].AvgVoltageRaw)/65536.0)*9000.0; //in mV
-
     
-    if(chMeterArr[i].filterType==FILTER_TYPE_MOVING_AVG) voltageMovingAverageFilter(i);
-    if(chMeterArr[i].filterType==FILTER_TYPE_MEDIAN) voltageMedianFilter(i);
-    
+    if(chMeterArr[i].filterType == FILTER_TYPE_MOVING_AVG) voltageMovingAverageFilter(i);
+    if(chMeterArr[i].filterType == FILTER_TYPE_MEDIAN) voltageMedianFilter(i);    
   }
   
   for(i =0; i < 3; i++)
@@ -175,12 +173,11 @@ void PAC194x::readAvgMeter(){
 
     chMeterArr[i].AvgCurrent = sign*((float)(aux16)/32768.0)*chMeterArr[i].FullScale;  //in mA
 
-    if(chMeterArr[i].filterType==FILTER_TYPE_MOVING_AVG) currentMovingAverageFilter(i);
-    if(chMeterArr[i].filterType==FILTER_TYPE_MEDIAN) currentMedianFilter(i);
-
+    if(chMeterArr[i].filterType == FILTER_TYPE_MOVING_AVG) currentMovingAverageFilter(i);
+    if(chMeterArr[i].filterType == FILTER_TYPE_MEDIAN) currentMedianFilter(i);
   }
   
-  filterIndex = (filterIndex+1) % AVG_WINDOW_SIZE;
+  filterIndex = (filterIndex+1) % filterWindowsize;
 }
 
 void PAC194x::setCurrentLimit(float climit, bool cdir, int ch){
@@ -261,76 +258,49 @@ uint16_t PAC194x::read16(uint8_t address){
 
 
 void PAC194x::voltageMovingAverageFilter(int i){  
-  chAverager[i].VoltageTotal=chAverager[i].VoltageTotal-chAverager[i].VoltageBuf[filterIndex]; // Remove the oldest entry from the sum  
+  /* This moving average filter implementation is more efficient, but needs to start from 0.
+  chAverager[i].VoltageTotal = chAverager[i].VoltageTotal - chAverager[i].VoltageBuf[filterIndex]; // Remove the oldest entry from the sum    
   chAverager[i].VoltageBuf[filterIndex] = chMeterArr[i].AvgVoltage; // Add the newest reading to the window
   chAverager[i].VoltageTotal = chAverager[i].VoltageTotal + chMeterArr[i].AvgVoltage; // Add the newest reading to the sum
-  chAverager[i].VoltageAveraged = chAverager[i].VoltageTotal/AVG_WINDOW_SIZE;  //Compute average
+  chAverager[i].VoltageAveraged = chAverager[i].VoltageTotal/filterWindowsize;  //Compute average
+  */
+  chAverager[i].VoltageBuf[filterIndex] = chMeterArr[i].AvgVoltage; // Add the newest reading to the window
+  chAverager[i].VoltageAveraged = movingAverage(chAverager[i].VoltageBuf, filterWindowsize);
+
 }
 
-void PAC194x::currentMovingAverageFilter(int i){     
-  chAverager[i].CurrentTotal=chAverager[i].CurrentTotal-chAverager[i].CurrentBuf[filterIndex]; // Remove the oldest entry from the sum    
+void PAC194x::currentMovingAverageFilter(int i){  
+  /* This moving average filter implementation is more efficient, but needs to start from 0.   
+  chAverager[i].CurrentTotal = chAverager[i].CurrentTotal - chAverager[i].CurrentBuf[filterIndex]; // Remove the oldest entry from the sum    
   chAverager[i].CurrentBuf[filterIndex] = chMeterArr[i].AvgCurrent; // Add the newest reading to the window 
   chAverager[i].CurrentTotal = chAverager[i].CurrentTotal + chMeterArr[i].AvgCurrent; // Add the newest reading to the sum
-  chAverager[i].CurrentAveraged = chAverager[i].CurrentTotal/AVG_WINDOW_SIZE;  //Compute average
+  chAverager[i].CurrentAveraged = chAverager[i].CurrentTotal/filterWindowsize;  //Compute average
+  */
+  chAverager[i].CurrentBuf[filterIndex] = chMeterArr[i].AvgCurrent; // Add the newest reading to the window
+  chAverager[i].CurrentAveraged = movingAverage(chAverager[i].CurrentBuf, filterWindowsize);
+
 }
 
 void PAC194x::voltageMedianFilter(int i){
   
   chAverager[i].VoltageBuf[filterIndex] = chMeterArr[i].AvgVoltage; // Add the newest reading to the window
-  chAverager[i].VoltageAveraged = medianFunction(chAverager[i].VoltageBuf, AVG_WINDOW_SIZE);
-
-  //sort the new array
-  /*
-  for (int j =0; j < AVG_WINDOW_SIZE - 1; j++){
-    for(int k = 0; k < AVG_WINDOW_SIZE - j - 1; k++){
-      if(chAverager[i].VoltageBuf[k] > chAverager[i].VoltageBuf[k+1]){
-        //swap k and k+1
-        float temp = chAverager[i].VoltageBuf[k];
-        chAverager[i].VoltageBuf[k] = chAverager[i].VoltageBuf[k+1];
-        chAverager[i].VoltageBuf[k+1] = temp;
-      }
-    }
-  }
-
-  
-  //find the position to insert the new value
-  while(pos < AVG_WINDOW_SIZE && chAverager[i].VoltageBuf[pos] < chMeterArr[i].AvgVoltage){
-    pos++;
-  }
-  //shift elements to insert the new value
-  for(int j=AVG_WINDOW_SIZE-1; j > pos; --j){
-     chAverager[i].VoltageBuf[j] = chAverager[i].VoltageBuf[j-1];
-  }
-  //insert new value
-  chAverager[i].VoltageBuf[pos] = chMeterArr[i].AvgVoltage;
-  */
-
-  //chAverager[i].VoltageAveraged = chAverager[i].VoltageBuf[int(AVG_WINDOW_SIZE/2)];
+  chAverager[i].VoltageAveraged = medianFunction(chAverager[i].VoltageBuf, filterWindowsize);
 
 }
 
 void PAC194x::currentMedianFilter(int i){     
 
   chAverager[i].CurrentBuf[filterIndex] = chMeterArr[i].AvgCurrent; // Add the newest reading to the window
-  chAverager[i].CurrentAveraged = medianFunction(chAverager[i].CurrentBuf, AVG_WINDOW_SIZE);
+  chAverager[i].CurrentAveraged = medianFunction(chAverager[i].CurrentBuf, filterWindowsize);
 
-  /*int pos = 0;
-  //place the new value in a an ascending sorting list.
+}
 
-  //find the position to insert the new value
-  while(pos < AVG_WINDOW_SIZE && chAverager[i].CurrentBuf[pos] < chMeterArr[i].AvgCurrent){
-    pos++;
-  }
-  //shift elements to insert the new value
-  for(int j=AVG_WINDOW_SIZE-1; j > pos; --j){
-     chAverager[i].CurrentBuf[j] = chAverager[i].CurrentBuf[j-1];
-  }
-  //insert new value
-  chAverager[i].CurrentBuf[pos] = chMeterArr[i].AvgCurrent;
-
-  chAverager[i].CurrentAveraged = chAverager[i].CurrentBuf[int(AVG_WINDOW_SIZE/2)];
-  */
-
+float PAC194x::movingAverage(float arr[], int n){
+    float sum = 0;
+    for(int i = 0; i < n; i++){
+      sum = sum + arr[i];
+    }
+    return sum/n;
 }
 
 float PAC194x::medianFunction(float arr[], int n){
@@ -352,4 +322,14 @@ float PAC194x::medianFunction(float arr[], int n){
       return arr[int(n/2)+1]; //if odd take the middle value
     }  
       
+}
+
+
+
+void PAC194x::setFilterLength(uint8_t length){
+  if(length >= 1 && length <= MAX_FILTER_WINDOW_SIZE) 
+    filterWindowsize = length;
+  else 
+    filterWindowsize = 10;
+  
 }

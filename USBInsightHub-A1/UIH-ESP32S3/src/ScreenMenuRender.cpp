@@ -2,7 +2,7 @@
 #include "MenuView.h"
 
 const char* helpArr[] = {
-/*   "Individual Channe"*/    
+/*   "Individual Channel"*/    
 /*0*/"",
 /*1*/"Individual CH:\n -Over Current\n -Back Current\n -Starup Timer",
 /*2*/"Global settings:\n -Wi-Fi\n -Startup Mode\n -Meter\n -Screen\n -Hub Mode",
@@ -23,7 +23,7 @@ const char* helpArr[] = {
 /*17*/"",
 /*18*/"",
 /*19*/"",
-/*20*/"Current and\n Voltage meter\nconfigs",
+/*20*/"Current and\nVoltage meter\nconfigs",
 /*21*/"Meter refresh\nrate.",
 /*22*/"Type of digital\nfilter applied to\nthe voltage and\ncurrent samples",
 /*23*/"The average of\nthe last 10 or 20\nsamples",
@@ -52,19 +52,21 @@ const char* helpArr[] = {
 };
 
 
-void screenMenuIntroRender(Menu* m, Screen* s){
+void screenMenuIntroRender(Menu* m, Screen* s, String channel){
 
     uint8_t ch=0;
 
     digitalWrite(s->dProp[ch].cs_pin, LOW);     
-    s->tft.setRotation(s->dProp[ch].rotation);
+    //s->tft.setRotation(s->dProp[ch].rotation);
+    s->tft.setRotation(ROT_180_DEG);
     s->img.fillScreen(TFT_BLACK);          
 
     //header
     s->img.fillRoundRect(5,17,230,6,1,TFT_LIGHTGREY);
-
+    if(m->name =="Over Current" || m->name =="Back Current" ||m->name =="Startup Timer")
+        menuTextItemPlacer("CH"+String(channel.toInt()+1),s,1,0,0);
     menuTextItemPlacer(m->name,s,2,0,0);
-    menuButtonTextPlacer(s,"<< Return");
+    menuButtonTextPlacer(s,"Return");
 
     s->img.pushSprite(0,0);
     digitalWrite(s->dProp[ch].cs_pin, HIGH);
@@ -76,7 +78,8 @@ void screenMenuListRender(Menu* m, Screen* s, int index, int type){
     bool downArrow = false;
 
     digitalWrite(s->dProp[ch].cs_pin, LOW);     
-    s->tft.setRotation(s->dProp[ch].rotation);
+    //s->tft.setRotation(s->dProp[ch].rotation);
+    s->tft.setRotation(ROT_180_DEG);
     s->img.fillScreen(TFT_BLACK); 
 
     //header
@@ -116,7 +119,8 @@ void screenMenuRangeRender(uint16_t value, String units, Screen* s){
     uint8_t ch=1;
 
     digitalWrite(s->dProp[ch].cs_pin, LOW);     
-    s->tft.setRotation(s->dProp[ch].rotation);
+    //s->tft.setRotation(s->dProp[ch].rotation);
+    s->tft.setRotation(ROT_180_DEG);
     s->img.fillScreen(TFT_BLACK); 
 
     //header
@@ -145,11 +149,12 @@ void screenMenuRangeRender(uint16_t value, String units, Screen* s){
     digitalWrite(s->dProp[ch].cs_pin, HIGH);        
 }
 
-void screenMenuInfoRender(Menu* m, Screen* s, int index){
+void screenMenuInfoRender(Menu* m, Screen* s, uint16_t sel ,int index){
     uint8_t ch=2;
 
     digitalWrite(s->dProp[ch].cs_pin, LOW);     
-    s->tft.setRotation(s->dProp[ch].rotation);
+    //s->tft.setRotation(s->dProp[ch].rotation);
+    s->tft.setRotation(ROT_180_DEG);
     s->img.fillScreen(TFT_BLACK); 
 
     //header
@@ -164,9 +169,30 @@ void screenMenuInfoRender(Menu* m, Screen* s, int index){
     }
     if(m->menuType == TYPE_RANGE){
         drawTextWithNewlines(s,helpArr[m->helpReference[0]],5,30,3);
+        if(m->name == "Brightness"){
+            s->screenSetBackLight(sel);
+            renderDemoScreen(s, ch, ROT_180_DEG);
+            digitalWrite(s->dProp[ch].cs_pin, LOW);
+        }
     }
     if(m->menuType == TYPE_SELECT){        
         drawTextWithNewlines(s,helpArr[m->helpReference[index+1]],5,30,3);
+        if(m->name == "Rotation"){
+            renderDemoScreen(s, ch, index);
+            digitalWrite(s->dProp[ch].cs_pin, LOW);
+            //elements draw directly on screen to keep 
+            s->tft.setRotation(ROT_180_DEG);
+            s->tft.fillRect(0,195,240,45,TFT_BLACK);
+            s->tft.fillRoundRect(0,200,240,40,5,TFT_LIGHTGREY);
+            s->tft.fillRoundRect(2,202,236,36,5,DARKGREY);
+            s->tft.loadFont(SMALLFONT);
+            s->tft.setTextFont(2);
+            s->tft.setTextColor(TFT_WHITE);        
+            s->tft.drawCentreString("Select",120,210,4);
+            digitalWrite(s->dProp[ch].cs_pin, HIGH);
+            return;       
+            //s->tft.setRotation                        
+        } 
     }    
 
     if(m->menuType == TYPE_SELECT || m->menuType == TYPE_ROOT)
@@ -187,7 +213,7 @@ void menuTextItemPlacer(String text, Screen* s, int pos, int selType, int tick){
     int32_t y = 40*pos+5;
 
     if(selType == 1){
-        s->img.fillRoundRect(2,40*pos-3,236,36,5,0x7BF2);
+        s->img.fillRoundRect(2,40*pos-3,236,36,5,DARKGREY);
     }
 
     if(tick == 1){
@@ -206,9 +232,9 @@ void menuTextItemPlacer(String text, Screen* s, int pos, int selType, int tick){
 
 void menuButtonTextPlacer(Screen* s, String barText){
 
-    //recangle color    
+    //rectangle color    
     s->img.fillRoundRect(0,200,240,40,5,TFT_LIGHTGREY);
-    s->img.fillRoundRect(2,202,236,36,5,0x7BF2);
+    s->img.fillRoundRect(2,202,236,36,5,DARKGREY);
     s->img.loadFont(SMALLFONT);
     s->img.setTextFont(2);
     s->img.setTextColor(TFT_WHITE);        
@@ -229,5 +255,20 @@ void drawTextWithNewlines(Screen* s, const char* text, int startX, int startY, i
     }
     ptr++;
   }
+
+}
+
+void renderDemoScreen(Screen* s, int ch, int index){
+    chScreenData demosScr = {
+        {},
+        {5000,725,1000,20,false,false},
+        {1,"COMx","",3},
+        false, true, true, ILIM_1_0, true, 0,0
+    };
+
+    demosScr.dProp.cs_pin = s->dProp[ch].cs_pin;
+    demosScr.dProp.rotation = index;
+
+    s->screenDefaultRender(demosScr);
 
 }

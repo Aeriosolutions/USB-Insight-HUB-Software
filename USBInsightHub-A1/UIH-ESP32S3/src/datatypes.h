@@ -99,7 +99,8 @@
 #define VEXT    true
 
 struct System {
-  uint8_t currentView;  
+  uint8_t currentView;
+  TaskHandle_t taskIntercommHandle; 
 };
 
 struct FeaturesState {

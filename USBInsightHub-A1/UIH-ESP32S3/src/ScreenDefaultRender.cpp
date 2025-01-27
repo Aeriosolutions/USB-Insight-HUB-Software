@@ -7,8 +7,11 @@ void Screen::screenDefaultRender(chScreenData Screen){
   String device = "*";
   uint32_t color;
   int faultType = 0;
-
+  
+  unsigned long timers=0;
+  unsigned long timere=0;
   //Fault classification
+  timers=millis();
 
   if(Screen.pwr_en && Screen.fault) faultType = 1;
   else if (Screen.mProp.fwdAlertSet||Screen.mProp.backAlertSet) faultType = 2;
@@ -65,6 +68,8 @@ void Screen::screenDefaultRender(chScreenData Screen){
   img.setTextSize(2);
   img.setTextColor(TFT_GREEN);
 
+  //ESP_LOGI("1","%u",millis()-timers); //----------------------------------------
+  
   aux = String(Screen.mProp.AvgVoltage/1000, 3);
   //aux = String(Screen.mProp.AvgVoltage,0);
 
@@ -92,6 +97,8 @@ void Screen::screenDefaultRender(chScreenData Screen){
   img.drawRightString(aux, 235, 182, 4);
   img.unloadFont();
 
+  //ESP_LOGI("2","%u",millis()-timers); //----------------------------------------
+
   img.loadFont(SMALLFONT);
 
   //if(Screen.fault) img.drawCentreString("S",20,180,4);
@@ -113,7 +120,7 @@ void Screen::screenDefaultRender(chScreenData Screen){
   img.fillRect(65, 222, cval, 18, TFT_CYAN) ;
 
   //Device name box
-  img.fillRoundRect(7, 40, 226, 90, 10, 0x7BF2); //**
+  img.fillRoundRect(7, 40, 226, 90, 10, DARKGREY); //**
   
   //Device text print
   //img.setTextSize(2);
@@ -141,6 +148,8 @@ void Screen::screenDefaultRender(chScreenData Screen){
   }
 
   img.unloadFont();
+
+  //ESP_LOGI("3","%u",millis()-timers); //----------------------------------------
 
   //img.loadFont(SMALLFONT);
   //USB type info
@@ -205,23 +214,28 @@ void Screen::screenDefaultRender(chScreenData Screen){
     img.setTextColor(TFT_GREEN);
     img.fillRoundRect(7, 40, 226, 90, 10, TFT_BLACK);
     cval = ((Screen.startup_timer-Screen.startup_cnt) * 226) / Screen.startup_timer;
-    img.fillRoundRect(7, 40, cval, 90, 10, 0x7BF2);
+    img.fillRoundRect(7, 40, cval, 90, 10, DARKGREY);
     //aux = String((Screen.startup_cnt+9)/10) + "/" + String((Screen.startup_timer+10)/10);
     aux = String((float)(Screen.startup_cnt)/10) + "s";
     img.drawCentreString(aux, 120, 65, 4); //**
     img.unloadFont();
   }
+ 
+  //ESP_LOGI("4","%u",millis()-timers); //---------------------------------------- 
+  
 
+  timers=millis();
+  //img.pushSprite(0, 0);
+  tft.pushImageDMA(0,0,240,240,imgPtr);
+  timere=millis();
+  //ESP_LOGI("P","%u",millis()-timers); //----------------------------------------- 
+  
+  while(tft.dmaBusy()){
+    vTaskDelay(pdMS_TO_TICKS(5));    
+  }
+  
+  //ESP_LOGI("W","%u",millis()-timers); //---------------------------------------- 
 
-  /*
-  //test counter
-  img.setTextSize(1);
-  img.setTextColor(TFT_LIGHTGREY);
-  img.drawCentreString(String(Screen.dProp.brightness),140,2,4);  
-  */
-  //img.unloadFont();
-  //img.fillRoundRect(0, 0, 240, 240, 0, TFT_WHITE);
-  img.pushSprite(0, 0);
   digitalWrite(Screen.dProp.cs_pin, HIGH);
   
 }

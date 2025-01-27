@@ -11,7 +11,7 @@ void iniPowerStartUp(GlobalState* globalState, GlobalConfig* globalConfig){
     globState = globalState;
     globConfig = globalConfig;
 
-    if(globConfig->features.startUpmode==STARTUP_SEC){
+    if(globConfig->features.startUpmode == STARTUP_SEC){
         globState->features.startUpActive = true;
     }             
 

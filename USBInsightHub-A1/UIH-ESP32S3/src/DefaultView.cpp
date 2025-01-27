@@ -20,6 +20,7 @@ void taskDefaultScreenLoop(void *pvParameters);
 bool defaultViewActive = false;
 SemaphoreHandle_t screen_Semaphore;
 
+
 void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Screen *screen){
 
   gState = globalState;
@@ -48,9 +49,8 @@ void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Scree
       iScreen->screenDefaultRender(ScreenArr[i]);
     }
     
-    analogWrite(DLIT_1,800);
-    analogWrite(DLIT_2,800);
-    analogWrite(DLIT_3,800);
+    iScreen->screenSetBackLight(gConfig->screen[0].brightness);
+
     xSemaphoreGive(screen_Semaphore);
     defaultViewStart();
 
@@ -64,7 +64,7 @@ void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Scree
 void defaultViewStart(void){
   if(!defaultViewActive){
     defaultViewActive = true;
-    xTaskCreatePinnedToCore(taskDefaultScreenLoop, "Default Screen", 2048, NULL, 4, NULL,APP_CORE);
+    xTaskCreatePinnedToCore(taskDefaultScreenLoop, "Default Screen", 4096, NULL, 4, NULL,APP_CORE);
     xTaskCreatePinnedToCore(taskDefaultViewLoop, "Default View", 2048, NULL, 3, NULL,APP_CORE);      
   }
 }
@@ -94,15 +94,16 @@ void taskDefaultViewLoop(void *pvParameters){
             }
             //Normal condition, toggle output ON/OFF
             else
-            {
-              gState->baseMCUOut[i].pwr_en = !gState->baseMCUOut[i].pwr_en;
+            { 
+              gState->baseMCUOut[i].pwr_en = !gState->baseMCUOut[i].pwr_en;              
             }
           }
 
         }
         if (btnLongCheck(i)) {
           ESP_LOGI(TAG,"Button %s long press",String(i+1));
-          gState->baseMCUOut[i].data_en = !gState->baseMCUOut[i].data_en;
+          if(gConfig->features.hubMode == USB2_3 || gConfig->features.hubMode == USB2)
+            gState->baseMCUOut[i].data_en = !gState->baseMCUOut[i].data_en;
         }
       }
 
@@ -141,26 +142,6 @@ void taskDefaultViewLoop(void *pvParameters){
         
         ESP_LOGI(TAG,"Setup button long press");
 
-        //To change the screen rotation
-
-        /*
-        for(int i=0;i<3;i++){
-          switch(gConfig->screen[i].rotation){
-              case 0: 
-                gConfig->screen[i].rotation = 1;
-                break;
-              case 1: 
-                gConfig->screen[i].rotation = 2;
-                break;
-              case 2: 
-                gConfig->screen[i].rotation = 3;
-                break;
-              case 3: 
-                gConfig->screen[i].rotation = 0;
-                break;
-          }                  
-        } */
-
         defaultViewActive=false;
         menuViewStart(gState,gConfig,iScreen);
         ESP_LOGI(TAG,"Delete Task Loop");
@@ -169,33 +150,56 @@ void taskDefaultViewLoop(void *pvParameters){
       }       
     }
     vTaskDelay(pdMS_TO_TICKS(DEFAULT_VIEW_PERIOD));
-  }
-    
+  }   
 }
 
 void taskDefaultScreenLoop(void *pvParameters){
-  int iScnt=0;
-  int slowCnt=0;
+  
+  int iScnt = 0;
+  int slowCnt = 0;
+  int slowPeriod = 10;
+  bool firstPass = false;
+  uint16_t prevBrightness = 10; //this value is out of range 0-3 to force first update 
+  unsigned long timers=0;
+  unsigned long timere=0;
+  
   TickType_t xLastWakeTime = xTaskGetTickCount();
   ESP_LOGI(TAG,"Loop Screen on Core %u",xPortGetCoreID());
+  
   if(xSemaphoreTake(screen_Semaphore,( TickType_t ) 10 ) == pdTRUE)
   {
     for(;;){
       
+      xTaskNotifyGive(gState->system.taskIntercommHandle);
+
+      //adjust brightness only if there is a change to avoid flikering
+      if(prevBrightness != gConfig->screen[0].brightness && firstPass){        
+        iScreen->screenSetBackLight(gConfig->screen[0].brightness);
+        prevBrightness = gConfig->screen[0].brightness;
+      }
+      //keep backlight off for the first update for the three screens
+      if(!firstPass) iScreen->screenSetBackLight(0);
+
       defaultScreenFastDataUpdate();
+      if(gConfig->features.refreshRate == S0_5) slowPeriod = SLOW_DATA_DOWNSAMPLES_0_5;
+      if(gConfig->features.refreshRate == S1_0) slowPeriod = SLOW_DATA_DOWNSAMPLES_1_0;
       slowCnt++;
-      if(slowCnt==SLOW_DATA_DOWNSAMPLES){
+      if(slowCnt == slowPeriod){
         slowCnt=0;
         defaultScreenSlowDataUpdate();      
       }
-      //update screen only if something changed
-      
-      if(memcmp(&prevScreenArr[iScnt],&(ScreenArr[iScnt]),sizeof(prevScreenArr[iScnt])) != 0 ){
+
+      //update screen only if something changed or on the first update cycle      
+      if(memcmp(&prevScreenArr[iScnt],&(ScreenArr[iScnt]),sizeof(prevScreenArr[iScnt])) != 0 || !firstPass){
+        //timers=millis();
         iScreen->screenDefaultRender(ScreenArr[iScnt]);
-        prevScreenArr[iScnt] = ScreenArr[iScnt];      
+        //timere=millis();
+        prevScreenArr[iScnt] = ScreenArr[iScnt];
+        //ESP_LOGI(TAG,"%u",timere-timers);            
       }
+
       iScnt++;
-      if(iScnt==3) iScnt=0;    
+      if(iScnt==3) {iScnt=0;  firstPass = true;  }
 
       if(!defaultViewActive){
         ESP_LOGI(TAG,"Delete Screen Loop");

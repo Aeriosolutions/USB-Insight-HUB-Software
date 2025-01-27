@@ -75,12 +75,13 @@ struct Menu {
 
 void menuViewStart(GlobalState* globalState, GlobalConfig* globalConfig, Screen *screen);
 
-void screenMenuIntroRender(Menu* m, Screen* s);
+void screenMenuIntroRender(Menu* m, Screen* s, String channel ="0");
 void screenMenuListRender(Menu* m, Screen* s, int index,int type);
 void screenMenuRangeRender(uint16_t value, String units, Screen* s);
-void screenMenuInfoRender(Menu* m, Screen* s, int index=0);
+void screenMenuInfoRender(Menu* m, Screen* s, uint16_t sel, int index=0);
 void menuTextItemPlacer(String text, Screen* s, int pos, int selType, int tick);
 void menuButtonTextPlacer(Screen* s, String barText);
 void drawTextWithNewlines(Screen* s, const char* text, int startX, int startY, int textHeight);
+void renderDemoScreen(Screen* s, int ch, int index=0);
 
 #endif //MENUVIEW_H

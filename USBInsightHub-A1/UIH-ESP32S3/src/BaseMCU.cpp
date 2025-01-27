@@ -69,26 +69,6 @@ void BaseMCU::readAll(){
   unsigned long i2cwd_timer = 0;
 
   if(readStart(BASEMCU_ADDR,CH1REG,5)){  
-  /*if(initiated){
-    I2C->beginTransmission(BASEMCU_ADDR);
-    I2C->write(CH1REG);
-    err = I2C->endTransmission(false); 
-    i2cwd_timer = millis();  //*probably this protection is not longer necessary
-    err = I2C->requestFrom(BASEMCU_ADDR,5); //*
-    if(millis()-i2cwd_timer > SLOWDOWN_TIMEOUT){ //*workaround for sudden drop in I2C speed, reported here https://github.com/espressif/arduino-esp32/issues/8480
-      //Serial.println("I2C Slow down on bMCU detected!!");//*
-      ESP_LOGW(TAG,"I2C Slow down on bMCU detected!!");
-      I2C->flush(); //*
-      I2C->setClock(100000); //*
-      I2C->setClock(400000); //*
-      return; //*
-    }
-
-    if(err==0) {
-      //Serial.println("BaseMCU Fail to read bytes");
-      ESP_LOGW(TAG,"BaseMCU Fail to read bytes");
-      return;
-    }*/
 
     while(I2C->available()){
       data=I2C->read();

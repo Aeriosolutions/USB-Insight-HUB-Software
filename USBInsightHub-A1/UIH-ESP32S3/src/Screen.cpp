@@ -21,9 +21,7 @@ void Screen::start(){
   analogWriteResolution(PWN_RESOLUTION);
   analogWriteFrequency(BACKLIGHT_FREQ);
 
-  analogWrite(DLIT_1, 0);
-  analogWrite(DLIT_2, 0);
-  analogWrite(DLIT_3, 0);
+  screenSetBackLight(0);
   delay(150); //100ms wait after power up before reset
   //Reset Displays
   digitalWrite(DISPLAY_ALL_DRES, HIGH);
@@ -37,10 +35,11 @@ void Screen::start(){
   digitalWrite(DISPLAY_CS_3, LOW);
 
   tft.init();
+  tft.initDMA();
   tft.writecommand(ST7789_TEON); //Enable tearing effect signal
   tft.writedata(0x00);
   
-  img.createSprite(240, 240);
+  imgPtr = (uint16_t*)img.createSprite(240, 240);
   pcimg.createSprite(33, 29);
   pcimg.setSwapBytes(true);
   warimg.createSprite(35, 35);
@@ -57,4 +56,10 @@ void Screen::start(){
   //analogWrite(DLIT_1, 800);
   //analogWrite(DLIT_2, 800);
   //analogWrite(DLIT_3, 800);
+}
+
+void Screen::screenSetBackLight(int pwm){
+  analogWrite(DLIT_1, pwm);
+  analogWrite(DLIT_2, pwm);
+  analogWrite(DLIT_3, pwm);  
 }

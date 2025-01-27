@@ -15,8 +15,9 @@ PAC194x bMeter;
 
 //BaseMCUState prevMCUState[3];
 BaseMCUStateOut prevMCUConfig[3];
-MeterState prevMeterState[3];
+//MeterState prevMeterState[3];
 MeterConfig prevMeterConfig[3];
+uint8_t prevHubMode;
 
 //Route the power meter physical channels to the board channels
 uint8_t meterBoardMap[3]={2,0,1}; 
@@ -44,6 +45,10 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
     pinMode(MCU_INT,INPUT_PULLUP);
 
     i2c_Semaphore = xSemaphoreCreateMutex();
+
+    //memcpy(prevMCUConfig,glState->baseMCUOut,sizeof(prevMCUConfig));
+    //memcpy(prevMeterConfig,glConfig->meter,sizeof(prevMeterConfig));
+    //prevHubMode = glConfig->features.hubMode;
 
     //I2C initialization
     ESP_LOGI(TAG,"Core %u",xPortGetCoreID());
@@ -77,7 +82,7 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
         xSemaphoreGive(i2c_Semaphore);
 
         attachInterrupt(PAC_ALERT, inter_pac_alert_isr, FALLING);        
-        xTaskCreatePinnedToCore(taskIntercomms, "Default View", 2560, NULL, 2, NULL,APP_CORE);
+        xTaskCreatePinnedToCore(taskIntercomms, "Default View", 4096, NULL, 2,&(glState->system.taskIntercommHandle),APP_CORE);
         xTaskCreatePinnedToCore(inter_pac_alert_handler_task, "pac alert handler", 2048,  NULL, 2,  &inter_pac_alert_handle, APP_CORE);
     } 
     else {
@@ -90,7 +95,7 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
 void interMcuWriteAll(void){
 
   if(i2c_Semaphore != NULL){
-    if(xSemaphoreTake(i2c_Semaphore,portMAX_DELAY) == pdTRUE){
+    if(xSemaphoreTake(i2c_Semaphore,pdMS_TO_TICKS(10)) == pdTRUE){
       bMCU.writeAll();       
       xSemaphoreGive(i2c_Semaphore);
     } 
@@ -105,7 +110,7 @@ void interMcuWriteAll(void){
 void interMcuReadAll(void){
 
   if(i2c_Semaphore != NULL){
-    if(xSemaphoreTake(i2c_Semaphore,portMAX_DELAY) == pdTRUE){
+    if(xSemaphoreTake(i2c_Semaphore,pdMS_TO_TICKS(10)) == pdTRUE){
       bMCU.readAll();       
       xSemaphoreGive(i2c_Semaphore);
     } 
@@ -118,7 +123,7 @@ void interMcuReadAll(void){
 
 void interAvgMeterRead(void){
   if(i2c_Semaphore != NULL){
-    if(xSemaphoreTake(i2c_Semaphore,portMAX_DELAY) == pdTRUE){
+    if(xSemaphoreTake(i2c_Semaphore,pdMS_TO_TICKS(10)) == pdTRUE){
       bMeter.refresh_v();
       delayMicroseconds(500); //required to update Meter registers after refresh command. 
       bMeter.readAvgMeter();        
@@ -133,7 +138,7 @@ void interAvgMeterRead(void){
 void interSetCurrentLimits(void){
   
   if(i2c_Semaphore != NULL){
-    if(xSemaphoreTake(i2c_Semaphore,portMAX_DELAY) == pdTRUE){
+    if(xSemaphoreTake(i2c_Semaphore,pdMS_TO_TICKS(10)) == pdTRUE){
       bMeter.enableAlerts(false);
       ESP_LOGV(TAG,"Set current");
       for(int i=0; i<3; i++)
@@ -153,7 +158,7 @@ void interSetCurrentLimits(void){
       xSemaphoreGive(i2c_Semaphore);
     } 
     else{
-      ESP_LOGE(TAG,"Timeout to write I2C PAC1943");
+      ESP_LOGE(TAG,"Timeout I2C to set current on PAC1943");
     }
   }  
 }
@@ -161,8 +166,15 @@ void interSetCurrentLimits(void){
 void taskIntercomms(void *pvParameters){
   TickType_t xLastWakeTime = xTaskGetTickCount();
   ESP_LOGI(TAG,"Intercomms started on Core %u",xPortGetCoreID());
+  unsigned long timer=0;
+
   for(;;){
 
+    //wait taskDefaultScreenLoop notification to synchronize DISPLAY_REFRESH_PERIOD
+    //with actual sampling rate.
+    ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(100));
+
+    timer = millis();
     //handle automatic selection of the hardware current limit based on forward current limit
     for(int i=0; i<3; i++){
 
@@ -177,12 +189,29 @@ void taskIntercomms(void *pvParameters){
 
     }
 
+    //if there is a change in the HUB mode operation
+    if(prevHubMode != glConfig->features.hubMode){
+      ESP_LOGI(TAG, "HUB Mode Changed");
+      if(glConfig->features.hubMode == USB2_3 ||glConfig->features.hubMode == USB3)
+        bMCU.setUSB3Enable(true);
+      if(glConfig->features.hubMode == USB2)
+        bMCU.setUSB3Enable(false);
+
+      for(int i =0; i< 3; i++) 
+      {
+        if(glConfig->features.hubMode == USB2_3 || glConfig->features.hubMode == USB2)
+          glState->baseMCUOut[i].data_en = true;
+        if(glConfig->features.hubMode == USB3)
+          glState->baseMCUOut[i].data_en = false;
+      }
+      prevHubMode = glConfig->features.hubMode;                      
+    }
 
     //check if there is any change in GlobalConfig to update the MCU
     if( memcmp(&prevMCUConfig,&(glState->baseMCUOut),sizeof(prevMCUConfig)) != 0 ){
     //if( memcmp(&prevMCUConfig,&(glState->baseMCU),sizeof(prevMCUConfig)) != 0 ){
       //update bMCU data with what is in globalConfig
-      ESP_LOGV(TAG, "baseMCU Out changed");
+      ESP_LOGI(TAG, "baseMCU Out changed");
       for(int i=0; i<3; i++){
         bMCU.chArr[i].pwr_en = glState->baseMCUOut[i].pwr_en;
         bMCU.chArr[i].data_en = glState->baseMCUOut[i].data_en;
@@ -191,11 +220,14 @@ void taskIntercomms(void *pvParameters){
       //send data
       //ESP_LOGV(TAG, "baseMCU mcuwriteall");
       interMcuWriteAll();
-      //ESP_LOGV(TAG, "memcpy baseMCU");
+
+      //Save state only if statupmode is persistance      
+      if(bMCU.initiated && glConfig->features.startUpmode == PERSISTANCE) saveMCUState();          
       //save current state for later comparison
-      if(bMCU.initiated) saveMCUState();          
       memcpy(prevMCUConfig,glState->baseMCUOut,sizeof(prevMCUConfig));
     }
+    
+    //delayMicroseconds(500); 
 
     //read bMCU
     interMcuReadAll();
@@ -206,17 +238,18 @@ void taskIntercomms(void *pvParameters){
       glState->baseMCUOut[i].pwr_en = bMCU.chArr[i].pwr_en;
       glState->baseMCUOut[i].data_en = bMCU.chArr[i].data_en;
       glState->baseMCUOut[i].ilim = bMCU.chArr[i].ilim;
-      glState->baseMCUExtra.base_ver = bMCU.baseMCUVer;
-      glState->baseMCUExtra.pwr_source = bMCU.pwrsource;
-      glState->baseMCUExtra.usb3_mux_out_en = bMCU.muxoe;
-      glState->baseMCUExtra.usb3_mux_sel_pos = bMCU.muxsel;
-      glState->baseMCUExtra.vext_stat = bMCU.extState;
-      glState->baseMCUExtra.vhost_stat = bMCU.hostState;
-    }  
+    } 
+    
+    glState->baseMCUExtra.base_ver = bMCU.baseMCUVer;
+    glState->baseMCUExtra.pwr_source = bMCU.pwrsource;
+    glState->baseMCUExtra.usb3_mux_out_en = bMCU.muxoe;
+    glState->baseMCUExtra.usb3_mux_sel_pos = bMCU.muxsel;
+    glState->baseMCUExtra.vext_stat = bMCU.extState;
+    glState->baseMCUExtra.vhost_stat = bMCU.hostState; 
 
     vTaskDelay(pdMS_TO_TICKS(5));
     
-    //check if there is any change in GlobalConfig to update the Meter
+    //check if there is any change in GlobalConfig to update the Meter current limits
     if(memcmp(&prevMeterConfig,&(glConfig->meter),sizeof(prevMeterConfig))!=0){
       //update Meter with what is in globalConfig and send to Meter
       ESP_LOGV(TAG, "Meter Config changed");
@@ -226,6 +259,12 @@ void taskIntercomms(void *pvParameters){
       memcpy(prevMeterConfig,glConfig->meter,sizeof(prevMeterConfig));         
     }
 
+    for(int i=0; i<3; i++){
+      if(glConfig->features.filterType==FILTER_TYPE_MOVING_AVG) bMeter.chMeterArr[i].filterType = FILTER_TYPE_MOVING_AVG;
+      if(glConfig->features.filterType==FILTER_TYPE_MEDIAN) bMeter.chMeterArr[i].filterType = FILTER_TYPE_MEDIAN;
+    }
+    if(glConfig->features.refreshRate==S0_5) bMeter.setFilterLength(10);
+    if(glConfig->features.refreshRate==S1_0) bMeter.setFilterLength(20);
     //read Meter
     
     interAvgMeterRead();
@@ -240,9 +279,11 @@ void taskIntercomms(void *pvParameters){
       //State->Meter Inputs
       bMeter.chMeterArr[i].backAlertSet = glState->meter[i].backAlertSet;
       bMeter.chMeterArr[i].fwdAlertSet  = glState->meter[i].fwdAlertSet;    
-    }
+    }    
+    //ESP_LOGI("I2C","%u",millis()-timer); //----------------------------------
+    //this task takes 6-7 ms
     
-    vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(INTERCOMMS_PERIOD));
+    //vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(INTERCOMMS_PERIOD));
   }
 }
 
@@ -265,8 +306,7 @@ void inter_pac_alert_handler_task(void *pvParameters)
       ESP_LOGI(TAG,"pac alert interrupt detected");
       if(i2c_Semaphore != NULL){
         if(xSemaphoreTake(i2c_Semaphore,( TickType_t ) 10 ) == pdTRUE){        
-          //HWSerial.println("Inside sempahore");
-          //HWSerial.println(String(bMeter.readInterruptFlags()));
+
           int ret_count =0; //
           
           //The while loop is added to detect cases in which the alert is triggered again after reading the flags

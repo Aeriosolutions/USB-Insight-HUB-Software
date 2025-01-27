@@ -18,7 +18,7 @@
 
 #define FILTER_TYPE_MOVING_AVG 0
 #define FILTER_TYPE_MEDIAN 1
-#define AVG_WINDOW_SIZE 10
+#define MAX_FILTER_WINDOW_SIZE 20
 
 //define configurations
 //Configuration control for enabling bidirectional current and bipolar voltage measurements Page 52
@@ -134,10 +134,10 @@ struct meter {
 };
 
 struct meter_averager {
-  float VoltageBuf[AVG_WINDOW_SIZE];
+  float VoltageBuf[MAX_FILTER_WINDOW_SIZE];
   float VoltageTotal;
   float VoltageAveraged;
-  float CurrentBuf[AVG_WINDOW_SIZE];
+  float CurrentBuf[MAX_FILTER_WINDOW_SIZE];
   float CurrentTotal;
   float CurrentAveraged;
 };
@@ -151,17 +151,20 @@ class PAC194x {
                           {FULLSCALE_20mOHM,DEFAULT_FWD_C_LIM,DEFAULT_BACK_C_LIM,0,0,0,0,false,false,FILTER_TYPE_MEDIAN},
                           {FULLSCALE_20mOHM,DEFAULT_FWD_C_LIM,DEFAULT_BACK_C_LIM,0,0,0,0,false,false,FILTER_TYPE_MEDIAN}
                         };
+
     meter_averager chAverager[3];
     bool begin(TwoWire *theWire);    
     void refresh_v();
     void refresh();
     void readAvgMeter();
     void setCurrentLimit(float climit, bool cdir, int ch);
+    void setFilterLength(uint8_t length);
     void enableAlerts(bool enable);
     uint8_t readInterruptFlags();
-    uint16_t read16(uint8_t address);
+    uint16_t read16(uint8_t address);        
 
   private:
+    uint8_t filterWindowsize = 10;
     void write24(uint8_t reg_address,uint8_t lowByte, uint8_t midByte, uint8_t highByte);
     void write16(uint8_t reg_address,uint8_t lowByte, uint8_t highByte);
     void write8(uint8_t reg_address,uint8_t data);
@@ -170,6 +173,7 @@ class PAC194x {
     void voltageMedianFilter(int i);
     void currentMedianFilter(int i);
     float medianFunction(float arr[], int n);
+    float movingAverage(float arr[], int n);
 
     TwoWire *I2C;
     bool initiated = false;

@@ -7,6 +7,8 @@ Preferences flashstorage;
 GlobalState *globlState;
 GlobalConfig *globlConfig;
 
+GlobalConfig prevGloblConfig;
+
 void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig);
 
 
@@ -85,7 +87,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     
     for(int i=0; i<3; i++){
         //---Startup    
-        globalState->startup[i].startup_cnt = globalConfig->startup[i].startup_timer;
+        globalState->startup[i].startup_cnt = 0;
         
         //---Meter
         globalState->meter[i].AvgVoltage = 0;
@@ -99,23 +101,30 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
         globalState->usbInfo[i].Dev2_Name ="-";
         globalState->usbInfo[i].usbType = 0;
 
+
+
         //---BaseMCU
         globalState->baseMCUIn[i].fault = false;
         switch(globalConfig->features.startUpmode){
-            case PERSISTANCE:
-                globalState->startup[i].startup_cnt = 0;
+            case PERSISTANCE:                
                 break;
-            case START_ON:
-                globalState->startup[i].startup_cnt = 0;
+            case START_ON:                
                 globalState->baseMCUOut[i].data_en = true;
                 globalState->baseMCUOut[i].pwr_en = true;
                 break;
-            case START_OFF: 
-            case STARTUP_SEC:                
+            case START_OFF:                
+                globalState->baseMCUOut[i].data_en = true;
+                globalState->baseMCUOut[i].pwr_en = false;
+                break;
+            case STARTUP_SEC:
+                globalState->startup[i].startup_cnt = globalConfig->startup[i].startup_timer;                
                 globalState->baseMCUOut[i].data_en = true;
                 globalState->baseMCUOut[i].pwr_en = false;
                 break;
         }
+
+        //---USB HUB Mode
+        if(globalConfig->features.hubMode == USB3) globalState->baseMCUOut[i].data_en = false;
 
     }
 
@@ -127,8 +136,11 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     globalState->baseMCUExtra.pwr_source = VHOST;  
     globalState->baseMCUExtra.usb3_mux_out_en = false;
     globalState->baseMCUExtra.usb3_mux_sel_pos = false;
-    globalState->baseMCUExtra.base_ver = 255; //not implemented yet
+    globalState->baseMCUExtra.base_ver = 255;
 
+    //start task to detect
+    prevGloblConfig = *globlConfig;
+    xTaskCreatePinnedToCore(taskConfigAutoSave, "ConfigAutoSave", 2048, NULL, 5, NULL,APP_CORE);
 }
 
 void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig){
@@ -161,9 +173,29 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
     globalConfig->startup[2].startup_timer = 81;
 }
 
+
+void taskConfigAutoSave(void *pvParameters){
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  for(;;){
+    if( memcmp(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig)) != 0 ){
+        saveConfig();
+        memcpy(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig));
+    }
+    //check if is a change in config parameters
+    vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(CONFIG_AUTO_SAVE_PERIOD));
+  }
+}
+
 void saveMCUState(void){
     flashstorage.begin(UIH_NAMESPACE,false);
     flashstorage.putBytes("MCUBlob",&(globlState->baseMCUOut),sizeof(globlState->baseMCUOut));
     ESP_LOGI(TAG,"Save MCU blob");
+    flashstorage.end();
+}
+
+void saveConfig(void){
+    flashstorage.begin(UIH_NAMESPACE,false);
+    flashstorage.putBytes("ConfigBlob",globlConfig,sizeof(*globlConfig));
+    ESP_LOGI(TAG,"Save Config blob");
     flashstorage.end();
 }

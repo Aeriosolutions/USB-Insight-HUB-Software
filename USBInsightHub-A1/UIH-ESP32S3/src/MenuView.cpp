@@ -59,8 +59,8 @@ Menu generalConfig = {
             {TYPE_SELECT,"Filter Type",{},{"Moving Avg.","Median"},"",{H_METFILT,H_METFILTMA,H_METFILTMED}}
         },{},"",{H_METER}},        
         {TYPE_ROOT, "Screen",{
-            {TYPE_SELECT,"Rotation",{},{"0","90","180","270"},"DEG",{H_SCRROT,H_SCRROT,H_NONE,H_NONE,H_NONE}},
-            {TYPE_RANGE,"Brightness",{},{"100","1000","50"},"%",{H_SCRBRI}}
+            {TYPE_SELECT,"Rotation",{},{"0","90","180","270"},"DEG",{H_SCRROT,H_NONE,H_NONE,H_NONE,H_NONE}},
+            {TYPE_RANGE,"Brightness",{},{"50","1000","50"},"%",{H_SCRBRI}}
         },{},"",{H_SCREEN}},
         {TYPE_SELECT, "HUB Mode",{},{"USB2 & USB3", "USB2 Only", "USB3 Only"},"",
         {H_USBTYP,H_USBTYP23,H_USBTYP2,H_USBTYP3}}
@@ -102,7 +102,7 @@ void menuViewStart(GlobalState* globalState, GlobalConfig* globalConfig, Screen 
 void taskMenuViewLoop(void *pvParameters){
     ESP_LOGI(TAG,"Loop on Core %u",xPortGetCoreID());
     
-    if(xSemaphoreTake(screen_Semaphore,pdMS_TO_TICKS(50) ) == pdTRUE)
+    if(xSemaphoreTake(screen_Semaphore,pdMS_TO_TICKS(60) ) == pdTRUE)
     {   
         //place main menu
         mIndex=0;
@@ -113,8 +113,9 @@ void taskMenuViewLoop(void *pvParameters){
         uint16_t step;
         uint16_t rmin;
         uint16_t rmax;
-
+        iScr->screenSetBackLight(0);
         rootLayout(currentMenu,mIndex);
+        iScr->screenSetBackLight(800);
 
         for(;;){
 
@@ -148,6 +149,11 @@ void taskMenuViewLoop(void *pvParameters){
                         rmin = (uint16_t)(currentMenu->params[0].toInt());                        
                         step = (uint16_t)(currentMenu->params[2].toInt());
                         ESP_LOGI(TAG,"%s, %u, %u, %u",ch,sel,rmin,step);
+
+                        if(currentMenu->name == "Startup Timer" && sel == 5){
+                            sel = 1;
+                            setParamValue(currentMenu->name,sel,ch);
+                        } 
                         if(sel - step >= rmin){
                             sel = sel - step;
                             setParamValue(currentMenu->name,sel,ch);
@@ -188,7 +194,10 @@ void taskMenuViewLoop(void *pvParameters){
                         step = (uint16_t)(currentMenu->params[2].toInt());
                         //ESP_LOGI(TAG,"%s, %u, %u, %u",ch,sel,rmax,step);
                         if(sel + step <= rmax) {
-                            sel = sel + step;
+                            if(currentMenu->name == "Startup Timer" && sel < 5) 
+                                sel = 5;
+                            else 
+                                sel = sel + step;
                             setParamValue(currentMenu->name,sel,ch);    
                         }                        
                     }                   
@@ -240,7 +249,7 @@ void rootLayout(Menu* root, int index){
 
     ESP_LOGI("","-------------");
     ESP_LOGI("","Help Index: %u", root->submenus[index].helpReference[0]);
-    screenMenuInfoRender(root,iScr,index);
+    screenMenuInfoRender(root,iScr,0,index);
 }
 
 void selectLayout(Menu* root, int index){
@@ -266,7 +275,7 @@ void selectLayout(Menu* root, int index){
 
     ESP_LOGI("","-------------");
     ESP_LOGI("","Help Index: %u", root->helpReference[0]);
-    screenMenuInfoRender(root,iScr,index);
+    screenMenuInfoRender(root,iScr,0,index);
 }
 
 void rangeLayout(Menu* root, String channel){
@@ -274,13 +283,13 @@ void rangeLayout(Menu* root, String channel){
     uint16_t sel = getParamValue(root->name, channel);
     ESP_LOGI("","-------------");
     ESP_LOGI("","%s",root->name.c_str());
-    screenMenuIntroRender(root,iScr);     
+    screenMenuIntroRender(root,iScr,channel);     
     ESP_LOGI("","-------------");
     ESP_LOGI("","<< %u >>",sel);
     screenMenuRangeRender(sel,root->paramUnits,iScr);
     ESP_LOGI("","-------------");
     ESP_LOGI("","Help Index: %u", root->helpReference[0]);
-    screenMenuInfoRender(root,iScr);
+    screenMenuInfoRender(root,iScr,sel);
 }
 
 
@@ -350,11 +359,15 @@ void setParamValue(String param, uint16_t value, String channel){
         return;
     }
     if(param =="Rotation") {    
-        gCon->screen[channel.toInt()].rotation = (uint8_t)(value);
+        gCon->screen[0].rotation = (uint8_t)(value);
+        gCon->screen[1].rotation = (uint8_t)(value);
+        gCon->screen[2].rotation = (uint8_t)(value);
         return;
     }
     if(param =="Brightness") {    
-        gCon->screen[channel.toInt()].brightness = value;
+        gCon->screen[0].brightness = value;
+        gCon->screen[1].brightness = value;
+        gCon->screen[2].brightness = value;
         return;
     }
     if(param =="HUB Mode") {    

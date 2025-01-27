@@ -26,6 +26,8 @@
 #define PWN_RESOLUTION 10
 #define BACKLIGHT_FREQ 290 //Hz. Higher frequencies cause flickering when WiFi is active
 
+#define DARKGREY 0x7BF2
+
 #define SMALLFONT aptossb30l
 
 struct displayProp{
@@ -70,6 +72,7 @@ class Screen{
     //void start(TFT_eSPI *r_tft, TFT_eSprite *r_img);
     void start();
     void screenDefaultRender(chScreenData Screen);
+    void screenSetBackLight(int pwm);
 
     displayProp dProp[3];
     TFT_eSPI tft       = TFT_eSPI();       // Invoke custom library
@@ -79,6 +82,7 @@ class Screen{
 
     TFT_eSprite pcimg  = TFT_eSprite(&tft);
     TFT_eSprite warimg = TFT_eSprite(&tft);
+    uint16_t* imgPtr;
 
 };
 
