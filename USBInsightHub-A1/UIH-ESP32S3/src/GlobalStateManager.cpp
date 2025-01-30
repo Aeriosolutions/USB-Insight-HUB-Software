@@ -167,10 +167,10 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
         globalState->baseMCUOut[i].pwr_en = true;
         
     }
-    //for test only
-    globalConfig->startup[0].startup_timer = 41;
-    globalConfig->startup[1].startup_timer = 61;
-    globalConfig->startup[2].startup_timer = 81;
+    //Defaults
+    globalConfig->startup[0].startup_timer = 10;
+    globalConfig->startup[1].startup_timer = 20;
+    globalConfig->startup[2].startup_timer = 30;
 }
 
 

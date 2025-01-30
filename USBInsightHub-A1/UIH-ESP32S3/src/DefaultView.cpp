@@ -49,7 +49,7 @@ void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Scree
       iScreen->screenDefaultRender(ScreenArr[i]);
     }
     
-    iScreen->screenSetBackLight(gConfig->screen[0].brightness);
+    //iScreen->screenSetBackLight(gConfig->screen[0].brightness);
 
     xSemaphoreGive(screen_Semaphore);
     defaultViewStart();
@@ -64,7 +64,7 @@ void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Scree
 void defaultViewStart(void){
   if(!defaultViewActive){
     defaultViewActive = true;
-    xTaskCreatePinnedToCore(taskDefaultScreenLoop, "Default Screen", 4096, NULL, 4, NULL,APP_CORE);
+    xTaskCreatePinnedToCore(taskDefaultScreenLoop, "Default Screen", 4096, NULL, 4, &(gState->system.taskDefaultScreenLoopHandle),APP_CORE);
     xTaskCreatePinnedToCore(taskDefaultViewLoop, "Default View", 2048, NULL, 3, NULL,APP_CORE);      
   }
 }
@@ -171,6 +171,7 @@ void taskDefaultScreenLoop(void *pvParameters){
     for(;;){
       
       xTaskNotifyGive(gState->system.taskIntercommHandle);
+      ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(10));
 
       //adjust brightness only if there is a change to avoid flikering
       if(prevBrightness != gConfig->screen[0].brightness && firstPass){        
@@ -191,9 +192,9 @@ void taskDefaultScreenLoop(void *pvParameters){
 
       //update screen only if something changed or on the first update cycle      
       if(memcmp(&prevScreenArr[iScnt],&(ScreenArr[iScnt]),sizeof(prevScreenArr[iScnt])) != 0 || !firstPass){
-        //timers=millis();
+        timers=millis();
         iScreen->screenDefaultRender(ScreenArr[iScnt]);
-        //timere=millis();
+        timere=millis();
         prevScreenArr[iScnt] = ScreenArr[iScnt];
         //ESP_LOGI(TAG,"%u",timere-timers);            
       }

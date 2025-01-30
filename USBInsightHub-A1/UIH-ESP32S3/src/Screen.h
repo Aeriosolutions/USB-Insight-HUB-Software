@@ -83,7 +83,8 @@ class Screen{
     TFT_eSprite pcimg  = TFT_eSprite(&tft);
     TFT_eSprite warimg = TFT_eSprite(&tft);
     uint16_t* imgPtr;
-
+    uint16_t palette[256];
+    uint16_t RGB332_to_RGB565(uint8_t rgb332);
 };
 
 #endif //SCREEN_H

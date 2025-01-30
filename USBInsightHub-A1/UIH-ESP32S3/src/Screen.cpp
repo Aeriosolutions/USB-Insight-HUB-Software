@@ -38,8 +38,16 @@ void Screen::start(){
   tft.initDMA();
   tft.writecommand(ST7789_TEON); //Enable tearing effect signal
   tft.writedata(0x00);
+
+  // Create the RGB332 palette (256 colors)
+  for (int i = 0; i < 256; i++) {
+      palette[i] = RGB332_to_RGB565(i);
+  }
+
+  img.setColorDepth(8); //use 8 bit color depth to save 57.6kB of SRAM
+  imgPtr = (uint16_t*)img.createSprite(240, 240); //imgPtr used for DMA transaction, only with 16bit color depth
+  //img.createPalette(palette);
   
-  imgPtr = (uint16_t*)img.createSprite(240, 240);
   pcimg.createSprite(33, 29);
   pcimg.setSwapBytes(true);
   warimg.createSprite(35, 35);
@@ -53,13 +61,23 @@ void Screen::start(){
   digitalWrite(DISPLAY_CS_2, HIGH);
   digitalWrite(DISPLAY_CS_3, HIGH);
 
-  //analogWrite(DLIT_1, 800);
-  //analogWrite(DLIT_2, 800);
-  //analogWrite(DLIT_3, 800);
 }
 
 void Screen::screenSetBackLight(int pwm){
   analogWrite(DLIT_1, pwm);
   analogWrite(DLIT_2, pwm);
   analogWrite(DLIT_3, pwm);  
+}
+
+uint16_t Screen::RGB332_to_RGB565(uint8_t rgb332) {
+    uint8_t r = (rgb332 >> 5) & 0x07;  // Extract 3-bit Red
+    uint8_t g = (rgb332 >> 2) & 0x07;  // Extract 3-bit Green
+    uint8_t b = (rgb332 >> 0) & 0x03;  // Extract 2-bit Blue
+
+    // Convert to full 8-bit values and then to RGB565 format
+    r = (r * 255) / 7;  
+    g = (g * 255) / 7;
+    b = (b * 255) / 3;
+
+    return tft.color565(r, g, b);
 }

@@ -227,8 +227,6 @@ void taskIntercomms(void *pvParameters){
       memcpy(prevMCUConfig,glState->baseMCUOut,sizeof(prevMCUConfig));
     }
     
-    //delayMicroseconds(500); 
-
     //read bMCU
     interMcuReadAll();
 
@@ -247,7 +245,7 @@ void taskIntercomms(void *pvParameters){
     glState->baseMCUExtra.vext_stat = bMCU.extState;
     glState->baseMCUExtra.vhost_stat = bMCU.hostState; 
 
-    vTaskDelay(pdMS_TO_TICKS(5));
+    //vTaskDelay(pdMS_TO_TICKS(5));
     
     //check if there is any change in GlobalConfig to update the Meter current limits
     if(memcmp(&prevMeterConfig,&(glConfig->meter),sizeof(prevMeterConfig))!=0){
@@ -281,8 +279,10 @@ void taskIntercomms(void *pvParameters){
       bMeter.chMeterArr[i].fwdAlertSet  = glState->meter[i].fwdAlertSet;    
     }    
     //ESP_LOGI("I2C","%u",millis()-timer); //----------------------------------
-    //this task takes 6-7 ms
+    //this task takes 2 ms
     
+    if(glState->system.taskDefaultScreenLoopHandle != NULL)
+      xTaskNotifyGive(glState->system.taskDefaultScreenLoopHandle);
     //vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(INTERCOMMS_PERIOD));
   }
 }

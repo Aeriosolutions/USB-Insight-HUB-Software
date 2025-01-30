@@ -256,7 +256,6 @@ uint16_t PAC194x::read16(uint8_t address){
   return val;
 }
 
-
 void PAC194x::voltageMovingAverageFilter(int i){  
   /* This moving average filter implementation is more efficient, but needs to start from 0.
   chAverager[i].VoltageTotal = chAverager[i].VoltageTotal - chAverager[i].VoltageBuf[filterIndex]; // Remove the oldest entry from the sum    
@@ -323,8 +322,6 @@ float PAC194x::medianFunction(float arr[], int n){
     }  
       
 }
-
-
 
 void PAC194x::setFilterLength(uint8_t length){
   if(length >= 1 && length <= MAX_FILTER_WINDOW_SIZE) 

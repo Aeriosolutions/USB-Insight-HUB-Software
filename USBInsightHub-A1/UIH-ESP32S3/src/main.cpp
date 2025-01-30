@@ -49,11 +49,11 @@ void setup()
 {
 
     // start serial and filesystem
-    //Serial.begin(SERIAL_BAUD_RATE);
-    ESP_LOGI("Main","Running Firmware Version: %s\n", APP_VERSION);    
+    //Serial.begin(SERIAL_BAUD_RATE);   
     globalStateInitializer(&globalState,&globalConfig);
     iniExtercomms(&globalState);
     delay(40); //to give time to print
+    ESP_LOGI("Main","Running Firmware Version: %s\n", APP_VERSION);
     iniIntercomms(&globalState, &globalConfig);
     iniButtons();
     iniDefaultView(&globalState,&globalConfig, &screen);
@@ -82,6 +82,7 @@ void loop()
     masterStateObj["switch_on"] = switch_on; 
     //update
     masterStateService.update(masterStateObj,MasterState::update,"main");
+    //ESP_LOGI("Main"," Heap_ Free: %u, Total: %u, MinFree: %u, MaxAlloc: %u", ESP.getFreeHeap(), ESP.getHeapSize(),ESP.getMinFreeHeap(),ESP.getMaxAllocHeap());
     delay(1000);
     
 }

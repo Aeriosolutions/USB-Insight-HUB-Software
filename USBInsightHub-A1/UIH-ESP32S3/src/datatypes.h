@@ -100,7 +100,8 @@
 
 struct System {
   uint8_t currentView;
-  TaskHandle_t taskIntercommHandle; 
+  TaskHandle_t taskIntercommHandle;
+  TaskHandle_t taskDefaultScreenLoopHandle; 
 };
 
 struct FeaturesState {

@@ -224,15 +224,16 @@ void Screen::screenDefaultRender(chScreenData Screen){
   //ESP_LOGI("4","%u",millis()-timers); //---------------------------------------- 
   
 
-  timers=millis();
-  //img.pushSprite(0, 0);
-  tft.pushImageDMA(0,0,240,240,imgPtr);
-  timere=millis();
+  //timers=millis();
+  img.pushSprite(0, 0);
+  //tft.pushImageDMA(0,0,240,240,imgPtr); // use only with 16bit color depth
+  //timere=millis();
   //ESP_LOGI("P","%u",millis()-timers); //----------------------------------------- 
   
+  /*
   while(tft.dmaBusy()){
     vTaskDelay(pdMS_TO_TICKS(5));    
-  }
+  }*/
   
   //ESP_LOGI("W","%u",millis()-timers); //---------------------------------------- 
 
