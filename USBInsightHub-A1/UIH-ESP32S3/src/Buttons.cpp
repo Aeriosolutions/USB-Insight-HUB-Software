@@ -75,6 +75,14 @@ bool btnLongCheck(int index){
   return false;
 }
 
+void btnClearAll(){
+  for(int i=0; i<4; i++)
+  {
+    buttonsFlags.shortPress[i] = false;
+    buttonsFlags.longPress[i] = false;
+  }
+}
+
 //Handler for button interruption
 void btnDebounce(Button *button)
 {

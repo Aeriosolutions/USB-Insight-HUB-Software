@@ -44,12 +44,12 @@
 
 	let menuItems = [
 		{
-			title: 'Demo App',
+			title: 'Settings',
 			icon: Control,
-			href: '/demo',
+			href: '/settings',
 			feature: true,
 			
-		},
+		},		
 		{
 			title: 'Connections',
 			icon: Remote,

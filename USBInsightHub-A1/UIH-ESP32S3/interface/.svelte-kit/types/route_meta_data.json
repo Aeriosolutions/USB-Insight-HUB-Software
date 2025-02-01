@@ -15,8 +15,8 @@
 		"src/routes/connections/ntp/+page.ts",
 		"src/routes/+layout.ts"
 	],
-	"/demo": [
-		"src/routes/demo/+page.ts",
+	"/settings": [
+		"src/routes/settings/+page.ts",
 		"src/routes/+layout.ts"
 	],
 	"/system": [

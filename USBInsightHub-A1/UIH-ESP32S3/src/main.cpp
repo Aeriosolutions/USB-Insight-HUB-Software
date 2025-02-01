@@ -35,8 +35,6 @@ GlobalState globalState ={};
 GlobalConfig globalConfig ={};
 Screen screen;
 
-JsonDocument masterState;
-
 PsychicHttpServer server;
 
 ESP32SvelteKit esp32sveltekit(&server, 120);
@@ -61,28 +59,13 @@ void setup()
 
     // start ESP32-SvelteKit
     esp32sveltekit.begin();    
+    masterStateService.begin(&globalState,&globalConfig);
 
-    masterStateService.begin();
-    deserializeJson(masterState, "{\"power_on\":\"false\",\"switch_on\":\"false\"}");   
 }
 
 void loop()
-{
-    
-    JsonObject masterStateObj =masterState.as<JsonObject>();
-
-    //read
-    masterStateService.read(masterStateObj,MasterState::read);
-    //change something
-    bool power_on = (bool)(masterStateObj["power_on"]);
-    bool switch_on = (bool)(masterStateObj["switch_on"]);
-    //ESP_LOGI("Main","Power Button changed to %s",power_on ? "on" : "off");
-    switch_on = !switch_on;
-    //ESP_LOGI("Main","Switch changed to %s",switch_on ? "on" : "off");
-    masterStateObj["switch_on"] = switch_on; 
-    //update
-    masterStateService.update(masterStateObj,MasterState::update,"main");
+{    
     //ESP_LOGI("Main"," Heap_ Free: %u, Total: %u, MinFree: %u, MaxAlloc: %u", ESP.getFreeHeap(), ESP.getHeapSize(),ESP.getMinFreeHeap(),ESP.getMaxAllocHeap());
-    delay(1000);
     
+    delay(1000);    
 }

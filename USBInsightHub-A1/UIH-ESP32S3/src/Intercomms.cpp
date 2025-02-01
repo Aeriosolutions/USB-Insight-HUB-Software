@@ -82,7 +82,7 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
         xSemaphoreGive(i2c_Semaphore);
 
         attachInterrupt(PAC_ALERT, inter_pac_alert_isr, FALLING);        
-        xTaskCreatePinnedToCore(taskIntercomms, "Default View", 4096, NULL, 2,&(glState->system.taskIntercommHandle),APP_CORE);
+        xTaskCreatePinnedToCore(taskIntercomms, "Intercomms", 4096, NULL, 2,&(glState->system.taskIntercommHandle),APP_CORE);
         xTaskCreatePinnedToCore(inter_pac_alert_handler_task, "pac alert handler", 2048,  NULL, 2,  &inter_pac_alert_handle, APP_CORE);
     } 
     else {

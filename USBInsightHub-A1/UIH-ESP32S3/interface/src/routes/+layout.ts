@@ -10,7 +10,7 @@ export const load = (async ({ fetch }) => {
 	return {
 		features: item,
 		title: 'USB-Insight-Hub',
-		github: 'theelims/ESP32-sveltekit',
+		github: 'Aeriosolutions/USB-Insight-HUB-Software',
 		copyright: '2025 Aerio Solutions',
 		appName: 'USB Insight Hub'
 	};

@@ -56,15 +56,6 @@ export type ApSettings = {
 	subnet_mask: string;
 };
 
-export type LightState = {
-	led_on: boolean;
-};
-
-export type MasterState = {
-	power_on: boolean;
-	switch_on: boolean;
-};
-
 export type BrokerSettings = {
 	mqtt_path: string;
 	name: string;
@@ -148,4 +139,54 @@ export type MQTTSettings = {
 	client_id: string;
 	keep_alive: number;
 	clean_session: boolean;
+};
+
+export type MasterState = {
+	power_on: boolean;
+	switch_on: boolean;
+
+	channels: ChannelData[];
+
+	features_conf_startUpmode: number;
+	features_conf_wifi_enabled: number;
+	features_conf_hubMode: number;
+	features_conf_filterType: number;
+	features_conf_refreshRate: number;
+	features_startUpActive: boolean;
+	features_pcConnected: boolean;
+	features_vbusVoltage: number;
+	
+	screen_conf_rotation: number;
+	screen_conf_brightness: number;
+	
+	BaseMCU_vext_cc: number;
+	BaseMCU_vhost_cc: number;
+	BaseMCU_vext_stat: number;
+	BaseMCU_vhost_stat: number;
+	BaseMCU_pwr_source: boolean;
+	BaseMCU_usb3_mux_out_en: boolean;
+	BaseMCU_usb3_mux_sel_pos: boolean;
+	BaseMCU_base_ver: number;
+};
+
+export type ChannelData = {
+	startup_counter: number;
+	startup_conf_timer: number;
+
+	meter_voltage: number;
+	meter_current: number;
+	meter_fwdAlertSet: boolean;
+	meter_backAlertSet: boolean;
+	meter_conf_fwdCLim: number;
+	meter_conf_backCLim: number;
+
+	USBInfo_numDev: number;
+	USBInfo_Dev1_Name: string;
+	USBInfo_Dev2_Name: string;
+	USBInfo_usbType: number;
+
+	BaseMCU_fault: boolean;
+	BaseMCU_ilim: number;
+	BaseMCU_data_en: boolean;
+	BaseMCU_pwr_en: boolean;
 };

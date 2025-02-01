@@ -47,5 +47,6 @@ extern int resolveButton(Button *button);
 
 bool btnShortCheck(int index);
 bool btnLongCheck(int index);
+void btnClearAll();
 
 #endif

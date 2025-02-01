@@ -215,6 +215,7 @@ void taskMenuViewLoop(void *pvParameters){
             
                 ESP_LOGI(TAG,"Setup button long press");
                 xSemaphoreGive(screen_Semaphore);
+                btnClearAll();
                 defaultViewStart();
                 ESP_LOGI(TAG,"Delete Task Loop");
                 vTaskDelete(NULL);

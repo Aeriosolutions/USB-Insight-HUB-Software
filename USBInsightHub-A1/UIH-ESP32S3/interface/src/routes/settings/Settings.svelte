@@ -9,22 +9,25 @@
 	import Save from '~icons/tabler/device-floppy';
 	import Reload from '~icons/tabler/reload';
 	import { socket } from '$lib/stores/socket';
+	import type { LightState } from '$lib/types/models';
 	import type { MasterState } from '$lib/types/models';
 
-
-	//let masterState = {};
+	//let lightState: LightState = { led_on: false };
 	let masterState: MasterState = {power_on: false, switch_on:false};
 
 
 	onMount(() => {
-
+		/*socket.on<LightState>('led', (data) => {
+			lightState = data;
+		});*/
 		socket.on<MasterState>('master', (data)=>{
 			masterState = data;
 		});
 		//getLightstate();
 	});
 
-	onDestroy(() => {		
+	onDestroy(() => {
+		//socket.off('led');
 		socket.off('master');
 	});
 
@@ -44,13 +47,7 @@
 				It will automatically update whenever the LED state changes.</span
 			>
 		</div>
-<!-- 		{#if masterState?.channels?.length > 0}
-			<div class="text-xl font-bold text-blue-600">
-			Voltage: {masterState.channels[0].meter_voltage}V
-			</div>
-		{:else}
-			<div class="text-red-600">No channel data available</div>
-		{/if} -->
+
 		<div class="form-control w-52">
 			<label class="label cursor-pointer">
 				<span class="">To ESP32</span>

@@ -25,7 +25,7 @@ export const dictionary = {
 		"/connections": [3],
 		"/connections/mqtt": [4],
 		"/connections/ntp": [5],
-		"/demo": [6],
+		"/settings": [6],
 		"/system": [7],
 		"/system/metrics": [8],
 		"/system/status": [9],

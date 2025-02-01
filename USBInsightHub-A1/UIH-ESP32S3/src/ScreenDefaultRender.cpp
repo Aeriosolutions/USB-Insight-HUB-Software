@@ -109,7 +109,10 @@ void Screen::screenDefaultRender(chScreenData Screen){
 
   aux = String(Screen.mProp.fwdCLim/1000,1);
   aux.concat("A");
-  cbarmax = (long)(Screen.mProp.fwdCLim);
+  if(Screen.mProp.fwdCLim != 0)
+    cbarmax = (long)(Screen.mProp.fwdCLim);
+  else
+    cbarmax = 1000;
  
   //current limit value
   img.drawString(aux, 2, 220, 4);
