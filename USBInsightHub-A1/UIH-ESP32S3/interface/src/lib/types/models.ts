@@ -145,8 +145,6 @@ export type MasterState = {
 	power_on: boolean;
 	switch_on: boolean;
 
-	channels: ChannelData[];
-
 	features_conf_startUpmode: number;
 	features_conf_wifi_enabled: number;
 	features_conf_hubMode: number;
@@ -167,26 +165,71 @@ export type MasterState = {
 	BaseMCU_usb3_mux_out_en: boolean;
 	BaseMCU_usb3_mux_sel_pos: boolean;
 	BaseMCU_base_ver: number;
-};
 
-export type ChannelData = {
-	startup_counter: number;
-	startup_conf_timer: number;
+//--------------------------------------------
 
-	meter_voltage: number;
-	meter_current: number;
-	meter_fwdAlertSet: boolean;
-	meter_backAlertSet: boolean;
-	meter_conf_fwdCLim: number;
-	meter_conf_backCLim: number;
+	c1_startup_counter: number;
+	c1_startup_conf_timer: number;
 
-	USBInfo_numDev: number;
-	USBInfo_Dev1_Name: string;
-	USBInfo_Dev2_Name: string;
-	USBInfo_usbType: number;
+	c1_meter_voltage: number;
+	c1_meter_current: number;
+	c1_meter_fwdAlertSet: boolean;
+	c1_meter_backAlertSet: boolean;
+	c1_meter_conf_fwdCLim: number;
+	c1_meter_conf_backCLim: number;
 
-	BaseMCU_fault: boolean;
-	BaseMCU_ilim: number;
-	BaseMCU_data_en: boolean;
-	BaseMCU_pwr_en: boolean;
+	c1_USBInfo_numDev: number;
+	c1_USBInfo_Dev1_Name: string;
+	c1_USBInfo_Dev2_Name: string;
+	c1_USBInfo_usbType: number;
+
+	c1_BaseMCU_fault: boolean;
+	c1_BaseMCU_ilim: number;
+	c1_BaseMCU_data_en: boolean;
+	c1_BaseMCU_pwr_en: boolean;
+
+//--------------------------------------------
+
+	c2_startup_counter: number;
+	c2_startup_conf_timer: number;
+
+	c2_meter_voltage: number;
+	c2_meter_current: number;
+	c2_meter_fwdAlertSet: boolean;
+	c2_meter_backAlertSet: boolean;
+	c2_meter_conf_fwdCLim: number;
+	c2_meter_conf_backCLim: number;
+
+	c2_USBInfo_numDev: number;
+	c2_USBInfo_Dev1_Name: string;
+	c2_USBInfo_Dev2_Name: string;
+	c2_USBInfo_usbType: number;
+
+	c2_BaseMCU_fault: boolean;
+	c2_BaseMCU_ilim: number;
+	c2_BaseMCU_data_en: boolean;
+	c2_BaseMCU_pwr_en: boolean;
+
+//--------------------------------------------
+
+	c3_startup_counter: number;
+	c3_startup_conf_timer: number;
+
+	c3_meter_voltage: number;
+	c3_meter_current: number;
+	c3_meter_fwdAlertSet: boolean;
+	c3_meter_backAlertSet: boolean;
+	c3_meter_conf_fwdCLim: number;
+	c3_meter_conf_backCLim: number;
+
+	c3_USBInfo_numDev: number;
+	c3_USBInfo_Dev1_Name: string;
+	c3_USBInfo_Dev2_Name: string;
+	c3_USBInfo_usbType: number;
+
+	c3_BaseMCU_fault: boolean;
+	c3_BaseMCU_ilim: number;
+	c3_BaseMCU_data_en: boolean;
+	c3_BaseMCU_pwr_en: boolean;
+
 };

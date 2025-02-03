@@ -6,7 +6,10 @@
 #include <Wire.h>
 #include "BaseMCU.h"
 #include "PAC194x.h"
+#include "esp_system.h"
 #include <Preferences.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 
 #define UIH_NAMESPACE "uih-nvm-1"
 #define MEM_INITIALIZED_NUM 55
@@ -16,5 +19,6 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
 void taskConfigAutoSave(void *pvParameters);
 void saveMCUState(void);
 void saveConfig(void);
+void check_reset_reason();
 
 #endif

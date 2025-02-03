@@ -14,6 +14,8 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
 
 void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig){
 
+    //check_reset_reason();
+
     globlState  = globalState;
     globlConfig = globalConfig;
 
@@ -198,4 +200,14 @@ void saveConfig(void){
     flashstorage.putBytes("ConfigBlob",globlConfig,sizeof(*globlConfig));
     ESP_LOGI(TAG,"Save Config blob");
     flashstorage.end();
+}
+
+void check_reset_reason() {
+    esp_reset_reason_t reason = esp_reset_reason();
+    if (!(reason == ESP_RST_POWERON || reason == ESP_RST_INT_WDT)) {        
+        ESP_LOGI(TAG,"Non-power-on reset detected. Forcing full reset...");
+        //force_hard_reset();
+        WRITE_PERI_REG(RTC_CNTL_OPTIONS0_REG, RTC_CNTL_SW_SYS_RST);
+        esp_rom_delay_us(2000);  // Give time for reset to take effect        
+    }
 }

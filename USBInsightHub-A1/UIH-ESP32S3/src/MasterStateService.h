@@ -1,20 +1,6 @@
 #ifndef MasterStateService_h
 #define MasterStateService_h
 
-/**
- *   ESP32 SvelteKit
- *
- *   A simple, secure and extensible framework for IoT projects for ESP32 platforms
- *   with responsive Sveltekit front-end built with TailwindCSS and DaisyUI.
- *   https://github.com/theelims/ESP32-sveltekit
- *
- *   Copyright (C) 2018 - 2023 rjwats
- *   Copyright (C) 2023 - 2024 theelims
- *
- *   All Rights Reserved. This software may be modified and distributed under
- *   the terms of the LGPL v3 license. See the LICENSE file for details.
- **/
-
 
 #include <EventSocket.h>
 #include <HttpEndpoint.h>
@@ -28,9 +14,9 @@
 #define OFF_STATE "OFF"
 #define ON_STATE "ON"
 
-#define LIGHT_SETTINGS_ENDPOINT_PATH "/rest/masterState"
-#define LIGHT_SETTINGS_SOCKET_PATH "/ws/masterState"
-#define LIGHT_SETTINGS_EVENT "master"
+#define MASTER_STATE_ENDPOINT_PATH "/rest/masterState"
+#define MASTER_STATE_SOCKET_PATH "/ws/masterState"
+#define MASTER_STATE_EVENT "master"
 
 #define FRONTEND_UPDATE_PERIOD 1000
 
@@ -93,45 +79,43 @@ public:
         root["switch_on"] = settings.switchOn;
 
         //move MasterState data to Stateles json structures
-        root["features_conf_startUpmode"] = settings.features_conf_startUpmode;
-        root["features_conf_wifi_enabled"] = settings.features_conf_wifi_enabled;
-        root["features_conf_hubMode"] = settings.features_conf_hubMode;
-        root["features_conf_filterType"] = settings.features_conf_filterType;
-        root["features_conf_refreshRate"] = settings.features_conf_refreshRate;
-        root["features_startUpActive"] = settings.features_startUpActive;
-        root["features_pcConnected"] = settings.features_pcConnected;
-        root["features_vbusVoltage"] = settings.features_vbusVoltage;
-        root["screen_conf_rotation"] = settings.screen_conf_rotation;
-        root["screen_conf_brightness"] = settings.screen_conf_brightness;
-        root["BaseMCU_vext_cc"] = settings.BaseMCU_vext_cc;
-        root["BaseMCU_vhost_cc"] = settings.BaseMCU_vhost_cc;
-        root["BaseMCU_vext_stat"] = settings.BaseMCU_vext_stat;
-        root["BaseMCU_vhost_stat"] = settings.BaseMCU_vhost_stat;
-        root["BaseMCU_pwr_source"] = settings.BaseMCU_pwr_source;
-        root["BaseMCU_usb3_mux_out_en"] = settings.BaseMCU_usb3_mux_out_en;
-        root["BaseMCU_usb3_mux_sel_pos"] = settings.BaseMCU_usb3_mux_sel_pos;
-        root["BaseMCU_base_ver"] = settings.BaseMCU_base_ver;
-
-        JsonArray channels = root["channels"].as<JsonArray>();
+        root["features_conf_startUpmode"]   = settings.features_conf_startUpmode;
+        root["features_conf_wifi_enabled"]  = settings.features_conf_wifi_enabled;
+        root["features_conf_hubMode"]       = settings.features_conf_hubMode;
+        root["features_conf_filterType"]    = settings.features_conf_filterType;
+        root["features_conf_refreshRate"]   = settings.features_conf_refreshRate;
+        root["features_startUpActive"]      = settings.features_startUpActive;
+        root["features_pcConnected"]        = settings.features_pcConnected;
+        root["features_vbusVoltage"]        = settings.features_vbusVoltage;
+        root["screen_conf_rotation"]        = settings.screen_conf_rotation;
+        root["screen_conf_brightness"]      = settings.screen_conf_brightness;
+        root["BaseMCU_vext_cc"]             = settings.BaseMCU_vext_cc;
+        root["BaseMCU_vhost_cc"]            = settings.BaseMCU_vhost_cc;
+        root["BaseMCU_vext_stat"]           = settings.BaseMCU_vext_stat;
+        root["BaseMCU_vhost_stat"]          = settings.BaseMCU_vhost_stat;
+        root["BaseMCU_pwr_source"]          = settings.BaseMCU_pwr_source;
+        root["BaseMCU_usb3_mux_out_en"]     = settings.BaseMCU_usb3_mux_out_en;
+        root["BaseMCU_usb3_mux_sel_pos"]    = settings.BaseMCU_usb3_mux_sel_pos;
+        root["BaseMCU_base_ver"]            = settings.BaseMCU_base_ver;
 
         for(int i =0; i<3; i++){
-            JsonObject ch = root["channels"][i].as<JsonObject>();
-            ch["startup_counter"] = settings.chData[i].startup_counter;
-            ch["startup_conf_timer"] = settings.chData[i].startup_conf_timer;
-            ch["meter_voltage"] = settings.chData[i].meter_voltage;
-            ch["meter_current"] = settings.chData[i].meter_current;
-            ch["meter_fwdAlertSet"] = settings.chData[i].meter_fwdAlertSet;
-            ch["meter_backAlertSet"] = settings.chData[i].meter_backAlertSet;
-            ch["meter_conf_fwdCLim"] = settings.chData[i].meter_conf_fwdCLim;
-            ch["meter_conf_backCLim"] = settings.chData[i].meter_conf_backCLim;
-            ch["USBInfo_numDev"] = settings.chData[i].USBInfo_numDev;
-            ch["USBInfo_Dev1_Name"] = settings.chData[i].USBInfo_Dev1_Name;
-            ch["USBInfo_Dev2_Name"] = settings.chData[i].USBInfo_Dev2_Name;
-            ch["USBInfo_usbType"] = settings.chData[i].USBInfo_usbType;
-            ch["BaseMCU_fault"] = settings.chData[i].BaseMCU_fault;
-            ch["BaseMCU_ilim"] = settings.chData[i].BaseMCU_ilim;
-            ch["BaseMCU_data_en"] = settings.chData[i].BaseMCU_data_en;
-            ch["BaseMCU_pwr_en"] = settings.chData[i].BaseMCU_pwr_en;
+            
+            root["c"+String(i+1)+"_startup_counter"]    = settings.chData[i].startup_counter;
+            root["c"+String(i+1)+"_startup_conf_timer"] = settings.chData[i].startup_conf_timer;
+            root["c"+String(i+1)+"_meter_voltage"]      = settings.chData[i].meter_voltage;
+            root["c"+String(i+1)+"_meter_current"]      = settings.chData[i].meter_current;
+            root["c"+String(i+1)+"_meter_fwdAlertSet"]  = settings.chData[i].meter_fwdAlertSet;
+            root["c"+String(i+1)+"_meter_backAlertSet"] = settings.chData[i].meter_backAlertSet;
+            root["c"+String(i+1)+"_meter_conf_fwdCLim"] = settings.chData[i].meter_conf_fwdCLim;
+            root["c"+String(i+1)+"_meter_conf_backCLim"] = settings.chData[i].meter_conf_backCLim;
+            root["c"+String(i+1)+"_USBInfo_numDev"]     = settings.chData[i].USBInfo_numDev;
+            root["c"+String(i+1)+"_USBInfo_Dev1_Name"]  = settings.chData[i].USBInfo_Dev1_Name;
+            root["c"+String(i+1)+"_USBInfo_Dev2_Name"]  = settings.chData[i].USBInfo_Dev2_Name;
+            root["c"+String(i+1)+"_USBInfo_usbType"]    = settings.chData[i].USBInfo_usbType;
+            root["c"+String(i+1)+"_BaseMCU_fault"]      = settings.chData[i].BaseMCU_fault;
+            root["c"+String(i+1)+"_BaseMCU_ilim"]       = settings.chData[i].BaseMCU_ilim;
+            root["c"+String(i+1)+"_BaseMCU_data_en"]    = settings.chData[i].BaseMCU_data_en;
+            root["c"+String(i+1)+"_BaseMCU_pwr_en"]     = settings.chData[i].BaseMCU_pwr_en;
         }
 
     }
@@ -141,43 +125,43 @@ public:
         settings.powerOn = root["power_on"] | false;
         settings.switchOn = root["switch_on"] | false;
         
-        settings.features_conf_startUpmode = root["features_conf_startUpmode"].as<uint8_t>();
+        settings.features_conf_startUpmode  = root["features_conf_startUpmode"].as<uint8_t>();
         settings.features_conf_wifi_enabled = root["features_conf_wifi_enabled"].as<uint8_t>();
-        settings.features_conf_hubMode = root["features_conf_hubMode"].as<uint8_t>();
-        settings.features_conf_filterType = root["features_conf_filterType"].as<uint8_t>();
-        settings.features_conf_refreshRate = root["features_conf_refreshRate"].as<uint8_t>();
-        settings.features_startUpActive = root["features_startUpActive"] | false;
-        settings.features_pcConnected = root["features_pcConnected"] | false;
-        settings.features_vbusVoltage = root["features_vbusVoltage"].as<float>();
-        settings.screen_conf_rotation = root["screen_conf_rotation"].as<uint8_t>();
-        settings.screen_conf_brightness = root["screen_conf_brightness"].as<uint16_t>();
-        settings.BaseMCU_vext_cc = root["BaseMCU_vext_cc"].as<uint8_t>();
-        settings.BaseMCU_vhost_cc = root["BaseMCU_vhost_cc"].as<uint8_t>();
-        settings.BaseMCU_vext_stat = root["BaseMCU_vext_stat"].as<uint8_t>();
-        settings.BaseMCU_vhost_stat = root["BaseMCU_vhost_stat"].as<uint8_t>();
-        settings.BaseMCU_pwr_source = root["BaseMCU_pwr_source"] | false;
-        settings.BaseMCU_usb3_mux_out_en = root["BaseMCU_usb3_mux_out_en"] | false;
-        settings.BaseMCU_usb3_mux_sel_pos = root["BaseMCU_usb3_mux_sel_pos"] | false;
-        settings.BaseMCU_base_ver = root["BaseMCU_base_ver"].as<uint8_t>();                
+        settings.features_conf_hubMode      = root["features_conf_hubMode"].as<uint8_t>();
+        settings.features_conf_filterType   = root["features_conf_filterType"].as<uint8_t>();
+        settings.features_conf_refreshRate  = root["features_conf_refreshRate"].as<uint8_t>();
+        settings.features_startUpActive     = root["features_startUpActive"] | false;
+        settings.features_pcConnected       = root["features_pcConnected"] | false;
+        settings.features_vbusVoltage       = root["features_vbusVoltage"].as<float>();
+        settings.screen_conf_rotation       = root["screen_conf_rotation"].as<uint8_t>();
+        settings.screen_conf_brightness     = root["screen_conf_brightness"].as<uint16_t>();
+        settings.BaseMCU_vext_cc            = root["BaseMCU_vext_cc"].as<uint8_t>();
+        settings.BaseMCU_vhost_cc           = root["BaseMCU_vhost_cc"].as<uint8_t>();
+        settings.BaseMCU_vext_stat          = root["BaseMCU_vext_stat"].as<uint8_t>();
+        settings.BaseMCU_vhost_stat         = root["BaseMCU_vhost_stat"].as<uint8_t>();
+        settings.BaseMCU_pwr_source         = root["BaseMCU_pwr_source"] | false;
+        settings.BaseMCU_usb3_mux_out_en    = root["BaseMCU_usb3_mux_out_en"] | false;
+        settings.BaseMCU_usb3_mux_sel_pos   = root["BaseMCU_usb3_mux_sel_pos"] | false;
+        settings.BaseMCU_base_ver           = root["BaseMCU_base_ver"].as<uint8_t>();                
 
         for(int i =0; i<3; i++){
-            JsonObject ch = root["channels"][i];
-            settings.chData[i].startup_counter = ch["startup_counter"].as<int>();
-            settings.chData[i].startup_conf_timer = ch["startup_conf_timer"].as<int>();
-            settings.chData[i].meter_voltage = ch["meter_voltage"].as<float>();
-            settings.chData[i].meter_current = ch["meter_current"].as<float>();
-            settings.chData[i].meter_fwdAlertSet = ch["meter_fwdAlertSet"] | false;
-            settings.chData[i].meter_backAlertSet = ch["meter_backAlertSet" ] | false;
-            settings.chData[i].meter_conf_fwdCLim = ch["meter_conf_fwdCLim"].as<uint16_t>();
-            settings.chData[i].meter_conf_backCLim = ch["meter_conf_backCLim"].as<uint16_t>();
-            settings.chData[i].USBInfo_numDev = ch["USBInfo_numDev"].as<int>();
-            settings.chData[i].USBInfo_Dev1_Name = ch["USBInfo_Dev1_Name"].as<String>();
-            settings.chData[i].USBInfo_Dev2_Name = ch["USBInfo_Dev2_Name"].as<String>();
-            settings.chData[i].USBInfo_usbType = ch["USBInfo_usbType"].as<int>();
-            settings.chData[i].BaseMCU_fault = ch["BaseMCU_fault"] | false;
-            settings.chData[i].BaseMCU_ilim = ch["BaseMCU_ilim"].as<uint8_t>();
-            settings.chData[i].BaseMCU_data_en = ch["BaseMCU_data_en"] | false;
-            settings.chData[i].BaseMCU_pwr_en = ch["BaseMCU_pwr_en"] | false;
+            
+            settings.chData[i].startup_counter      = root["c"+String(i+1)+"_startup_counter"].as<int>();
+            settings.chData[i].startup_conf_timer   = root["c"+String(i+1)+"_startup_conf_timer"].as<int>();
+            settings.chData[i].meter_voltage        = root["c"+String(i+1)+"_meter_voltage"].as<float>();
+            settings.chData[i].meter_current        = root["c"+String(i+1)+"_meter_current"].as<float>();
+            settings.chData[i].meter_fwdAlertSet    = root["c"+String(i+1)+"_meter_fwdAlertSet"] | false;
+            settings.chData[i].meter_backAlertSet   = root["c"+String(i+1)+"_meter_backAlertSet" ] | false;
+            settings.chData[i].meter_conf_fwdCLim   = root["c"+String(i+1)+"_meter_conf_fwdCLim"].as<uint16_t>();
+            settings.chData[i].meter_conf_backCLim  = root["c"+String(i+1)+"_meter_conf_backCLim"].as<uint16_t>();
+            settings.chData[i].USBInfo_numDev       = root["c"+String(i+1)+"_USBInfo_numDev"].as<int>();
+            settings.chData[i].USBInfo_Dev1_Name    = root["c"+String(i+1)+"_USBInfo_Dev1_Name"].as<String>();
+            settings.chData[i].USBInfo_Dev2_Name    = root["c"+String(i+1)+"_USBInfo_Dev2_Name"].as<String>();
+            settings.chData[i].USBInfo_usbType      = root["c"+String(i+1)+"_USBInfo_usbType"].as<int>();
+            settings.chData[i].BaseMCU_fault        = root["c"+String(i+1)+"_BaseMCU_fault"] | false;
+            settings.chData[i].BaseMCU_ilim         = root["c"+String(i+1)+"_BaseMCU_ilim"].as<uint8_t>();
+            settings.chData[i].BaseMCU_data_en      = root["c"+String(i+1)+"_BaseMCU_data_en"] | false;
+            settings.chData[i].BaseMCU_pwr_en       = root["c"+String(i+1)+"_BaseMCU_pwr_en"] | false;
         }
 
         return StateUpdateResult::CHANGED;
@@ -202,6 +186,7 @@ private:
     GlobalState *gState;
     GlobalConfig *gConfig;
 
+    //StaticJsonDocument<2100> masterStateDoc;
     JsonDocument masterStateDoc;
     JsonObject masterStateObj;
 
