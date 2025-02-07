@@ -18,7 +18,7 @@
 #define MASTER_STATE_SOCKET_PATH "/ws/masterState"
 #define MASTER_STATE_EVENT "master"
 
-#define FRONTEND_UPDATE_PERIOD 1000
+#define FRONTEND_UPDATE_PERIOD 500
 
 
 //Staruct defining data for each USB table

@@ -82,7 +82,7 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
         xSemaphoreGive(i2c_Semaphore);
 
         attachInterrupt(PAC_ALERT, inter_pac_alert_isr, FALLING);        
-        xTaskCreatePinnedToCore(taskIntercomms, "Intercomms", 4096, NULL, 2,&(glState->system.taskIntercommHandle),APP_CORE);
+        xTaskCreatePinnedToCore(taskIntercomms, "Intercomms", 5120, NULL, 2,&(glState->system.taskIntercommHandle),APP_CORE);
         xTaskCreatePinnedToCore(inter_pac_alert_handler_task, "pac alert handler", 2048,  NULL, 2,  &inter_pac_alert_handle, APP_CORE);
     } 
     else {
@@ -221,8 +221,9 @@ void taskIntercomms(void *pvParameters){
       //ESP_LOGV(TAG, "baseMCU mcuwriteall");
       interMcuWriteAll();
 
-      //Save state only if statupmode is persistance      
-      if(bMCU.initiated && glConfig->features.startUpmode == PERSISTANCE) saveMCUState();          
+      //Flag to save state only if statupmode is persistance      
+      if(bMCU.initiated && glConfig->features.startUpmode == PERSISTANCE) 
+        glState->system.saveMCUState = true;        
       //save current state for later comparison
       memcpy(prevMCUConfig,glState->baseMCUOut,sizeof(prevMCUConfig));
     }

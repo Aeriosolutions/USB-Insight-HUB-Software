@@ -132,7 +132,7 @@ void MasterStateService::begin(GlobalState *globalState, GlobalConfig *globalCon
     lastHash = calculateJsonHash(masterStateObj);
     update(masterStateObj,MasterState::update,"startup");
     onConfigUpdated();
-    xTaskCreatePinnedToCore(taskMSSImpl, "Master State Service", 6144, this, 3,NULL,APP_CORE);
+    xTaskCreatePinnedToCore(taskMSSImpl, "Master State Service", 8192, this, 3,NULL,APP_CORE);
 }
 
 void MasterStateService::onConfigUpdated(){
@@ -198,8 +198,8 @@ void MasterStateService::copyBackendToGlobal(JsonObject &root){
     gConfig->startup[i].startup_timer = root["c"+String(i+1)+"_startup_conf_timer"].as<int>();
     //gState->meter[i].AvgVoltage     = root["c"+String(i+1)+"_meter_voltage"].as<float>();
     //gState->meter[i].AvgCurrent     = root["c"+String(i+1)+"_meter_current"].as<float>();
-    //gState->meter[i].fwdAlertSet    = root["c"+String(i+1)+"_meter_fwdAlertSet"] | false;
-    //gState->meter[i].backAlertSet   = root["c"+String(i+1)+"_meter_backAlertSet" ] | false;
+    gState->meter[i].fwdAlertSet    = root["c"+String(i+1)+"_meter_fwdAlertSet"] | false;
+    gState->meter[i].backAlertSet   = root["c"+String(i+1)+"_meter_backAlertSet" ] | false;
     gConfig->meter[i].fwdCLim         = root["c"+String(i+1)+"_meter_conf_fwdCLim"].as<uint16_t>();
     gConfig->meter[i].backCLim        = root["c"+String(i+1)+"_meter_conf_backCLim"].as<uint16_t>();
     //gState->usbInfo[i].numDev       = root["c"+String(i+1)+"_USBInfo_numDev"].as<int>();

@@ -8,7 +8,7 @@
 #define BASEMCU_ADDR 0x51
 #define WHOAMI_ID    0x35
 
-#define SLOWDOWN_TIMEOUT 3
+#define SLOWDOWN_TIMEOUT_MCU 3
 
 //BaseMCU register addresses
 #define WHOAMI   0x10  //BASE MCU ID

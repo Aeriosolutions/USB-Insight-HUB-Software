@@ -102,6 +102,7 @@ struct System {
   uint8_t currentView;
   TaskHandle_t taskIntercommHandle;
   TaskHandle_t taskDefaultScreenLoopHandle;
+  bool saveMCUState;
 };
 
 struct FeaturesState {

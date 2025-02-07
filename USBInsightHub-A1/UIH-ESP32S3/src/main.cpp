@@ -26,7 +26,6 @@
 #include "DefaultView.h"
 #include "Powerstartup.h"
 
-
 #include <ArduinoJson.h>
 
 #define SERIAL_BAUD_RATE 115200
@@ -42,6 +41,7 @@ ESP32SvelteKit esp32sveltekit(&server, 120);
 MasterStateService masterStateService = MasterStateService(&server,
                                                         esp32sveltekit.getSocket(),
                                                         esp32sveltekit.getSecurityManager());                                                        
+
 
 void setup()
 {
@@ -64,8 +64,9 @@ void setup()
 }
 
 void loop()
-{    
+{   
+
     //ESP_LOGI("Main"," Heap_ Free: %u, Total: %u, MinFree: %u, MaxAlloc: %u", ESP.getFreeHeap(), ESP.getHeapSize(),ESP.getMinFreeHeap(),ESP.getMaxAllocHeap());
-    
+
     delay(1000);    
 }

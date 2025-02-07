@@ -77,6 +77,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     //---System
 
     globalState->system.currentView = globalConfig->features.startView;
+    globalState->system.saveMCUState = false;
 
     //---Features
     globalConfig->features.startUpmode != STARTUP_SEC ? globalState->features.startUpActive = false : globalState->features.startUpActive = true;
@@ -182,6 +183,10 @@ void taskConfigAutoSave(void *pvParameters){
     if( memcmp(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig)) != 0 ){
         saveConfig();
         memcpy(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig));
+    }
+    if(globlState->system.saveMCUState){
+        saveMCUState();
+        globlState->system.saveMCUState = false;
     }
     //check if is a change in config parameters
     vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(CONFIG_AUTO_SAVE_PERIOD));
