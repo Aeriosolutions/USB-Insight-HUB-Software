@@ -2,6 +2,7 @@
 #define MasterStateService_h
 
 
+#include <ESP32SvelteKit.h>
 #include <EventSocket.h>
 #include <HttpEndpoint.h>
 #include <EventEndpoint.h>
@@ -176,7 +177,7 @@ public:
                       EventSocket *socket,
                       SecurityManager *securityManager);
 
-    void begin(GlobalState *globalState, GlobalConfig *globalConfig);
+    void begin(GlobalState *globalState, GlobalConfig *globalConfig, ESP32SvelteKit *esp32sveltekit);
 
 private:
     HttpEndpoint<MasterState> _httpEndpoint;
@@ -185,6 +186,7 @@ private:
 
     GlobalState *gState;
     GlobalConfig *gConfig;
+    ESP32SvelteKit *_skit;
 
     //StaticJsonDocument<2100> masterStateDoc;
     JsonDocument masterStateDoc;
@@ -200,6 +202,7 @@ private:
     void copyBackendToGlobal(JsonObject &root);
     void copyGlobalToBackend(JsonObject &root);
     uint32_t calculateJsonHash(JsonObject &root);
+    void getNetworkInfo();
 
 };
 

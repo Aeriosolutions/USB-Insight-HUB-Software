@@ -101,9 +101,9 @@ public:
     StatefulService<WiFiSettings> *getWiFiSettingsService()
     {
         return &_wifiSettingsService;
-    }
-
-    StatefulService<APSettings> *getAPSettingsService()
+    } 
+    //change
+    APSettingsService *getAPSettingsService()
     {
         return &_apSettingsService;
     }

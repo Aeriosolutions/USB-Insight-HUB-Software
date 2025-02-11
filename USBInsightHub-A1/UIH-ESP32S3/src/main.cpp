@@ -56,10 +56,11 @@ void setup()
     iniButtons();
     iniDefaultView(&globalState,&globalConfig, &screen);
     iniPowerStartUp(&globalState,&globalConfig);    
-
+    
     // start ESP32-SvelteKit
     esp32sveltekit.begin();    
-    masterStateService.begin(&globalState,&globalConfig);
+    
+    masterStateService.begin(&globalState,&globalConfig,&esp32sveltekit);
 
 }
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from '../$types';
 	import MQTT from './MQTT.svelte';
-	import MqttConfig from './MQTTConfig.svelte';
+	//import MqttConfig from './MQTTConfig.svelte';
 
 	export let data: PageData;
 </script>
@@ -11,5 +11,4 @@
      sm:mx-8 sm:my-8"
 >
 	<MQTT />
-	<MqttConfig />
 </div>

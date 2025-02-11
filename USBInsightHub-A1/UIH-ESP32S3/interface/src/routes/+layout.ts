@@ -9,7 +9,7 @@ export const load = (async ({ fetch }) => {
 	const item = await result.json();
 	return {
 		features: item,
-		title: 'USB-Insight-Hub',
+		title: 'UIH Control Panel',
 		github: 'Aeriosolutions/USB-Insight-HUB-Software',
 		copyright: '2025 Aerio Solutions',
 		appName: 'USB Insight Hub'

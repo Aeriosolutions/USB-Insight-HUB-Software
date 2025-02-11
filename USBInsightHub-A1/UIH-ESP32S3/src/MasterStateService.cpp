@@ -112,11 +112,12 @@ MasterStateService::MasterStateService(PsychicHttpServer *server,
                      false);
 }
 
-void MasterStateService::begin(GlobalState *globalState, GlobalConfig *globalConfig)
+void MasterStateService::begin(GlobalState *globalState, GlobalConfig *globalConfig, ESP32SvelteKit *esp32sveltekit)
 {
 
     gState = globalState;
     gConfig = globalConfig;
+    _skit = esp32sveltekit;
 
     //initialize json document
     deserializeJson(masterStateDoc,jsonDefault);
@@ -154,7 +155,7 @@ void MasterStateService::taskMSS(){
         if(lastHash !=calculateJsonHash(masterStateObj)){
           copyBackendToGlobal(masterStateObj);          
         }
-        
+        getNetworkInfo();
         copyGlobalToBackend(masterStateObj);
         //logJsonObject(masterStateObj);
         //vTaskDelay(pdMS_TO_TICKS(20));
@@ -285,4 +286,29 @@ uint32_t MasterStateService::calculateJsonHash(JsonObject &root) {
 
     // Compute CRC32 hash
     return esp_crc32_le(0, (const uint8_t*)buffer, jsonSize);
+}
+
+void MasterStateService::getNetworkInfo(){ 
+  
+  uint8_t tempWifiState = WIFI_UNKNOWN ;
+
+  _skit->getWiFiSettingsService()->read([&](WiFiSettings& wifiSettings) {
+    //Serial.print("The ssid is:");
+    //Serial.println(wifiSettings.wifiSettings[0].ssid);
+
+    for (auto &wifi : wifiSettings.wifiSettings)
+    { 
+      if(wifi.available){
+        ESP_LOGI("","The ssid is: %s %u", wifi.ssid, wifi.available); 
+        tempWifiState = STA_CONNECTED;
+        gState->features.wifiIP = wifi.localIP.toString();
+        gState->features.ssid = wifi.ssid;
+      }       
+    }         
+  });
+
+  APSettingsService *_apSettingsService = _skit->getAPSettingsService();
+  APNetworkStatus apStatus = _apSettingsService->getAPNetworkStatus();
+  ESP_LOGI("","The ssid is: %u",apStatus);  
+ 
 }

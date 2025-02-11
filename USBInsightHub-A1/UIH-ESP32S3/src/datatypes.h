@@ -48,11 +48,11 @@
 //Feature State ->wifistate
 #define WIFI_UNKNOWN    0
 #define WIFI_DISABLED   1
-#define AP_DISCONNECTED 2
-#define AP_CONNECTED    3
-#define SEARCHING       4
-#define CONNECTED       5
-#define DISCONNECTED    6
+#define DISCONNECTED    2
+#define STA_CONNECTED   3
+#define AP_CONNECTED    4
+#define SEARCHING       5
+
 
 //Features Config->starupMode
 #define PERSISTANCE   0
@@ -109,6 +109,7 @@ struct FeaturesState {
   bool startUpActive;
   bool pcConnected;
   float vbusVoltage;
+  String ssid;
   uint8_t wifiState;
   String wifiIP;
   String wifiAPIP;      
