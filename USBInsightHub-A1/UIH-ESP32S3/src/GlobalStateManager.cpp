@@ -83,7 +83,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     globalConfig->features.startUpmode != STARTUP_SEC ? globalState->features.startUpActive = false : globalState->features.startUpActive = true;
     globalState->features.pcConnected   = false;
     globalState->features.vbusVoltage   = 5.000; //Fixed value, Not implemented yet
-    globalState->features.wifiState     = WIFI_UNKNOWN;
+    globalState->features.wifiState     = WIFI_OFFLINE;
     globalState->features.wifiAPIP      = "192.168.1.1";
     globalState->features.wifiIP        = "0.0.0.0";
 

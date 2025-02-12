@@ -16,7 +16,7 @@
 
 ESP32SvelteKit::ESP32SvelteKit(PsychicHttpServer *server, unsigned int numberEndpoints) : _server(server),
                                                                                           _numberEndpoints(numberEndpoints),
-                                                                                          _featureService(server),
+                                                                                          _featureService(server, &_socket),
                                                                                           _securitySettingsService(server, &ESPFS),
                                                                                           _wifiSettingsService(server, &ESPFS, &_securitySettingsService, &_socket),
                                                                                           _wifiScanner(server, &_securitySettingsService),
@@ -166,14 +166,14 @@ void ESP32SvelteKit::begin()
     _authenticationService.begin();
     _securitySettingsService.begin();
 #endif
-#if FT_ENABLED(FT_ANALYTICS)
-    _analyticsService.begin();
-#endif
 #if FT_ENABLED(FT_SLEEP)
     _sleepService.begin();
 #endif
 #if FT_ENABLED(FT_BATTERY)
     _batteryService.begin();
+#endif
+#if FT_ENABLED(FT_ANALYTICS)
+    _analyticsService.begin();
 #endif
 
     // Start the loop task
@@ -183,7 +183,7 @@ void ESP32SvelteKit::begin()
         "ESP32 SvelteKit Loop",     // Name of the task (for debugging)
         4096,                       // Stack size (bytes)
         this,                       // Pass reference to this class instance
-        (tskIDLE_PRIORITY + 1),     // task priority
+        (tskIDLE_PRIORITY + 2),     // task priority
         NULL,                       // Task handle
         ESP32SVELTEKIT_RUNNING_CORE // Pin to application core
     );
@@ -191,6 +191,13 @@ void ESP32SvelteKit::begin()
 
 void ESP32SvelteKit::_loop()
 {
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+
+    bool wifi = false;
+    bool ap = false;
+    bool event = false;
+    bool mqtt = false;
+
     while (1)
     {
         _wifiSettingsService.loop(); // 30 seconds
@@ -198,6 +205,50 @@ void ESP32SvelteKit::_loop()
 #if FT_ENABLED(FT_MQTT)
         _mqttSettingsService.loop(); // 5 seconds
 #endif
-        vTaskDelay(20 / portTICK_PERIOD_MS);
+#if FT_ENABLED(FT_ANALYTICS)
+        _analyticsService.loop();
+#endif
+
+        // Query the connectivity status
+        wifi = _wifiStatus.isConnected();
+        ap = _apStatus.isActive();
+        event = _socket.getConnectedClients() > 0;
+#if FT_ENABLED(FT_MQTT)
+        mqtt = _mqttStatus.isConnected();
+#endif
+
+        // Update the system status
+        if (wifi && mqtt)
+        {
+            _connectionStatus = ConnectionStatus::STA_MQTT;
+        }
+        else if (wifi)
+        {
+            _connectionStatus = event ? ConnectionStatus::STA_CONNECTED : ConnectionStatus::STA;
+        }
+        else if (ap)
+        {
+            _connectionStatus = event ? ConnectionStatus::AP_CONNECTED : ConnectionStatus::AP;
+        }
+        else
+        {
+            _connectionStatus = ConnectionStatus::OFFLINE;
+        }
+
+        // iterate over all loop functions
+        for (auto &function : _loopFunctions)
+        {
+            function();
+        }
+
+#ifdef TELEPLOT_TASKS
+        static int lastTime = 0;
+        if (millis() - lastTime > 1000)
+        {
+            lastTime = millis();
+            Serial.printf(">ESP32SveltekitTask:%i:%i\n", millis(), uxTaskGetStackHighWaterMark(NULL));
+        }
+#endif
+        vTaskDelayUntil(&xLastWakeTime, ESP32SVELTEKIT_LOOP_INTERVAL / portTICK_PERIOD_MS);
     }
 }

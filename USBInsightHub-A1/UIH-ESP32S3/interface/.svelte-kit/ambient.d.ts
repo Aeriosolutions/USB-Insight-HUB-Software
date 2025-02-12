@@ -43,7 +43,7 @@ declare module '$env/static/private' {
 	export const DOTNET_TIEREDPGO: string;
 	export const DRIVERDATA: string;
 	export const EDITOR: string;
-	export const EFC_13200: string;
+	export const EFC_22532: string;
 	export const ELECTRON_RUN_AS_NODE: string;
 	export const FPS_BROWSER_APP_PROFILE_STRING: string;
 	export const FPS_BROWSER_USER_PROFILE_STRING: string;
@@ -133,7 +133,6 @@ declare module '$env/static/private' {
 	export const VSCODE_NLS_CONFIG: string;
 	export const VSCODE_PID: string;
 	export const WINDIR: string;
-	export const __COMPAT_LAYER: string;
 }
 
 /**
@@ -180,7 +179,7 @@ declare module '$env/dynamic/private' {
 		DOTNET_TIEREDPGO: string;
 		DRIVERDATA: string;
 		EDITOR: string;
-		EFC_13200: string;
+		EFC_22532: string;
 		ELECTRON_RUN_AS_NODE: string;
 		FPS_BROWSER_APP_PROFILE_STRING: string;
 		FPS_BROWSER_USER_PROFILE_STRING: string;
@@ -270,7 +269,6 @@ declare module '$env/dynamic/private' {
 		VSCODE_NLS_CONFIG: string;
 		VSCODE_PID: string;
 		WINDIR: string;
-		__COMPAT_LAYER: string;
 		[key: `PUBLIC_${string}`]: undefined;
 		[key: `${string}`]: string | undefined;
 	}

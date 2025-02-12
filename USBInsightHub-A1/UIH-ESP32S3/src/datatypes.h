@@ -46,12 +46,13 @@
 #define SETTINGS_VIEW 2
 
 //Feature State ->wifistate
-#define WIFI_UNKNOWN    0
-#define WIFI_DISABLED   1
-#define DISCONNECTED    2
-#define STA_CONNECTED   3
-#define AP_CONNECTED    4
-#define SEARCHING       5
+#define WIFI_OFFLINE    0 //Device is completely offline
+#define AP_NOCLIENT     1 //Access Point is available, but no client is connected
+#define AP_CONNECTED    2 //Access Point is used and at least 1 client is connected
+#define STA_NOCLIENT    3 //Device connected to a WiFi Station
+#define STA_CONNECTED   4 //Device connected to a WiFi Station and at least 1 client is connected
+#define STA_MQTT        5 //Device connected to a WiFi Station and the device is connected to a MQTT server
+#define WIFI_OFF        6 //WIFI is off
 
 
 //Features Config->starupMode

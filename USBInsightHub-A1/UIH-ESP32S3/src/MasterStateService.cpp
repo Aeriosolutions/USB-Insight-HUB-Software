@@ -1,6 +1,6 @@
 
 
-#include <MasterStateService.h>
+#include "MasterStateService.h"
 
 void logJsonObject(JsonObject &root);
 
@@ -133,7 +133,7 @@ void MasterStateService::begin(GlobalState *globalState, GlobalConfig *globalCon
     lastHash = calculateJsonHash(masterStateObj);
     update(masterStateObj,MasterState::update,"startup");
     onConfigUpdated();
-    xTaskCreatePinnedToCore(taskMSSImpl, "Master State Service", 8192, this, 3,NULL,APP_CORE);
+    xTaskCreatePinnedToCore(taskMSSImpl, "Master State Service", 9216, this, 3,NULL,APP_CORE);
 }
 
 void MasterStateService::onConfigUpdated(){
@@ -290,25 +290,25 @@ uint32_t MasterStateService::calculateJsonHash(JsonObject &root) {
 
 void MasterStateService::getNetworkInfo(){ 
   
-  uint8_t tempWifiState = WIFI_UNKNOWN ;
+  uint8_t tempWifiState = WIFI_OFFLINE ;
 
-  _skit->getWiFiSettingsService()->read([&](WiFiSettings& wifiSettings) {
-    //Serial.print("The ssid is:");
-    //Serial.println(wifiSettings.wifiSettings[0].ssid);
+  //gState->features.wifiState = static_cast<uint8_t>(_skit->getConnectionStatus());
+  tempWifiState = static_cast<uint8_t>(_skit->getConnectionStatus());
+  gState->features.wifiState = tempWifiState;
 
-    for (auto &wifi : wifiSettings.wifiSettings)
-    { 
-      if(wifi.available){
-        ESP_LOGI("","The ssid is: %s %u", wifi.ssid, wifi.available); 
-        tempWifiState = STA_CONNECTED;
-        gState->features.wifiIP = wifi.localIP.toString();
-        gState->features.ssid = wifi.ssid;
-      }       
-    }         
-  });
+  if(tempWifiState == AP_NOCLIENT || tempWifiState == AP_CONNECTED){
+    gState->features.wifiAPIP = WiFi.softAPIP().toString();
+  }
+  else if (tempWifiState == STA_NOCLIENT || tempWifiState == STA_CONNECTED){
+    gState->features.wifiIP = WiFi.localIP().toString();
+    gState->features.ssid = WiFi.SSID();   
+  }
+  else{
+    gState->features.wifiIP ="0.0.0.0";
+    gState->features.ssid = "";
+    gState->features.wifiAPIP = "0.0.0.0";
+  }
 
-  APSettingsService *_apSettingsService = _skit->getAPSettingsService();
-  APNetworkStatus apStatus = _apSettingsService->getAPNetworkStatus();
-  ESP_LOGI("","The ssid is: %u",apStatus);  
- 
+  ESP_LOGI("","ssid: %s IP: %s Stat: %u", gState->features.ssid.c_str(), gState->features.wifiIP, gState->features.wifiState);
+  
 }
