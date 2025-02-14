@@ -82,8 +82,8 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
         xSemaphoreGive(i2c_Semaphore);
 
         attachInterrupt(PAC_ALERT, inter_pac_alert_isr, FALLING);        
-        xTaskCreatePinnedToCore(taskIntercomms, "Intercomms", 5120, NULL, 2,&(glState->system.taskIntercommHandle),APP_CORE);
-        xTaskCreatePinnedToCore(inter_pac_alert_handler_task, "pac alert handler", 2048,  NULL, 2,  &inter_pac_alert_handle, APP_CORE);
+        xTaskCreatePinnedToCore(taskIntercomms, "Intercomms", 6144, NULL, 1,&(glState->system.taskIntercommHandle),APP_CORE);
+        xTaskCreatePinnedToCore(inter_pac_alert_handler_task, "pac alert handler", 2048,  NULL, 1,  &inter_pac_alert_handle, APP_CORE);
     } 
     else {
         ESP_LOGE(TAG, "I2C Hardware is bussy, could not initialize I2C peripherals");        
@@ -262,8 +262,8 @@ void taskIntercomms(void *pvParameters){
       if(glConfig->features.filterType==FILTER_TYPE_MOVING_AVG) bMeter.chMeterArr[i].filterType = FILTER_TYPE_MOVING_AVG;
       if(glConfig->features.filterType==FILTER_TYPE_MEDIAN) bMeter.chMeterArr[i].filterType = FILTER_TYPE_MEDIAN;
     }
-    if(glConfig->features.refreshRate==S0_5) bMeter.setFilterLength(10);
-    if(glConfig->features.refreshRate==S1_0) bMeter.setFilterLength(20);
+    if(glConfig->features.refreshRate==S0_5) bMeter.setFilterLength(SLOW_DATA_DOWNSAMPLES_0_5);
+    if(glConfig->features.refreshRate==S1_0) bMeter.setFilterLength(SLOW_DATA_DOWNSAMPLES_1_0);
     //read Meter
     
     interAvgMeterRead();

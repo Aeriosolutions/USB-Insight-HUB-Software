@@ -25,6 +25,7 @@
 
 #define PWN_RESOLUTION 10
 #define BACKLIGHT_FREQ 290 //Hz. Higher frequencies cause flickering when WiFi is active
+//#define BACKLIGHT_FREQ 193
 
 #define DARKGREY 0x7BF2
 
@@ -85,6 +86,7 @@ class Screen{
     uint16_t* imgPtr;
     uint16_t palette[256];
     uint16_t RGB332_to_RGB565(uint8_t rgb332);
+    void setCSPins(uint8_t state);
 };
 
 #endif //SCREEN_H

@@ -18,7 +18,7 @@ communitcaion between the Main MCU, the BaseMCU and the Power Meter
 
 #define CLEAR_ALERT_RETRIES 3
 
-#define INTERCOMMS_PERIOD 40 //ms
+#define INTERCOMMS_PERIOD 50 //ms
 
 void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig);
 

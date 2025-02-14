@@ -216,7 +216,7 @@ public:
     void begin();
     void loop();
     String getHostname();
-
+    void connectToWiFi();
 private:
     PsychicHttpServer *_server;
     SecurityManager *_securityManager;
@@ -232,7 +232,7 @@ private:
 
     void reconfigureWiFiConnection();
     void manageSTA();
-    void connectToWiFi();
+
     void configureNetwork(wifi_settings_t &network);
     void updateRSSI();
 };

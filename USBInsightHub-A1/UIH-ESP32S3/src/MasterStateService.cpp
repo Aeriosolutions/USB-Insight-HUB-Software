@@ -133,6 +133,7 @@ void MasterStateService::begin(GlobalState *globalState, GlobalConfig *globalCon
     lastHash = calculateJsonHash(masterStateObj);
     update(masterStateObj,MasterState::update,"startup");
     onConfigUpdated();
+    gState->system.APSSID = SettingValue::format("USB-Insight-Hub-#{unique_id}");
     xTaskCreatePinnedToCore(taskMSSImpl, "Master State Service", 9216, this, 3,NULL,APP_CORE);
 }
 
@@ -148,14 +149,13 @@ void MasterStateService::taskMSSImpl(void *pvParameters){
 void MasterStateService::taskMSS(){
     TickType_t xLastWakeTime = xTaskGetTickCount();
     ESP_LOGI("Master State Service","Started on Core %u",xPortGetCoreID());
-
+    unsigned long fallBackTimer = 0;    
     for(;;){
                
         read(masterStateObj,MasterState::read);
         if(lastHash !=calculateJsonHash(masterStateObj)){
           copyBackendToGlobal(masterStateObj);          
-        }
-        getNetworkInfo();
+        }        
         copyGlobalToBackend(masterStateObj);
         //logJsonObject(masterStateObj);
         //vTaskDelay(pdMS_TO_TICKS(20));
@@ -167,6 +167,23 @@ void MasterStateService::taskMSS(){
         update(masterStateObj,MasterState::update,"main");
         lastHash = calculateJsonHash(masterStateObj);        
         //ESP_LOGI("","Hash: %u",lastHash);
+        getNetworkInfo();
+
+        if(millis()-fallBackTimer > FALLBACK_TIMER){
+          fallBackTimer = millis();
+          wifiFallBackCheck();
+        }
+        if(gState->features.wifiRecovery == 1){
+          _skit->recoveryMode();
+          vTaskDelay(pdMS_TO_TICKS(200));
+          gState->features.wifiRecovery = 0;
+        }
+        if(gState->features.wifiReset == 1){
+          _skit->factoryReset();
+          vTaskDelay(pdMS_TO_TICKS(200));
+          gState->features.wifiReset = 0;
+        }        
+        
         vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(FRONTEND_UPDATE_PERIOD));
     }
 }
@@ -292,16 +309,20 @@ void MasterStateService::getNetworkInfo(){
   
   uint8_t tempWifiState = WIFI_OFFLINE ;
 
-  //gState->features.wifiState = static_cast<uint8_t>(_skit->getConnectionStatus());
   tempWifiState = static_cast<uint8_t>(_skit->getConnectionStatus());
   gState->features.wifiState = tempWifiState;
+  gState->features.wifiRSSI = WiFi.RSSI();
+  EventSocket *_socket = _skit->getSocket();
+  
 
   if(tempWifiState == AP_NOCLIENT || tempWifiState == AP_CONNECTED){
     gState->features.wifiAPIP = WiFi.softAPIP().toString();
+    gState->features.wifiClients = _socket->getConnectedClients();
   }
   else if (tempWifiState == STA_NOCLIENT || tempWifiState == STA_CONNECTED){
     gState->features.wifiIP = WiFi.localIP().toString();
-    gState->features.ssid = WiFi.SSID();   
+    gState->features.ssid = WiFi.SSID();
+    gState->features.wifiClients = _socket->getConnectedClients();   
   }
   else{
     gState->features.wifiIP ="0.0.0.0";
@@ -309,6 +330,15 @@ void MasterStateService::getNetworkInfo(){
     gState->features.wifiAPIP = "0.0.0.0";
   }
 
-  ESP_LOGI("","ssid: %s IP: %s Stat: %u", gState->features.ssid.c_str(), gState->features.wifiIP, gState->features.wifiState);
+  //ESP_LOGI("","ssid: %s IP: %s Stat: %u", gState->features.ssid.c_str(), gState->features.wifiIP, gState->features.wifiState);
   
+}
+
+void MasterStateService::wifiFallBackCheck(){
+  
+  WiFiSettingsService *wifiSettingsService = _skit->getWiFiSettingsService();
+   
+  if(gState->features.wifiState == WIFI_OFFLINE || gState->features.wifiState == AP_NOCLIENT)
+    wifiSettingsService->connectToWiFi();
+
 }

@@ -57,11 +57,12 @@ void setup()
     iniDefaultView(&globalState,&globalConfig, &screen);
     iniPowerStartUp(&globalState,&globalConfig);    
     
-    // start ESP32-SvelteKit
-    esp32sveltekit.begin();    
+    // start ESP32-SvelteKit if WiFi is enabled
+    if(globalConfig.features.wifi_enabled == ENABLE){
+        esp32sveltekit.begin();    
+        masterStateService.begin(&globalState,&globalConfig,&esp32sveltekit);
+    }
     
-    masterStateService.begin(&globalState,&globalConfig,&esp32sveltekit);
-
 }
 
 void loop()

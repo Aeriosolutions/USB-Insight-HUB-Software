@@ -171,7 +171,7 @@ void taskDefaultScreenLoop(void *pvParameters){
     for(;;){
       
       xTaskNotifyGive(gState->system.taskIntercommHandle);
-      ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(10));
+      ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(20));
 
       //adjust brightness only if there is a change to avoid flikering
       if(prevBrightness != gConfig->screen[0].brightness && firstPass){        
@@ -205,6 +205,7 @@ void taskDefaultScreenLoop(void *pvParameters){
       if(!defaultViewActive){
         ESP_LOGI(TAG,"Delete Screen Loop");
         xSemaphoreGive(screen_Semaphore);
+        gState->system.taskDefaultScreenLoopHandle = NULL;
         vTaskDelete(NULL);
       } 
 

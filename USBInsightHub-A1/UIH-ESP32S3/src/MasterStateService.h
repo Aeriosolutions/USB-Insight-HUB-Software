@@ -20,6 +20,7 @@
 #define MASTER_STATE_EVENT "master"
 
 #define FRONTEND_UPDATE_PERIOD 500
+#define FALLBACK_TIMER 10000
 
 
 //Staruct defining data for each USB table
@@ -203,6 +204,7 @@ private:
     void copyGlobalToBackend(JsonObject &root);
     uint32_t calculateJsonHash(JsonObject &root);
     void getNetworkInfo();
+    void wifiFallBackCheck();
 
 };
 

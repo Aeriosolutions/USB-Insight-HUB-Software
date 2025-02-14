@@ -49,7 +49,8 @@ Menu generalConfig = {
     {
         {TYPE_ROOT, "Wi-Fi",{
             {TYPE_INFO,"WiFi Info",{},{},"",{H_NONE}},
-            {TYPE_SELECT,"WiFi Reset",{},{"No Action", "Reset"},"",{H_WIRES,H_WIRESNA,H_WIRESRES}},
+            {TYPE_SELECT,"WiFi Recovery",{},{"No Action", "Recovery"},"",{H_WIREC,H_WIRExNA,H_WIRECREC}},
+            {TYPE_SELECT,"WiFi Reset",{},{"No Action", "Reset"},"",{H_WIRES,H_WIRExNA,H_WIRESRES}},
             {TYPE_SELECT,"WiFi Enable",{},{"Disable", "Enable"},"",{H_WIEN,H_WIENNO,H_WIENYES}}
         },{},"",{H_WIGEN}},
         {TYPE_SELECT, "Startup Mode",{},{"Persistance", "On at startup", "Off at startup", "Timed"},"",
@@ -86,6 +87,7 @@ void setParamValue(String param, uint16_t value, String channel="0");
 void rootLayout(Menu* root, int index);
 void selectLayout(Menu* root, int index);
 void rangeLayout(Menu* root, String channel="0");
+void screenWiFiInfoRender(void);
 
 void taskMenuViewLoop(void *pvParameters);
 
@@ -96,7 +98,7 @@ void menuViewStart(GlobalState* globalState, GlobalConfig* globalConfig, Screen 
     gCon = globalConfig;
     iScr = screen;
 
-    xTaskCreatePinnedToCore(taskMenuViewLoop, "MenuScreen", 4096, NULL, 4, NULL,APP_CORE);
+    xTaskCreatePinnedToCore(taskMenuViewLoop, "MenuScreen", 5120, NULL, 4, NULL,APP_CORE);
 }
 
 void taskMenuViewLoop(void *pvParameters){
@@ -113,6 +115,7 @@ void taskMenuViewLoop(void *pvParameters){
         uint16_t step;
         uint16_t rmin;
         uint16_t rmax;
+        uint8_t loop = 0;
         iScr->screenSetBackLight(0);
         rootLayout(currentMenu,mIndex);
         iScr->screenSetBackLight(800);
@@ -221,9 +224,21 @@ void taskMenuViewLoop(void *pvParameters){
                 vTaskDelete(NULL);
             }
 
+            //refresh wifi info every 1s
+            if(loop == (1000/MENU_VIEW_PERIOD -1) ){
+                if(currentMenu->menuType == TYPE_ROOT)
+                    if(currentMenu->submenus[mIndex].name == "WiFi Info"){
+                        screenWiFiInfoRender();
+                    }                
+                loop = 0;     
+            }
+            else{
+                loop++;
+            }
+
             vTaskDelay(pdMS_TO_TICKS(MENU_VIEW_PERIOD));
         }    
-    } 
+    }
     else {
         ESP_LOGE(TAG, "Screen resource taken, could not initialize");
         defaultViewStart();
@@ -250,7 +265,10 @@ void rootLayout(Menu* root, int index){
 
     ESP_LOGI("","-------------");
     ESP_LOGI("","Help Index: %u", root->submenus[index].helpReference[0]);
-    screenMenuInfoRender(root,iScr,0,index);
+
+    if(root->submenus[index].name != "WiFi Info"){
+        screenMenuInfoRender(root,iScr,0,index);
+    }
 }
 
 void selectLayout(Menu* root, int index){
@@ -276,7 +294,9 @@ void selectLayout(Menu* root, int index){
 
     ESP_LOGI("","-------------");
     ESP_LOGI("","Help Index: %u", root->helpReference[0]);
+
     screenMenuInfoRender(root,iScr,0,index);
+    
 }
 
 void rangeLayout(Menu* root, String channel){
@@ -294,6 +314,67 @@ void rangeLayout(Menu* root, String channel){
 }
 
 
+void screenWiFiInfoRender(void){
+    digitalWrite(iScr->dProp[2].cs_pin,LOW);
+    iScr->tft.setRotation(ROT_180_DEG);
+    iScr->img.fillScreen(TFT_BLACK); 
+    //header
+    iScr->img.fillRoundRect(5,17,230,6,1,TFT_LIGHTGREY);
+
+    iScr->img.loadFont(SMALLFONT);
+    iScr->img.setTextFont(2);
+    iScr->img.setTextColor(TFT_WHITE);
+    String mode;
+    String status;
+    switch(gSte->features.wifiState){
+        case WIFI_OFFLINE:             
+            iScr->img.drawString("Mode: Offline",6,45,4);
+            iScr->img.drawString("Stat: -",6,85,4);
+            break;
+        case AP_NOCLIENT: 
+        case AP_CONNECTED: 
+            iScr->img.drawString("Mode: AP",0,40,4);
+            if(gSte->features.wifiState == AP_NOCLIENT){
+                iScr->img.drawString("Stat: No Clients",0,80,4);
+            }
+            else{
+                iScr->img.drawString("Stat: " +String(gSte->features.wifiClients)+ String(" Clients"),0,80,4);
+            }
+            iScr->img.drawString("AP Name ("+String(gSte->features.wifiRSSI)+String(" dB):"),0,120,4);
+            iScr->img.setTextColor(TFT_CYAN);
+            iScr->img.drawString(gSte->system.APSSID,0,145,4);
+            iScr->img.setTextColor(TFT_WHITE);
+            iScr->img.drawString("IP: "+ gSte->features.wifiAPIP,0,205,4);
+            break;
+        case STA_NOCLIENT:            
+        case STA_CONNECTED:    
+            iScr->img.drawString("Mode: Station",0,40,4);
+            if(gSte->features.wifiState == STA_NOCLIENT){
+                iScr->img.drawString("Stat: No Clients",0,80,4);
+            }
+            else{
+                iScr->img.drawString("Stat: " +String(gSte->features.wifiClients)+ String(" Clients"),0,80,4);
+            }            
+            iScr->img.drawString("SSID ("+String(gSte->features.wifiRSSI)+String(" dB):"),0,120,4);
+            iScr->img.setTextColor(TFT_CYAN);
+            iScr->img.drawString(gSte->features.ssid,0,145,4);
+            iScr->img.setTextColor(TFT_WHITE);            
+            iScr->img.drawString("IP: "+ gSte->features.wifiIP,0,205,4);             
+            break;
+        case WIFI_OFF: 
+            iScr->img.drawString("Mode: Wi-Fi Off",6,45,4);
+            iScr->img.drawString("Stat: -",6,85,4);
+            break;
+        default:
+            break;
+    }
+   
+    iScr->img.unloadFont();
+    iScr->img.pushSprite(0,0);
+    digitalWrite(iScr->dProp[2].cs_pin, HIGH);    
+
+}
+
 uint16_t getParamValue(String param, String channel){
 
     if(param =="Over Current") {    
@@ -305,6 +386,12 @@ uint16_t getParamValue(String param, String channel){
     if(param =="Startup Timer") {    
         return ((uint16_t)(gCon->startup[channel.toInt()].startup_timer));
     }
+    if(param == "WiFi Recovery") {    
+        return ((uint16_t)(gSte->features.wifiRecovery));
+    }
+    if(param == "WiFi Reset") {    
+        return ((uint16_t)(gSte->features.wifiReset));
+    }    
     if(param =="WiFi Enable") {    
         return ((uint16_t)(gCon->features.wifi_enabled));
     }
@@ -343,6 +430,14 @@ void setParamValue(String param, uint16_t value, String channel){
         gCon->startup[channel.toInt()].startup_timer = (int)(value);
         return;
     }
+    if(param =="WiFi Recovery") {    
+        gSte->features.wifiRecovery = (uint8_t)(value);
+        return; 
+    }
+    if(param =="WiFi Reset") {    
+        gSte->features.wifiReset = (uint8_t)(value);
+        return; 
+    }    
     if(param =="WiFi Enable") {    
         gCon->features.wifi_enabled = (int)(value);
         return;

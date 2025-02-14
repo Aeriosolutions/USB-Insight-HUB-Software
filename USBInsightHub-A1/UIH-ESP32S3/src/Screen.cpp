@@ -14,15 +14,17 @@ void Screen::start(){
   pinMode(DISPLAY_CS_3, OUTPUT);
   pinMode(DISPLAY_ALL_DRES, OUTPUT);
 
-  //tft = TFT_eSPI();       // Invoke custom library
-
+  //If CS pins are not left low at initialization
+  //the displays stay blank with soft resets 
+  setCSPins(LOW); 
+ 
   //PWM signals for backlight control
   //On Espressif library 2.0.14
   analogWriteResolution(PWN_RESOLUTION);
   analogWriteFrequency(BACKLIGHT_FREQ);
 
   screenSetBackLight(0);
-  delay(150); //100ms wait after power up before reset
+  delay(50); //50ms wait after power up before reset
   //Reset Displays
   digitalWrite(DISPLAY_ALL_DRES, HIGH);
   delay(10); //10ms reset pulse
@@ -30,9 +32,8 @@ void Screen::start(){
   delay(10); //10ms wait before sending commands
   // We need to 'init' all displays
   // at the same time. so set both cs pins low
-  digitalWrite(DISPLAY_CS_1, LOW);
-  digitalWrite(DISPLAY_CS_2, LOW);
-  digitalWrite(DISPLAY_CS_3, LOW);
+  setCSPins(LOW);
+
 
   tft.init();
   tft.initDMA();
@@ -57,9 +58,7 @@ void Screen::start(){
   tft.fillScreen(TFT_BLUE);
   
   // Set both cs pins HIGH, or 'inactive'
-  digitalWrite(DISPLAY_CS_1, HIGH);
-  digitalWrite(DISPLAY_CS_2, HIGH);
-  digitalWrite(DISPLAY_CS_3, HIGH);
+  setCSPins(HIGH);
 
 }
 
@@ -80,4 +79,10 @@ uint16_t Screen::RGB332_to_RGB565(uint8_t rgb332) {
     b = (b * 255) / 3;
 
     return tft.color565(r, g, b);
+}
+
+void Screen::setCSPins(uint8_t state){
+  digitalWrite(DISPLAY_CS_1, state);
+  digitalWrite(DISPLAY_CS_2, state);
+  digitalWrite(DISPLAY_CS_3, state);
 }

@@ -40,10 +40,10 @@ bool BaseMCU::readStart(int address, int start, int numBytes){
     err = I2C->endTransmission(false); 
     i2cwd_timer = millis();  //*probably this protection is not longer necessary
     err = I2C->requestFrom(address,numBytes); //*
-    
-    if(millis()-i2cwd_timer > SLOWDOWN_TIMEOUT_MCU){ //*workaround for sudden drop in I2C speed, reported here https://github.com/espressif/arduino-esp32/issues/8480
+    i2cwd_timer = millis()-i2cwd_timer;
+    if(i2cwd_timer > SLOWDOWN_TIMEOUT_MCU){ //*workaround for sudden drop in I2C speed, reported here https://github.com/espressif/arduino-esp32/issues/8480
       //Serial.println("I2C Slow down on bMCU detected!!");//*
-      ESP_LOGW(TAG,"I2C Slow down on bMCU detected!!");
+      ESP_LOGW(TAG,"I2C Slow on bMCU: %u!!",i2cwd_timer);
       I2C->flush(); //*
       I2C->setClock(100000); //*
       I2C->setClock(400000); //*

@@ -78,14 +78,18 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
 
     globalState->system.currentView = globalConfig->features.startView;
     globalState->system.saveMCUState = false;
+    globalState->system.APSSID = "";
 
     //---Features
     globalConfig->features.startUpmode != STARTUP_SEC ? globalState->features.startUpActive = false : globalState->features.startUpActive = true;
     globalState->features.pcConnected   = false;
     globalState->features.vbusVoltage   = 5.000; //Fixed value, Not implemented yet
+    globalConfig->features.wifi_enabled == ENABLE ? globalState->features.wifiState = WIFI_OFFLINE : globalState->features.wifiState = WIFI_OFF;
     globalState->features.wifiState     = WIFI_OFFLINE;
-    globalState->features.wifiAPIP      = "192.168.1.1";
+    globalState->features.wifiAPIP      = "192.168.4.1";
     globalState->features.wifiIP        = "0.0.0.0";
+    globalState->features.wifiReset     = 0;
+    globalState->features.wifiRecovery  = 0;
 
     
     for(int i=0; i<3; i++){
@@ -182,6 +186,10 @@ void taskConfigAutoSave(void *pvParameters){
   for(;;){
     if( memcmp(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig)) != 0 ){
         saveConfig();
+        if(globlConfig->features.wifi_enabled != prevGloblConfig.features.wifi_enabled){
+            vTaskDelay(pdMS_TO_TICKS(90));
+            ESP.restart();
+        }
         memcpy(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig));
     }
     if(globlState->system.saveMCUState){

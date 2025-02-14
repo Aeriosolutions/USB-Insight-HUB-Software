@@ -32,12 +32,14 @@
 #define H_CHSTUP     5 //Channel starup help
 
 #define H_WIGEN      10 //wifi general help
-#define H_WIRES      11 //wifi reset info
-#define H_WIRESNA    12 //wifi no action
-#define H_WIRESRES   13 //wifi reset
+#define H_WIREC      11 //wifi recovery info
+#define H_WIRExNA    12 //wifi no action
+#define H_WIRECREC   13 //wifi recovery
 #define H_WIEN       14 //wifi eneable help
 #define H_WIENNO     15 //wifi eneable help
 #define H_WIENYES    16 //wifi eneable help
+#define H_WIRES      17 //wifi reset help
+#define H_WIRESRES   18 //wifi reset help
 
 #define H_METER      20 //meter info
 #define H_METREF     21 //meter refresh rate
