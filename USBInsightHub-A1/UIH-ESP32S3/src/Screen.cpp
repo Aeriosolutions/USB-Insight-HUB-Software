@@ -51,8 +51,9 @@ void Screen::start(){
   
   pcimg.createSprite(33, 29);
   pcimg.setSwapBytes(true);
-  warimg.createSprite(35, 35);
-  warimg.setSwapBytes(true);
+  wifiimg.createSprite(33, 30);
+  wifiimg.setSwapBytes(true);
+  
   tft.setTextSize(2);
   tft.setRotation(2);
   tft.fillScreen(TFT_BLUE);

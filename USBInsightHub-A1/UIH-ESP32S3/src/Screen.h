@@ -12,6 +12,7 @@
 #include "aptossb52l.h"
 #include "aptossb30l.h"
 #include "icons.h"
+#include "datatypes.h"
 
 
 
@@ -65,6 +66,8 @@ struct chScreenData {
   bool pconnected;
   int startup_timer;
   int startup_cnt;
+  uint8_t rssiBars;
+  uint8_t wifiState;
 };
 
 
@@ -82,7 +85,8 @@ class Screen{
   private:    
 
     TFT_eSprite pcimg  = TFT_eSprite(&tft);
-    TFT_eSprite warimg = TFT_eSprite(&tft);
+    TFT_eSprite wifiimg  = TFT_eSprite(&tft);
+
     uint16_t* imgPtr;
     uint16_t palette[256];
     uint16_t RGB332_to_RGB565(uint8_t rgb332);

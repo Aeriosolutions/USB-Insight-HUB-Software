@@ -318,6 +318,10 @@ void MasterStateService::getNetworkInfo(){
   if(tempWifiState == AP_NOCLIENT || tempWifiState == AP_CONNECTED){
     gState->features.wifiAPIP = WiFi.softAPIP().toString();
     gState->features.wifiClients = _socket->getConnectedClients();
+    wifi_sta_list_t staList;
+    if (tempWifiState == AP_CONNECTED) {
+      
+    }
   }
   else if (tempWifiState == STA_NOCLIENT || tempWifiState == STA_CONNECTED){
     gState->features.wifiIP = WiFi.localIP().toString();

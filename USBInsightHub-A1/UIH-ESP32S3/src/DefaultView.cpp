@@ -13,6 +13,7 @@ txtProp prevDevInfo[3];
 
 void defaultScreenFastDataUpdate();
 void defaultScreenSlowDataUpdate();
+uint8_t getRssiBars(int8_t rssi);
 
 void taskDefaultViewLoop(void *pvParameters);
 void taskDefaultScreenLoop(void *pvParameters);
@@ -221,7 +222,7 @@ void taskDefaultScreenLoop(void *pvParameters){
 
 void defaultScreenFastDataUpdate(){
 
-    for (int i=0; i<3 ; i++){
+    for (int i=0; i<3 ; i++){      
       ScreenArr[i].fault   = gState->baseMCUIn[i].fault;
       ScreenArr[i].data_en = gState->baseMCUOut[i].data_en;
       ScreenArr[i].pwr_en  = gState->baseMCUOut[i].pwr_en;
@@ -241,6 +242,8 @@ void defaultScreenFastDataUpdate(){
       ScreenArr[i].dProp.rotation   = gConfig->screen[i].rotation;
       ScreenArr[i].startup_cnt      = gState->startup[i].startup_cnt;
       ScreenArr[i].startup_timer    = gConfig->startup[i].startup_timer;
+      ScreenArr[i].rssiBars         = getRssiBars(gState->features.wifiRSSI);
+      ScreenArr[i].wifiState        = gState->features.wifiState;      
       if( memcmp(&prevDevInfo[i],&(ScreenArr[i].tProp),sizeof(prevDevInfo[i])) != 0 ){
         ESP_LOGI(TAG, "CH %u: #d %u, D1: %s, D2: %s, t: %u",i,ScreenArr[i].tProp.numDev,
         gState->usbInfo[i].Dev1_Name,
@@ -258,4 +261,13 @@ void defaultScreenSlowDataUpdate(){
       ScreenArr[i].mProp.AvgVoltage = gState->meter[i].AvgVoltage;
     }  
     //ESP_LOGV(TAG, "CH 0 state: %s, screen: %s",gState->usbInfo[0].Dev1_Name, ScreenArr[0].tProp.Dev1_Name);    
+}
+
+uint8_t getRssiBars(int8_t rssi){
+  //copy values from RSSIIndicator.svelte
+  if (rssi>= -55) return 3;
+  else if (rssi>= -75) return 2;
+  else if (rssi>= -85) return 1;
+  else return 0;
+
 }

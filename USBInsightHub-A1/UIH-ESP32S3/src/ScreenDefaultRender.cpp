@@ -49,8 +49,42 @@ void Screen::screenDefaultRender(chScreenData Screen){
     img.fillRoundRect(0, 33, 240, 104, 10, color);
   }
   
+  //PC image
+  
+  if(Screen.dProp.cs_pin == DISPLAY_CS_1){
+    if(Screen.pconnected){
+      pcimg.pushImage(0, 0, 33, 29, PC);
+    } else {
+      pcimg.pushImage(0, 0, 33, 29, NOPC);
+    }
+    pcimg.pushToSprite(&img, 65, 0, TFT_WHITE);
+  }
+  
+  //connection icon
+  if(Screen.dProp.cs_pin == DISPLAY_CS_3){
+
+    if(Screen.wifiState == WIFI_OFFLINE) wifiimg.pushImage(0, 0, 33, 30, WIFIE);
+    else if(Screen.wifiState == STA_CONNECTED || Screen.wifiState == STA_NOCLIENT){
+      if(Screen.rssiBars == 0) wifiimg.pushImage(0, 0, 33, 30, WIFI0_);
+      else if(Screen.rssiBars == 1) wifiimg.pushImage(0, 0, 33, 30, WIFI1_);
+      else if(Screen.rssiBars == 2) wifiimg.pushImage(0, 0, 33, 30, WIFI2_);
+      else if(Screen.rssiBars == 3) wifiimg.pushImage(0, 0, 33, 30, WIFI3_);
+      else wifiimg.pushImage(0, 0, 33, 30, WIFIE);
+    }
+    else if(Screen.wifiState == AP_CONNECTED  || Screen.wifiState == AP_NOCLIENT){
+      if(Screen.rssiBars == 0) wifiimg.pushImage(0, 0, 33, 30, AP0);
+      else if(Screen.rssiBars == 1) wifiimg.pushImage(0, 0, 33, 30, AP1);
+      else if(Screen.rssiBars == 2) wifiimg.pushImage(0, 0, 33, 30, AP2);            
+      else if(Screen.rssiBars == 3 || Screen.wifiState == AP_NOCLIENT) wifiimg.pushImage(0, 0, 33, 30, AP3);
+    }
+
+    if(Screen.wifiState != WIFI_OFF)
+      wifiimg.pushToSprite(&img, 110, 0, TFT_BLACK);
+  }  
+
 
   //data switch indicator
+  
   if(!Screen.data_en){
     img.setTextColor(TFT_RED);
     img.drawRightString("DATA", 238, 2, 4);
@@ -199,16 +233,7 @@ void Screen::screenDefaultRender(chScreenData Screen){
     img.drawCentreString(aux, 25, center, 4);
   }
 
-  //PC image
-  
-  if(Screen.dProp.cs_pin == DISPLAY_CS_1){
-    if(Screen.pconnected){
-      pcimg.pushImage(0, 0, 33, 29, PC);
-    } else {
-      pcimg.pushImage(0, 0, 33, 29, NOPC);
-    }
-    pcimg.pushToSprite(&img, 65, 0, TFT_WHITE);
-  }
+
 
   //startup counter
   if(Screen.startup_cnt > 0){
@@ -223,6 +248,8 @@ void Screen::screenDefaultRender(chScreenData Screen){
     img.drawCentreString(aux, 120, 65, 4); //**
     img.unloadFont();
   }
+
+
  
   //ESP_LOGI("4","%u",millis()-timers); //---------------------------------------- 
   
