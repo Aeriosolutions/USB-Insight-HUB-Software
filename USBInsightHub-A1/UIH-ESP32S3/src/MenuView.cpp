@@ -253,7 +253,7 @@ void rootLayout(Menu* root, int index){
     ESP_LOGI("","-------------");
     ESP_LOGI("","%s",root->name.c_str());  
     //ESP_LOGI("","Type: %u",root->menuType);
-    screenMenuIntroRender(root,iScr);  
+    screenMenuIntroRender(root,iScr,String(gSte->baseMCUExtra.base_ver));  
     ESP_LOGI("","-------------");
     for(int i=0; i< root->submenus.size(); i++){
         if(index == i)

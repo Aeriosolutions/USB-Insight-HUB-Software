@@ -1,5 +1,6 @@
 #include "Screen.h"
 #include "MenuView.h"
+#include <WiFi.h>
 
 const char* helpArr[] = {
 /*   "Individual Channel"*/    
@@ -63,10 +64,22 @@ void screenMenuIntroRender(Menu* m, Screen* s, String channel){
 
     //header
     s->img.fillRoundRect(5,17,230,6,1,TFT_LIGHTGREY);
-    if(m->name =="Over Current" || m->name =="Back Current" ||m->name =="Startup Timer")
+    if(m->name =="Over Current" || m->name =="Back Current" ||m->name =="Startup Timer"){
         menuTextItemPlacer("CH"+String(channel.toInt()+1),s,1,0,0);
-    menuTextItemPlacer(m->name,s,2,0,0);
-    menuButtonTextPlacer(s,"Return");
+        menuTextItemPlacer(m->name,s,2,0,0);
+        menuButtonTextPlacer(s,"Return");
+    }
+    else if(m->name == "Configurations"){
+        menuTextItemPlacer(m->name,s,1,0,0);
+        menuTextItemPlacer("Ver: " + String(APP_VERSION) + "_" + channel,s,3,0,0);
+        String mac = WiFi.macAddress();
+        mac.replace(":", "");  // Remove colons
+        menuTextItemPlacer(mac,s,4,0,0);
+    }
+    else{
+        menuTextItemPlacer(m->name,s,1,0,0);
+        menuButtonTextPlacer(s,"Return");
+    }
 
     s->img.pushSprite(0,0);
     digitalWrite(s->dProp[ch].cs_pin, HIGH);

@@ -57,6 +57,7 @@
 #define STA_MQTT        5 //Device connected to a WiFi Station and the device is connected to a MQTT server
 #define WIFI_OFF        6 //WIFI is off
 
+static const char* t_wifiState[] = {"offline","ap_noclient","ap_connected","sta_noclient","sta_connected","sta_mqtt,off"};
 
 //Features Config->starupMode
 #define PERSISTANCE   0
@@ -64,21 +65,31 @@
 #define START_OFF     2
 #define STARTUP_SEC   3
 
+static const char* t_startupMode[] = {"persistance","on_at_start","off_at_start","sequence"};
+
 //Features Config->hubMode
 #define USB2_3  0
 #define USB2    1
 #define USB3    2
 
+static const char* t_hubMode[] = {"usb2&3","usb2","usb3"};
+
 #define DISABLE 0
 #define ENABLE  1
+
+static const char* t_bool[] = {"false","true"};
 
 //Features Config->refreshRate
 #define S0_5 0
 #define S1_0 1
 
+static const char* t_refreshRate[] = {"0.5s","1.0s"};
+
 //Features Config->filterType
 #define FILTER_MOVING_AVG 0
 #define FILTER_MEDIAN 1
+
+static const char* t_filterType[] = {"moving_avg", "median"};
 
 //Screen Config Rotation
 #define ROT_0_DEG     0
@@ -86,11 +97,15 @@
 #define ROT_180_DEG   2
 #define ROT_270_DEG   3
 
+static const char* t_rotation[] = {"0","90","180","270"};
+
 //State BaseMCUExtra vx_cc
 #define UNKNOWN    0
 #define MINIMAL    1
 #define C_1_5A     2
 #define C_3_0A     3
+
+static const char* t_vx_cc[] = {"unknown", "minimal", "1.5A", "3.0A"};
 
 //State BaseMCUExtra vx_stat
 #define NO_PULLUPS    0
@@ -98,9 +113,12 @@
 #define CC2_PULLUP    2
 #define BOTH_PULLUPS  3
 
+static const char* t_vx_stat[] = {"no_pullups","cc1_pu","cc2_pu","both"};
+
 //State BaseMCUExtra pwr
 #define VHOST   false
 #define VEXT    true
+
 
 struct System {
   uint8_t currentView;

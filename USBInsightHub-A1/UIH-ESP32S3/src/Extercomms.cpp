@@ -13,40 +13,45 @@ USBCDC usbSerial;
 static const char* TAG = "Extercoms";
 
 GlobalState *gloState;
+GlobalConfig *gloConfig;
 
 bool USBSerialActivity = false;
+bool dataReceived = false; 
 
-//Port values from pc strings
-char *pcstrings[13]={"PC","0","-","-","0","0","-","-","0","0","-","-","0"}; //array of pointers to each value
-/*{"PC",<CH1_NUM_OF_DEVICES>,<CH1_USB_DEV_1>,<CH1_USB_DEV_2>,<CH1_USB_TYPE>
-        <CH2_NUM_OF_DEVICES>,<CH2_USB_DEV_1>,<CH2_USB_DEV_2>,<CH2_USB_TYPE>
-        <CH3_NUM_OF_DEVICES>,<CH3_USB_DEV_1>,<CH3_USB_DEV_2>,<CH3_USB_TYPE>
-}*/
-char *pcptr = NULL;
-char pcsbuffer[60]; //working array
-String tempString;
+
+char rawBuffer[76];
+size_t rawBufIndex = 0;
+char inputBuffer[MAX_BUFFER_SIZE];   //working array JSON-RPC
+size_t bufferIndex = 0;
 
 //Internal functions
 void parseDataPC();
 static void usbEventCallback(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
 void taskExterCheckActivity(void *pvParameters);
 
+void onSerialDataReceived();
+void processJsonRpcMessage(const char* jsonString);
+void sendJsonResponse(int id, JsonVariant result);
+void printErr(String err);
+int getEnumIndex(const char* name, const char* const* array, int size);
 
-void iniExtercomms(GlobalState* globalState){
+
+void iniExtercomms(GlobalState* globalState, GlobalConfig* globalConfig){
 
     gloState = globalState;
+    gloConfig = globalConfig;
 
     //Hardware Serial Ini
     //HWSerial.begin(115200); //Debug Serial
     USB.onEvent(usbEventCallback);
     usbSerial.onEvent(usbEventCallback);
 
-    usbSerial.begin();
+    usbSerial.begin(115200);
     USB.manufacturerName("Aerio");
     USB.productName("InsightHUB Controller");
     USB.begin();
 
-    xTaskCreatePinnedToCore(taskExterCheckActivity, "Extercom check", 1024, NULL, 5, NULL, APP_CORE);
+    xTaskCreatePinnedToCore(taskExterCheckActivity, "Extercom check", 4096, NULL, 5, NULL, APP_CORE);
 
 }
 
@@ -59,40 +64,278 @@ void taskExterCheckActivity(void *pvParameters){
         now= millis();
 
         if(USBSerialActivity){
-            lastPCcom = millis();
-            gloState->features.pcConnected = true;
-            USBSerialActivity=false;
+          lastPCcom = millis();
+          gloState->features.pcConnected = true;
+          USBSerialActivity=false;
         }
 
         if(now-lastPCcom > PC_CONNECTION_TIMEOUT){
-            gloState->features.pcConnected = false;
+          gloState->features.pcConnected = false;
         }
+
+        if(dataReceived){
+          processJsonRpcMessage(inputBuffer);  // Process JSON
+          dataReceived = false;
+        }
+
         vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(SERIAL_CHECK_PERIOD));
         //vTaskDelay(pdMS_TO_TICKS(SERIAL_CHECK_PERIOD));
     }
 
 }
 
-void parseDataPC() {
-  //ref: https://forum.arduino.cc/t/separating-a-comma-delimited-string/682868/6
+//void onSerialDataReceived(const uint8_t* data, size_t length){
+void onSerialDataReceived(){
+  // Process each byte
+  for (size_t i = 0; i < rawBufIndex; i++) {
+    char c = (char)rawBuffer[i];
 
-  byte index = 0;
-  pcptr = strtok(pcsbuffer,",");
-  while(pcptr != NULL){        
-    pcstrings[index] = pcptr;
-    index++;
-    pcptr = strtok(NULL, ",");
+    // Prevent buffer overflow
+    if (bufferIndex >= MAX_BUFFER_SIZE - 1) {
+        bufferIndex = 0;  // Reset buffer on overflow
+        Serial.println("{\"jsonrpc\": \"2.0\", \"error\": {\"code\": -32700, \"message\": \"Buffer overflow\"}}");
+        return;
+    }
+
+    // Store character in buffer
+    inputBuffer[bufferIndex++] = c;
+
+    // Check for end of message (`\n`)
+    if (c == '\n') {
+        inputBuffer[bufferIndex] = '\0';  // Null-terminate string
+        dataReceived = true;
+        //ESP_LOGI(TAG,"%s",inputBuffer);
+        bufferIndex = 0;  // Reset buffer for next message
+    }
+  }  
+}
+
+// Function to process JSON-RPC message
+void processJsonRpcMessage(const char* jsonString) {
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, jsonString);
+
+  if (error) {
+    String err = "{\"status\": \"error\", \"data\": {\"code\": -32700, \"message\": \"Parse error "+String(error.c_str())+"\"}}";
+    printErr(err);    
+    return;
+  }
+  
+  if (!doc["action"] || !doc["params"]) {  
+    String err = "{\"status\": \"error\", \"data\": {\"code\": -32600, \"message\": \"Invalid request\"}}";
+    printErr(err);
+    return;
   }
 
-  if(String(pcstrings[0])=="PC"){
-    for(int i=0;i<3;i++){       
-        gloState->usbInfo[i].numDev     = String(pcstrings[4*i+1]).toInt();
-        gloState->usbInfo[i].Dev1_Name  = String(pcstrings[4*i+2]);
-        gloState->usbInfo[i].Dev2_Name  = String(pcstrings[4*i+3]);
-        gloState->usbInfo[i].usbType    = String(pcstrings[4*i+4]).toInt();
+  String action = doc["action"].as<String>();
+  JsonDocument responseDoc;
+  JsonObject result = responseDoc.to<JsonObject>();  
+
+  if(action == "set"){
+
+    JsonObject params = doc["params"].as<JsonObject>();
+    bool pFail = false;
+    
+
+    if(params["startUpmode"]){
+      int inx = getEnumIndex(params["startUpmode"].as<const char*>(),t_startupMode,ARR_SIZE(t_startupMode));
+      inx != -1 ? gloConfig->features.startUpmode = inx : result["startUpmode"] = "fail";
+    }
+    if(params["wifi_enabled"]) {
+      int inx = getEnumIndex(params["wifi_enabled"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
+      inx != -1 ? gloConfig->features.wifi_enabled = inx : result["wifi_enabled"] = "fail";
+    }
+    
+    if(params["hubMode"]){
+      int inx = getEnumIndex(params["hubMode"].as<const char*>(),t_hubMode,ARR_SIZE(t_hubMode));
+      inx != -1 ? gloConfig->features.hubMode = inx : result["hubMode"] = "fail";
+    }
+    if(params["filterType"]){
+      int inx = getEnumIndex(params["filterType"].as<const char*>(),t_filterType,ARR_SIZE(t_filterType));
+      inx != -1 ? gloConfig->features.filterType = inx : result["filterType"] = "fail";
+    }
+    if(params["refreshRate"]){
+      int inx = getEnumIndex(params["refreshRate"].as<const char*>(),t_refreshRate,ARR_SIZE(t_refreshRate));
+      inx != -1 ? gloConfig->features.refreshRate = inx : result["refreshRate"] = "fail";
+    }        
+    if(params["rotation"]){
+      int inx = getEnumIndex(params["rotation"].as<const char*>(),t_rotation,ARR_SIZE(t_rotation));
+      if(inx != -1) {
+        gloConfig->screen[0].rotation = inx;
+        gloConfig->screen[1].rotation = inx;
+        gloConfig->screen[2].rotation = inx;
+      }
+      else
+        result["rotation"] = "fail";
+    }   
+    if(params["brightness"]){
+      uint8_t inx = params["brightness"].as<unsigned int>();
+      if(inx >= 10 && inx <= 100) {
+        gloConfig->screen[0].brightness = inx;
+        gloConfig->screen[1].brightness = inx;
+        gloConfig->screen[2].brightness = inx;
+      }
+      else
+        result["brightness"] = "fail";
     } 
-  }
+    
+    for(int i = 0; i<3; i++){
 
+      if(params["CH"+String(i+1)]["powerEn"]){
+        int inx = getEnumIndex(params["CH"+String(i+1)]["powerEn"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
+        inx != -1 ? gloState->baseMCUOut[i].pwr_en = inx : result["CH"+String(i+1)]["powerEn"] = "fail";        
+      }
+      if(params["CH"+String(i+1)]["dataEn"]){
+        int inx = getEnumIndex(params["CH"+String(i+1)]["dataEn"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
+        inx != -1 ? gloState->baseMCUOut[i].data_en = inx :  result["CH"+String(i+1)]["dataEn"] = "fail";        
+      }      
+      if(params["CH"+String(i+1)]["startup_tmr"]){
+        uint8_t inx = params["CH"+String(i+1)]["startup_tmr"].as<unsigned int>();
+        (inx >= 1 && inx <= 100) ? gloConfig->startup[i].startup_timer = inx :  result["CH"+String(i+1)]["startup_tmr"] = "out of range";
+      }
+      if(params["CH"+String(i+1)]["fwdLimit"]){
+        uint16_t inx = params["CH"+String(i+1)]["fwdLimit"].as<unsigned int>();
+        (inx >= 100 && inx <= 2000) ? gloConfig->meter[i].fwdCLim = inx : result["CH"+String(i+1)]["fwdLimit"] = "out of range";
+      }
+      if(params["CH"+String(i+1)]["backLimit"]){
+        uint16_t inx = params["CH"+String(i+1)]["backLimit"].as<unsigned int>();
+        (inx >= 1 && inx <= 200) ? gloConfig->meter[i].backCLim = inx : result["CH"+String(i+1)]["backLimit"] = "out of range";
+      }
+
+      if(params["CH"+String(i+1)]["numDev"]){
+        uint8_t inx = params["CH"+String(i+1)]["numDev"].as<unsigned int>();
+        (inx >= 0 && inx <= 10) ? gloState->usbInfo[i].numDev = inx : result["CH"+String(i+1)]["numDev"] = "out of range";
+      }
+      if(params["CH"+String(i+1)]["Dev1_name"]){
+        gloState->usbInfo[i].Dev1_Name = params["CH"+String(i+1)]["Dev1_name"].as<String>();        
+      }
+      if(params["CH"+String(i+1)]["Dev2_name"]){
+        gloState->usbInfo[i].Dev1_Name = params["CH"+String(i+1)]["Dev2_name"].as<String>();        
+      }
+      if(params["CH"+String(i+1)]["usbType"]){
+        uint8_t inx = params["CH"+String(i+1)]["usbType"].as<unsigned int>();
+        (inx >= 0 && inx <= 3) ? gloState->usbInfo[i].usbType = inx : result["CH"+String(i+1)]["usbType"] = "out of range";
+      }
+
+    }
+
+    result["valid"] = String(params.size()-result.size()) + " of " + String(params.size());
+
+    sendJsonResponse(0, result);
+    
+  }  
+
+  if (action == "get") {  
+    JsonArray params = doc["params"].as<JsonArray>();
+    JsonDocument responseDoc;
+    JsonObject result = responseDoc.to<JsonObject>();
+    
+
+    for (JsonVariant v : params) {
+      String pName = v.as<String>();
+      
+      bool all, conf, state;
+      
+      pName == "all" ? all = true : all = false;
+      pName == "config" ? conf = true : conf = false;
+      pName == "state" ? state = true: state = false;
+      
+      if(pName == "startUpmode"   || all || conf)  
+        result["startUpmode"]   = t_startupMode[gloConfig->features.startUpmode];
+      if(pName == "wifi_enabled"  || all || conf) 
+        result["wifi_enabled"]  = gloConfig->features.wifi_enabled;
+      if(pName == "hubMode"       || all || conf)      
+        result["hubMode"]       = t_hubMode[gloConfig->features.hubMode];
+      if(pName == "filterType"    || all || conf)   
+        result["filterType"]    = t_filterType[gloConfig->features.filterType];
+      if(pName == "refreshRate"   || all || conf)  
+        result["refreshRate"]   = t_refreshRate[gloConfig->features.refreshRate];
+      if(pName == "rotation"      || all || conf)     
+        result["rotation"]      = t_rotation[gloConfig->screen[0].rotation];
+      if(pName == "brightness"    || all || conf)   
+        result["brightness"]    = gloConfig->screen[0].brightness;
+      
+      if(pName == "startUpActive" || all || state)
+        result["startUpActive"] = gloState->features.startUpActive;
+      if(pName == "pcConnected"   || all || state)  
+        result["pcConnected"]   = gloState->features.pcConnected;
+      if(pName == "vbusVoltage"   || all || state)  
+        result["vbusVoltage"]   = gloState->features.vbusVoltage;
+      if(pName == "vext_cc"       || all || state)      
+        result["vext_cc"]       = t_vx_cc[gloState->baseMCUExtra.vext_cc];
+      if(pName == "vhost_cc"      || all || state)     
+        result["vhost_cc"]      = t_vx_cc[gloState->baseMCUExtra.vhost_cc];
+      if(pName == "vext_stat"     || all || state)    
+        result["vext_stat"]     = t_vx_stat[gloState->baseMCUExtra.vext_stat];
+      if(pName == "vhost_stat"    || all || state)   
+        result["vhost_stat"]    = t_vx_stat[gloState->baseMCUExtra.vhost_stat];
+      if(pName == "pwr_source"    || all || state)   
+        gloState->baseMCUExtra.pwr_source ? result["pwr_source"] = "vhost": result["pwr_source"] = "vext";
+      if(pName == "usb3_mux_out_en" || all || state) 
+        result["usb3_mux_out_en"] = gloState->baseMCUExtra.usb3_mux_out_en;
+      if(pName == "usb3_mux_sel_pos" || all || state) 
+        gloState->baseMCUExtra.usb3_mux_sel_pos ? result["usb3_mux_sel_pos"] = "1" : result["usb3_mux_sel_pos"] = "0";
+      if(pName == "base_ver"      || all || state)     
+        result["base_ver"]      = gloState->baseMCUExtra.base_ver;
+      
+
+      for(int i = 0; i<3; i++){
+        if (pName == "CH"+String(i+1) || pName == "CH"+String(i+1)+"_all"){
+          result["CH"+String(i+1)]["voltage"]     = String(gloState->meter[i].AvgVoltage,1);
+          result["CH"+String(i+1)]["current"]     = String(gloState->meter[i].AvgCurrent,1);
+          result["CH"+String(i+1)]["fwdAlert"]    = gloState->meter[i].fwdAlertSet;
+          result["CH"+String(i+1)]["backAlert"]   = gloState->meter[i].backAlertSet;
+          result["CH"+String(i+1)]["shortAlert"]  = gloState->baseMCUIn[i].fault;          
+          result["CH"+String(i+1)]["dataEn"]      = gloState->baseMCUOut[i].data_en;
+          result["CH"+String(i+1)]["powerEn"]     = gloState->baseMCUOut[i].pwr_en;
+        }
+        if(pName == "CH"+String(i+1)+"_all"){
+          result["CH"+String(i+1)]["ilim"]        = gloState->baseMCUOut[i].ilim;
+          result["CH"+String(i+1)]["startup_cnt"] = gloState->startup[i].startup_cnt;
+          result["CH"+String(i+1)]["startup_tmr"] = gloConfig->startup[i].startup_timer;
+          result["CH"+String(i+1)]["fwdLimit"]    = gloConfig->meter[i].fwdCLim;
+          result["CH"+String(i+1)]["backLimit"]   = gloConfig->meter[i].backCLim;
+          result["CH"+String(i+1)]["numDev"]      = gloState->usbInfo[i].numDev;
+          result["CH"+String(i+1)]["Dev1_name"]   = gloState->usbInfo[i].Dev1_Name;
+          result["CH"+String(i+1)]["Dev2_name"]   = gloState->usbInfo[i].Dev2_Name;
+          result["CH"+String(i+1)]["usbType"]     = gloState->usbInfo[i].usbType;
+        } 
+
+      }
+
+    }
+
+    sendJsonResponse(0, result);
+  }
+}
+
+// Send JSON-RPC response
+void sendJsonResponse(int id, JsonVariant result) {
+  JsonDocument doc;
+  doc["status"] = "ok";
+  doc["data"] = result;
+
+  String response;
+  serializeJson(doc, response);
+  usbSerial.println(response);
+  usbSerial.flush();
+}
+
+void printErr(String err){
+  
+  usbSerial.println(err);
+  usbSerial.flush();
+  ESP_LOGI(TAG," %s", err.c_str());
+}
+
+int getEnumIndex(const char* name, const char* const* array, int size) {
+  for (int i = 0; i < size; ++i) {
+      //ESP_LOGI(TAG,"size: %u, name: %s, array: %s, i: %u", size,name,array[i],i);
+      if (strcmp(array[i], name) == 0) {
+          return i;
+      }
+  }
+  return -1; // Return -1 if not found
 }
 
 //Handlers for TinyUSB events when working in CDC mode
@@ -142,19 +385,16 @@ static void usbEventCallback(void* arg, esp_event_base_t event_base, int32_t eve
         //ESP_LOGV(TAG,"CDC RX [%u]:", data->rx.len);
         {
             uint8_t buf[data->rx.len];
-            size_t len = usbSerial.read(buf, data->rx.len);
 
-            //pcsbuffer=(char)(buf);
-            memcpy(pcsbuffer,buf,len);
-            //tempString.toCharArray(pcsbuffer, tempString.length()+1);
-            parseDataPC();
+            rawBufIndex = usbSerial.read(rawBuffer,data->rx.len);
+            onSerialDataReceived();
+
             USBSerialActivity=true;
             gloState->features.pcConnected = true;
-            //HWSerial.write(buf, len);
+            
         }
-        //HWSerial.println();
         break;
-       case ARDUINO_USB_CDC_RX_OVERFLOW_EVENT:
+      case ARDUINO_USB_CDC_RX_OVERFLOW_EVENT:
         ESP_LOGW(TAG,"CDC RX Overflow of %d bytes", data->rx_overflow.dropped_bytes);
         break;
      

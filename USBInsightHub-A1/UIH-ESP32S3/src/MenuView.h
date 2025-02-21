@@ -86,4 +86,5 @@ void menuButtonTextPlacer(Screen* s, String barText);
 void drawTextWithNewlines(Screen* s, const char* text, int startX, int startY, int textHeight);
 void renderDemoScreen(Screen* s, int ch, int index=0);
 
+
 #endif //MENUVIEW_H

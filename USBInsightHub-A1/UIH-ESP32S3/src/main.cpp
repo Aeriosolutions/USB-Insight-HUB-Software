@@ -49,7 +49,7 @@ void setup()
     // start serial and filesystem
     //Serial.begin(SERIAL_BAUD_RATE);   
     globalStateInitializer(&globalState,&globalConfig);
-    iniExtercomms(&globalState);
+    iniExtercomms(&globalState,&globalConfig);
     delay(40); //to give time to print
     ESP_LOGI("Main","Running Firmware Version: %s\n", APP_VERSION);
     iniIntercomms(&globalState, &globalConfig);

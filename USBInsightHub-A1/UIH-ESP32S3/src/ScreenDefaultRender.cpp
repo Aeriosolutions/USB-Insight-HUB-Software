@@ -77,9 +77,12 @@ void Screen::screenDefaultRender(chScreenData Screen){
       else if(Screen.rssiBars == 2) wifiimg.pushImage(0, 0, 33, 30, AP2);            
       else if(Screen.rssiBars == 3 || Screen.wifiState == AP_NOCLIENT) wifiimg.pushImage(0, 0, 33, 30, AP3);
     }
+    else if(Screen.wifiState == WIFI_OFF)
+      wifiimg.pushImage(0, 0, 33, 30, NOWIFI);
 
-    if(Screen.wifiState != WIFI_OFF)
-      wifiimg.pushToSprite(&img, 110, 0, TFT_BLACK);
+    wifiimg.pushToSprite(&img, 110, 0, TFT_BLACK);
+    
+     
   }  
 
 

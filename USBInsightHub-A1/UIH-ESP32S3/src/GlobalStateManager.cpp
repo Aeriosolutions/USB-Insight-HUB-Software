@@ -85,7 +85,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     globalState->features.pcConnected   = false;
     globalState->features.vbusVoltage   = 5.000; //Fixed value, Not implemented yet
     globalConfig->features.wifi_enabled == ENABLE ? globalState->features.wifiState = WIFI_OFFLINE : globalState->features.wifiState = WIFI_OFF;
-    globalState->features.wifiState     = WIFI_OFFLINE;
+    globalState->features.wifiState     = WIFI_OFF;
     globalState->features.wifiAPIP      = "192.168.4.1";
     globalState->features.wifiIP        = "0.0.0.0";
     globalState->features.wifiReset     = 0;
