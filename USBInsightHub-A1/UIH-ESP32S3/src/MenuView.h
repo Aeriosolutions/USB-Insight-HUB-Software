@@ -15,6 +15,7 @@
 #include <memory>
 
 #define MENU_VIEW_PERIOD      40 //in ms
+#define AUTO_EXIT_TIMEOUT     10000 //in ms. 0 dispables the auto timer 
 
 
 #define TYPE_ROOT    0 //Is menu item that has submenus

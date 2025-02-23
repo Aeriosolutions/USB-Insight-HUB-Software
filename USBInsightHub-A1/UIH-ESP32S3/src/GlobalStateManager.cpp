@@ -79,6 +79,8 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     globalState->system.currentView = globalConfig->features.startView;
     globalState->system.saveMCUState = false;
     globalState->system.APSSID = "";
+    globalState->system.congigChangedToMenu = false;
+    globalState->system.configChangedFromMenu = false;
 
     //---Features
     globalConfig->features.startUpmode != STARTUP_SEC ? globalState->features.startUpActive = false : globalState->features.startUpActive = true;
@@ -186,6 +188,10 @@ void taskConfigAutoSave(void *pvParameters){
   for(;;){
     if( memcmp(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig)) != 0 ){
         saveConfig();
+        //discriminate if the configuration change comes from the Menu or elsewhere
+        if(!globlState->system.configChangedFromMenu) globlState->system.congigChangedToMenu = true;
+        globlState->system.configChangedFromMenu = false;
+
         if(globlConfig->features.wifi_enabled != prevGloblConfig.features.wifi_enabled){
             vTaskDelay(pdMS_TO_TICKS(90));
             ESP.restart();

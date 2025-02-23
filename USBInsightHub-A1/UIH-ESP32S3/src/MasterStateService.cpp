@@ -201,6 +201,10 @@ void MasterStateService::copyBackendToGlobal(JsonObject &root){
   //gState->features.vbusVoltage  = root["features_vbusVoltage"].as<float>();
   gConfig->screen[0].rotation     = root["screen_conf_rotation"].as<uint8_t>();
   gConfig->screen[0].brightness   = root["screen_conf_brightness"].as<uint16_t>();
+  gConfig->screen[1].rotation     = root["screen_conf_rotation"].as<uint8_t>();
+  gConfig->screen[1].brightness   = root["screen_conf_brightness"].as<uint16_t>();
+  gConfig->screen[2].rotation     = root["screen_conf_rotation"].as<uint8_t>();
+  gConfig->screen[2].brightness   = root["screen_conf_brightness"].as<uint16_t>();    
   //gState->baseMCUExtra.vext_cc  = root["BaseMCU_vext_cc"].as<uint8_t>();
   //gState->baseMCUExtra.vhost_cc = root["BaseMCU_vhost_cc"].as<uint8_t>();
   //gState->baseMCUExtra.vext_stat = root["BaseMCU_vext_stat"].as<uint8_t>();

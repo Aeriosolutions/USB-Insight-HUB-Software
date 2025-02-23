@@ -9,6 +9,7 @@ static const char* TAG = "MenuView";
 uint8_t mLevel = 0; //menu level
 uint8_t mIndex = 0; //menu Index (current pointed element)
 bool treeEnd = false;
+unsigned long lastButtonActivity;
 
 Menu* currentMenu;
 std::stack<Menu*> menuStack;
@@ -53,7 +54,7 @@ Menu generalConfig = {
             {TYPE_SELECT,"WiFi Reset",{},{"No Action", "Reset"},"",{H_WIRES,H_WIRExNA,H_WIRESRES}},
             {TYPE_SELECT,"WiFi Enable",{},{"Disable", "Enable"},"",{H_WIEN,H_WIENNO,H_WIENYES}}
         },{},"",{H_WIGEN}},
-        {TYPE_SELECT, "Startup Mode",{},{"Persistance", "On at startup", "Off at startup", "Timed"},"",
+        {TYPE_SELECT, "Startup Mode",{},{"Persistence", "On at startup", "Off at startup", "Timed"},"",
         {H_GLSTUP,H_GLSTUPPER,H_GLSTUPON,H_GLSTUPOFF,H_GLSTUPTMR}},
         {TYPE_ROOT, "Meter",{
             {TYPE_SELECT,"Refresh Rate",{},{"0.5s","1.0s"},"",{H_METREF,H_METREF,H_METREF}},
@@ -88,6 +89,7 @@ void rootLayout(Menu* root, int index);
 void selectLayout(Menu* root, int index);
 void rangeLayout(Menu* root, String channel="0");
 void screenWiFiInfoRender(void);
+void resetAutoTimer();
 
 void taskMenuViewLoop(void *pvParameters);
 
@@ -103,7 +105,7 @@ void menuViewStart(GlobalState* globalState, GlobalConfig* globalConfig, Screen 
 
 void taskMenuViewLoop(void *pvParameters){
     ESP_LOGI(TAG,"Loop on Core %u",xPortGetCoreID());
-    
+    lastButtonActivity = millis();
     if(xSemaphoreTake(screen_Semaphore,pdMS_TO_TICKS(60) ) == pdTRUE)
     {   
         //place main menu
@@ -132,6 +134,7 @@ void taskMenuViewLoop(void *pvParameters){
                     if(!currentMenu->params.empty()) ch = currentMenu->params[0];
                     rootLayout(currentMenu,mIndex);
                 }
+                resetAutoTimer();
             }
             if(btnShortCheck(1)){
                 //Move
@@ -158,19 +161,21 @@ void taskMenuViewLoop(void *pvParameters){
                             setParamValue(currentMenu->name,sel,ch);
                         } 
                         if(sel - step >= rmin){
-                            sel = sel - step;
+                            //round to the closes lower value factor of step                            
+                            sel%step == 0 ? sel = sel - step : sel = (sel/step)*step;                            
                             setParamValue(currentMenu->name,sel,ch);
                         }                         
                     }                     
 
                     rangeLayout(currentMenu,ch);                     
-                }                                
+                }
+                resetAutoTimer();                                
             }
             if(btnShortCheck(2)){
                 //Select
                 
                 //if(!currentMenu->submenus.empty()){
-                if(!treeEnd){
+                if(!treeEnd && currentMenu->menuType != TYPE_INFO){
                     menuStack.push(currentMenu);
                     if(!currentMenu->params.empty()) ch=currentMenu->params[0];
                     currentMenu=&currentMenu->submenus[mIndex];                    
@@ -199,8 +204,9 @@ void taskMenuViewLoop(void *pvParameters){
                         if(sel + step <= rmax) {
                             if(currentMenu->name == "Startup Timer" && sel < 5) 
                                 sel = 5;
-                            else 
-                                sel = sel + step;
+                            else
+                                //round to the closes higher value factor of step 
+                                sel = (sel/step)*step + step;
                             setParamValue(currentMenu->name,sel,ch);    
                         }                        
                     }                   
@@ -209,12 +215,15 @@ void taskMenuViewLoop(void *pvParameters){
                     treeEnd = true;                      
                 }
 
+                resetAutoTimer();
+
             }
             if(btnShortCheck(3)){
                 ESP_LOGI(TAG,"Setup key");
+                resetAutoTimer();
             }
 
-            if (btnLongCheck(3)){
+            if (btnLongCheck(3) || (millis() - lastButtonActivity > AUTO_EXIT_TIMEOUT) ){
             
                 ESP_LOGI(TAG,"Setup button long press");
                 xSemaphoreGive(screen_Semaphore);
@@ -229,11 +238,24 @@ void taskMenuViewLoop(void *pvParameters){
                 if(currentMenu->menuType == TYPE_ROOT)
                     if(currentMenu->submenus[mIndex].name == "WiFi Info"){
                         screenWiFiInfoRender();
+                        resetAutoTimer(); //if in this view, disable auto exit
                     }                
                 loop = 0;     
             }
             else{
                 loop++;
+            }
+
+            //update displays if global configuration from backend changes
+            if(gSte->system.congigChangedToMenu){
+                if(currentMenu->menuType == TYPE_RANGE){
+                    rangeLayout(currentMenu,ch);
+                }
+                if(currentMenu->menuType == TYPE_SELECT){
+                    mIndex = getParamValue(currentMenu->name,ch);
+                    selectLayout(currentMenu,mIndex);
+                }
+                gSte->system.congigChangedToMenu = false;
             }
 
             vTaskDelay(pdMS_TO_TICKS(MENU_VIEW_PERIOD));
@@ -418,6 +440,7 @@ uint16_t getParamValue(String param, String channel){
 }
 
 void setParamValue(String param, uint16_t value, String channel){
+    gSte->system.configChangedFromMenu = true;
     if(param =="Over Current") {    
         gCon->meter[channel.toInt()].fwdCLim = value;
         return;
@@ -471,4 +494,8 @@ void setParamValue(String param, uint16_t value, String channel){
         return;
     }
     return;
+}
+
+void resetAutoTimer(){
+    lastButtonActivity = millis();
 }

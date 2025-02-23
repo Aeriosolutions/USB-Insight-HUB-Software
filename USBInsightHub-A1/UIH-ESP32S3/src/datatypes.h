@@ -126,6 +126,8 @@ struct System {
   TaskHandle_t taskDefaultScreenLoopHandle;
   bool saveMCUState;
   String APSSID;
+  bool congigChangedToMenu;
+  bool configChangedFromMenu;
 };
 
 struct FeaturesState {
