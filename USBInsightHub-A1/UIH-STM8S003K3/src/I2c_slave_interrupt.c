@@ -2,7 +2,7 @@
 
 #define MAX_BUFFER  32
 #define WHOAMI_ID 0x35
-#define VERNUM 0x03
+#define VERNUM 0x04
 
 //registers
 #define WHOAMI 0x10
@@ -29,6 +29,7 @@
 	u8 reg_address;
 
 	bool muxoeReceived = FALSE; //i2C communication detected
+	bool firstPowerFlag = TRUE; //first time power up flag for r24
 
 	u8 r10_WHOAMI=0x10;
 	u8 r12_VERSION= 0x12;
@@ -71,17 +72,14 @@
 	
 	void I2C_byte_received(u8 u8_RxData)
 	{
-		//if (MessageBegin == TRUE  &&  u8_RxData < MAX_BUFFER) {
 		if (MessageBegin == TRUE) {			
-			//u8_MyBuffp= &u8_My_Buffer[u8_RxData];
 			reg_address= u8_RxData;
 			MessageBegin = FALSE;
 		}
-    //else if(u8_MyBuffp < &u8_My_Buffer[MAX_BUFFER])
+    
 		else {			
 			Writable_Registers(reg_address, u8_RxData);
 			reg_address++;
-		//*(u8_MyBuffp++) = u8_RxData
 		}
 	}
 	
@@ -95,7 +93,10 @@
 		else if(reg_address == CH2REG) 		return r21_CH2REG;
 		else if(reg_address == CH3REG) 		return r22_CH3REG;
 		else if(reg_address == CCSUM) 		return r23_CCSUM;
-		else if(reg_address == AUXREG) 		return r24_AUXREG;
+		else if(reg_address == AUXREG){
+			firstPowerFlag = FALSE;
+			return r24_AUXREG;
+		} 		
 		else if(reg_address == MUXOECTR) 	return r26_MUXOECTR;
 		else if(reg_address == VEXTCC1L) 	return r30_VEXTCC1L;
 		else if(reg_address == VEXTCC1H) 	return r31_VEXTCC1H;

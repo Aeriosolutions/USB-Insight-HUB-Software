@@ -26,6 +26,8 @@ u8 extdebcc2 = 0;
 u8 hostdebcc1 = 0;
 u8 hostdebcc2 = 0;
 
+extern bool firstPowerFlag;
+
 
 void BaseR_GPIO_Init(void){
 	
@@ -121,7 +123,11 @@ void Update_GPIO_from_I2CRegisters(void){
 	else r24_AUXREG &= 0xFB;	
 	//Read the direction selected
 	if(GPIO_ReadInputPin(USB3_MUX_SEL))r24_AUXREG 	|= 0x08; 
-	else r24_AUXREG &= 0xF7;	
+	else r24_AUXREG &= 0xF7;
+	//Check if is the first startup. Clear flag after first read
+	if(firstPowerFlag) r24_AUXREG 	|= 0x10;
+	else r24_AUXREG &= 0xEF;
+	
 }
 
 void Update_CC_signals(void) {

@@ -167,6 +167,7 @@ void taskIntercomms(void *pvParameters){
   TickType_t xLastWakeTime = xTaskGetTickCount();
   ESP_LOGI(TAG,"Intercomms started on Core %u",xPortGetCoreID());
   unsigned long timer=0;
+  bool forceMCUwrite = false;
 
   for(;;){
 
@@ -208,8 +209,8 @@ void taskIntercomms(void *pvParameters){
     }
 
     //check if there is any change in GlobalConfig to update the MCU
-    if( memcmp(&prevMCUConfig,&(glState->baseMCUOut),sizeof(prevMCUConfig)) != 0 ){
-    //if( memcmp(&prevMCUConfig,&(glState->baseMCU),sizeof(prevMCUConfig)) != 0 ){
+    if( memcmp(&prevMCUConfig,&(glState->baseMCUOut),sizeof(prevMCUConfig)) != 0 || forceMCUwrite){
+      forceMCUwrite = false;
       //update bMCU data with what is in globalConfig
       ESP_LOGI(TAG, "baseMCU Out changed");
       for(int i=0; i<3; i++){
@@ -231,14 +232,22 @@ void taskIntercomms(void *pvParameters){
     //read bMCU
     interMcuReadAll();
 
-    //update globalState with bMCU readings
-    for(int i=0; i<3; i++){
-      glState->baseMCUIn[i].fault = bMCU.chArr[i].fault;
-      glState->baseMCUOut[i].pwr_en = bMCU.chArr[i].pwr_en;
-      glState->baseMCUOut[i].data_en = bMCU.chArr[i].data_en;
-      glState->baseMCUOut[i].ilim = bMCU.chArr[i].ilim;
-    } 
-    
+    //update globalState with bMCU readings only if is not first boot
+    if(!bMCU.firstboot){
+      for(int i=0; i<3; i++){
+        glState->baseMCUIn[i].fault = bMCU.chArr[i].fault;
+        glState->baseMCUOut[i].pwr_en = bMCU.chArr[i].pwr_en;
+        glState->baseMCUOut[i].data_en = bMCU.chArr[i].data_en;
+        glState->baseMCUOut[i].ilim = bMCU.chArr[i].ilim;
+      } 
+    }
+    else
+    {
+      forceMCUwrite = true; //force MCU registers update on next cycle 
+      ESP_LOGI(TAG, "bMCU reset detected");
+    }
+
+
     glState->baseMCUExtra.base_ver = bMCU.baseMCUVer;
     glState->baseMCUExtra.pwr_source = bMCU.pwrsource;
     glState->baseMCUExtra.usb3_mux_out_en = bMCU.muxoe;

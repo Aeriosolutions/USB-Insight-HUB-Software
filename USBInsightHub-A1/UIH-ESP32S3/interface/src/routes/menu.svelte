@@ -11,6 +11,7 @@
 	import AP from '~icons/tabler/access-point';
 	import Remote from '~icons/tabler/network';
 	import Control from '~icons/tabler/adjustments';
+	import Panel from '~icons/tabler/gauge';
 	import Avatar from '~icons/tabler/user-circle';
 	import Logout from '~icons/tabler/logout';
 	import Copyright from '~icons/tabler/copyright';
@@ -43,6 +44,13 @@
 	};
 
 	let menuItems = [
+/* 		{
+			title: 'Control Panel',
+			icon: Panel,
+			href: '/panel',
+			feature: true,
+			
+		},	 */	
 		{
 			title: 'Settings',
 			icon: Control,

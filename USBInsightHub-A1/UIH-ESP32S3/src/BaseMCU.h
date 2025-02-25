@@ -66,8 +66,9 @@ class BaseMCU {
     uint8_t baseMCUVer = 0;
 
     bool pwrsource = false; //false vhost used, true vext used
-    bool muxoe = false;     //false disabled, true enabled
-    bool muxsel = false;    //false pos 1, true pos 2  
+    bool muxoe     = false; //false disabled, true enabled
+    bool muxsel    = false; //false pos 1, true pos 2  
+    bool firstboot = false; //first boot
   
   private: 
     TwoWire *I2C;

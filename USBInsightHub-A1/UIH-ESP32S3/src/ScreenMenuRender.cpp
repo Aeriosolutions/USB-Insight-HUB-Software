@@ -75,6 +75,7 @@ void screenMenuIntroRender(Menu* m, Screen* s, String channel){
         String mac = WiFi.macAddress();
         mac.replace(":", "");  // Remove colons
         menuTextItemPlacer(mac,s,4,0,0);
+        menuButtonTextPlacer(s,"Exit");
     }
     else{
         menuTextItemPlacer(m->name,s,1,0,0);

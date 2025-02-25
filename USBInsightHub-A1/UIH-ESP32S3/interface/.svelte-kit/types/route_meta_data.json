@@ -15,6 +15,10 @@
 		"src/routes/connections/ntp/+page.ts",
 		"src/routes/+layout.ts"
 	],
+	"/panel": [
+		"src/routes/panel/+page.ts",
+		"src/routes/+layout.ts"
+	],
 	"/settings": [
 		"src/routes/settings/+page.ts",
 		"src/routes/+layout.ts"

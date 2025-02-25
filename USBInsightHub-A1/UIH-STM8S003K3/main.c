@@ -3,8 +3,8 @@
   * file main.c
 	* BaseRMCU for STM8s. Serves as IO extender, USB3 CC and data muxer controller.
 	* Comunicates with a main CPU via I2C
-  * version V1.0.3
-  * date 13/01/2025
+  * version V4
+  * date 23/02/2025
   ******************************************************************************
  */
 

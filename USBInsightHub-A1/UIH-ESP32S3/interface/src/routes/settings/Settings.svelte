@@ -157,7 +157,7 @@
 
 </script>
 
-<div class="space-y-4 p-4">
+<div class="space-y-4 p-4" style="font-size: 20px;">
 	<!-- Startup Mode -->
 	<div class="bg-gray-200 p-4 rounded-lg shadow-md">
 	  <h2 class="font-bold">Startup Mode</h2>

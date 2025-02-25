@@ -125,7 +125,17 @@ void taskMenuViewLoop(void *pvParameters){
         for(;;){
 
             if(btnShortCheck(0)){                
-                //Back button
+                
+                //Exit soft button
+                if(currentMenu->name == "Configurations"){
+                    ESP_LOGI(TAG,"Exit button press");
+                    xSemaphoreGive(screen_Semaphore);
+                    btnClearAll();
+                    defaultViewStart();
+                    ESP_LOGI(TAG,"Delete Task Loop");
+                    vTaskDelete(NULL);                    
+                }                
+                //Back soft button
                 if(!menuStack.empty()){
                     currentMenu = menuStack.top();
                     menuStack.pop();
@@ -134,6 +144,7 @@ void taskMenuViewLoop(void *pvParameters){
                     if(!currentMenu->params.empty()) ch = currentMenu->params[0];
                     rootLayout(currentMenu,mIndex);
                 }
+
                 resetAutoTimer();
             }
             if(btnShortCheck(1)){
@@ -169,6 +180,7 @@ void taskMenuViewLoop(void *pvParameters){
 
                     rangeLayout(currentMenu,ch);                     
                 }
+
                 resetAutoTimer();                                
             }
             if(btnShortCheck(2)){

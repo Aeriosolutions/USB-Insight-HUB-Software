@@ -81,10 +81,15 @@ void Screen::screenDefaultRender(chScreenData Screen){
       wifiimg.pushImage(0, 0, 33, 30, NOWIFI);
 
     wifiimg.pushToSprite(&img, 110, 0, TFT_BLACK);
-    
+   
+    if(Screen.wifiState == STA_CONNECTED){
+      img.fillTriangle(136,24,142,30,142,18,TFT_WHITE);
+    }
+    if(Screen.wifiState == AP_CONNECTED){
+      img.fillTriangle(120,30,126,23,132,30,TFT_WHITE);
+    }
      
   }  
-
 
   //data switch indicator
   

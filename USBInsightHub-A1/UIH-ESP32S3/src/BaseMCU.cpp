@@ -84,14 +84,15 @@ void BaseMCU::readAll(){
         extState = (data & 0x0C)>>2;
         vhostCC = (data & 0x30)>>4;
         hostState = (data & 0xC0)>>6;
-        //Serial.println(String(vextCC)+" "+String(extState)+" "+String(vhostCC)+" "+String(hostState));
+        //ESP_LOGI(TAG, "ECC: %u,ES: %u, HCC: %u, HS: %u", vextCC,extState,vhostCC, hostState);        
       }
 
       if(byteCnt==4){
-        pwrsource = (data & 0x02)==0 ? false: true;
-        muxoe = (data & 0x04)==0 ? false : true;
-        muxsel = (data & 0x08)==0 ? false : true;
-        //Serial.println(String(pwrsource)+" "+String(muxoe)+" "+String(muxsel));
+        pwrsource = (data & 0x02) == 0 ? false : true;
+        muxoe     = (data & 0x04) == 0 ? false : true;
+        muxsel    = (data & 0x08) == 0 ? false : true;
+        firstboot = (data & 0x10) == 0 ? false : true;
+        //ESP_LOGI(TAG, "PS: %u, MOE: %u, MSEL: %u, FB: %u",pwrsource,muxoe,muxsel,firstboot);        
       }
       byteCnt++;
      }

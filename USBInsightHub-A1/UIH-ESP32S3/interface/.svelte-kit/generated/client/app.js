@@ -15,7 +15,8 @@ export const nodes = [
 	() => import('./nodes/11'),
 	() => import('./nodes/12'),
 	() => import('./nodes/13'),
-	() => import('./nodes/14')
+	() => import('./nodes/14'),
+	() => import('./nodes/15')
 ];
 
 export const server_loads = [];
@@ -25,15 +26,16 @@ export const dictionary = {
 		"/connections": [3],
 		"/connections/mqtt": [4],
 		"/connections/ntp": [5],
-		"/settings": [6],
-		"/system": [7],
-		"/system/metrics": [8],
-		"/system/status": [9],
-		"/system/update": [10],
-		"/user": [11],
-		"/wifi": [12],
-		"/wifi/ap": [13],
-		"/wifi/sta": [14]
+		"/panel": [6],
+		"/settings": [7],
+		"/system": [8],
+		"/system/metrics": [9],
+		"/system/status": [10],
+		"/system/update": [11],
+		"/user": [12],
+		"/wifi": [13],
+		"/wifi/ap": [14],
+		"/wifi/sta": [15]
 	};
 
 export const hooks = {

@@ -164,6 +164,7 @@
 </script>
 
 <div class="bg-gray-100 min-h-screen p-4" style="font-size: 20px;">
+
 	<!-- Header -->
 	<div class="flex justify-around items-center bg-gray-300 p-4 rounded-lg shadow-md mb-4">
 	  <div class="flex items-center gap-2">
