@@ -28,6 +28,9 @@ void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Scree
   gConfig = globalConfig;
   iScreen = screen;
   
+  //pinMode(AUX_LED,OUTPUT);
+  //digitalWrite(AUX_LED,HIGH);
+
   screen_Semaphore = xSemaphoreCreateMutex();
 
   ESP_LOGI(TAG,"Started on Core %u",xPortGetCoreID());
@@ -243,7 +246,8 @@ void defaultScreenFastDataUpdate(){
       ScreenArr[i].startup_cnt      = gState->startup[i].startup_cnt;
       ScreenArr[i].startup_timer    = gConfig->startup[i].startup_timer;
       ScreenArr[i].rssiBars         = getRssiBars(gState->features.wifiRSSI);
-      ScreenArr[i].wifiState        = gState->features.wifiState;      
+      ScreenArr[i].wifiState        = gState->features.wifiState;
+      ScreenArr[i].hubMode          = gConfig->features.hubMode;       
       if( memcmp(&prevDevInfo[i],&(ScreenArr[i].tProp),sizeof(prevDevInfo[i])) != 0 ){
         ESP_LOGI(TAG, "CH %u: #d %u, D1: %s, D2: %s, t: %u",i,ScreenArr[i].tProp.numDev,
         gState->usbInfo[i].Dev1_Name,

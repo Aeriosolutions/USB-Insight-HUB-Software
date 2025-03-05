@@ -210,7 +210,7 @@ void processJsonRpcMessage(const char* jsonString) {
         gloState->usbInfo[i].Dev1_Name = params["CH"+String(i+1)]["Dev1_name"].as<String>();        
       }
       if(params["CH"+String(i+1)]["Dev2_name"]){
-        gloState->usbInfo[i].Dev1_Name = params["CH"+String(i+1)]["Dev2_name"].as<String>();        
+        gloState->usbInfo[i].Dev2_Name = params["CH"+String(i+1)]["Dev2_name"].as<String>();        
       }
       if(params["CH"+String(i+1)]["usbType"]){
         uint8_t inx = params["CH"+String(i+1)]["usbType"].as<unsigned int>();
@@ -277,6 +277,10 @@ void processJsonRpcMessage(const char* jsonString) {
         gloState->baseMCUExtra.usb3_mux_sel_pos ? result["usb3_mux_sel_pos"] = "1" : result["usb3_mux_sel_pos"] = "0";
       if(pName == "base_ver"      || all || state)     
         result["base_ver"]      = gloState->baseMCUExtra.base_ver;
+      if(pName == "esp32_ver"     || all || state)
+        result["cpu_ver"]     = APP_VERSION;
+      if(pName == "cpu_freq"    || all || state)
+        result["cpu_freq"]    = String(ESP.getCpuFreqMHz());     
       
 
       for(int i = 0; i<3; i++){

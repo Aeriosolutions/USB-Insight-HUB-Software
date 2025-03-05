@@ -13,6 +13,7 @@ namespace USBInfoHub.DeviceFinder
     using System.IO;
     using System.IO.Ports;
     using System.Linq;
+    using System.Web.Script.Serialization;
     //using Microsoft.Win32;
 
 
@@ -26,6 +27,7 @@ namespace USBInfoHub.DeviceFinder
         public static bool controllerisConnected = false;
         public static int rescheduleCount = 0;
         public static String controllerFrame = "HB";
+        public static String controllerFrameJSON = "";
         public static bool updateList = false;
 
         //public static String controllerVid = "303A"; //ESP32-S2
@@ -403,12 +405,24 @@ namespace USBInfoHub.DeviceFinder
                     { ch3enum_b = DevicesOnPorts[2].comEnumerators[1].ToString(); }
                     else { ch3enum_b = "-"; }
 
+                    //controllerFrameJSON = "{\"action\":\"set\",\"params\":{\"CH1\":{\"Dev1_name\":\"COM1\",\"numDev\":\"0\",\"usbType\":\"0\"},\"CH2\":{\"Dev1_name\":\"COM2\",\"numDev\":\"0\",\"usbType\":\"\"}}}";
+
+                    controllerFrameJSON = String.Format("{{\"action\":\"set\",\"params\":{{" +
+                        "\"CH1\":{{\"Dev1_name\":\"{0}\",\"Dev2_name\":\"{1}\",\"numDev\":\"{2}\",\"usbType\":\"{3}\"}}," +
+                        "\"CH2\":{{\"Dev1_name\":\"{4}\",\"Dev2_name\":\"{5}\",\"numDev\":\"{6}\",\"usbType\":\"{7}\"}}," +
+                        "\"CH3\":{{\"Dev1_name\":\"{8}\",\"Dev2_name\":\"{9}\",\"numDev\":\"{10}\",\"usbType\":\"{11}\"}}" +
+                        "}}}}",
+                        ch1enum_a, ch1enum_b, ch1count.ToString(), ch1type,
+                        ch2enum_a, ch2enum_b, ch2count.ToString(), ch2type,
+                        ch3enum_a, ch3enum_b, ch3count.ToString(), ch3type
+                        );
+
                     controllerFrame = String.Format("PC,{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}",
                                         ch1count.ToString(), ch1enum_a, ch1enum_b, ch1type,
                                         ch2count.ToString(), ch2enum_a, ch2enum_b, ch2type,
                                         ch3count.ToString(), ch3enum_a, ch3enum_b, ch3type);
 
-                    Console.WriteLine(controllerFrame);
+                    Console.WriteLine(controllerFrameJSON);
                     updateList = false;
                 }
                 /*
@@ -419,7 +433,7 @@ namespace USBInfoHub.DeviceFinder
 
                 try
                 {                   
-                    _serialPort.WriteLine(controllerFrame);
+                    _serialPort.WriteLine(controllerFrameJSON);
                 }
                 catch (Exception ex)
                 {

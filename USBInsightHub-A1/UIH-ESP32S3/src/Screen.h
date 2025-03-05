@@ -13,6 +13,7 @@
 #include "aptossb30l.h"
 #include "icons.h"
 #include "datatypes.h"
+#include "esp_clk.h"
 
 
 
@@ -25,8 +26,9 @@
 #define DISPLAY_ALL_DRES 14
 
 #define PWN_RESOLUTION 10
-#define BACKLIGHT_FREQ 290 //Hz. Higher frequencies cause flickering when WiFi is active
-//#define BACKLIGHT_FREQ 193
+
+#define BACKLIGHT_FREQ_240 290 //Hz. Higher frequencies cause flickering when WiFi is active
+#define BACKLIGHT_FREQ_160 193
 
 #define DARKGREY 0x7BF2
 
@@ -68,6 +70,7 @@ struct chScreenData {
   int startup_cnt;
   uint8_t rssiBars;
   uint8_t wifiState;
+  uint8_t hubMode;
 };
 
 
@@ -77,6 +80,7 @@ class Screen{
     void start();
     void screenDefaultRender(chScreenData Screen);
     void screenSetBackLight(int pwm);
+    void usbIconDraw(uint8_t type, bool active,bool com);
 
     displayProp dProp[3];
     TFT_eSPI tft       = TFT_eSPI();       // Invoke custom library
@@ -86,6 +90,7 @@ class Screen{
 
     TFT_eSprite pcimg  = TFT_eSprite(&tft);
     TFT_eSprite wifiimg  = TFT_eSprite(&tft);
+    TFT_eSprite udata = TFT_eSprite(&tft);
 
     uint16_t* imgPtr;
     uint16_t palette[256];

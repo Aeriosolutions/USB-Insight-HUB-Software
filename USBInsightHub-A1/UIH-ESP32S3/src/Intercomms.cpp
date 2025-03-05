@@ -252,6 +252,8 @@ void taskIntercomms(void *pvParameters){
     glState->baseMCUExtra.pwr_source = bMCU.pwrsource;
     glState->baseMCUExtra.usb3_mux_out_en = bMCU.muxoe;
     glState->baseMCUExtra.usb3_mux_sel_pos = bMCU.muxsel;
+    glState->baseMCUExtra.vext_cc = bMCU.vextCC;
+    glState->baseMCUExtra.vhost_cc = bMCU.vhostCC;
     glState->baseMCUExtra.vext_stat = bMCU.extState;
     glState->baseMCUExtra.vhost_stat = bMCU.hostState; 
 

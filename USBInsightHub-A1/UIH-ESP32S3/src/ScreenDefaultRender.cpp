@@ -92,16 +92,27 @@ void Screen::screenDefaultRender(chScreenData Screen){
   }  
 
   //data switch indicator
+  if(Screen.hubMode == USB2) usbIconDraw(3,false,false);
+  if(Screen.hubMode == USB2_3 || Screen.hubMode == USB3){
+    Screen.tProp.usbType == 3 && Screen.pconnected ? usbIconDraw(3,true,true) : usbIconDraw(3,true,false);    
+  }   
   
-  if(!Screen.data_en){
-    img.setTextColor(TFT_RED);
-    img.drawRightString("DATA", 238, 2, 4);
-    img.fillRect(165, 10, 100, 2, TFT_RED) ;
+  if(Screen.hubMode == USB3) usbIconDraw(2,false,false);  
+  if(Screen.hubMode == USB2_3 || Screen.hubMode == USB2)
+  {
+    if(!Screen.data_en){
+      //img.setTextColor(TFT_RED);
+      //img.drawRightString("DATA", 238, 2, 4);
+      //img.fillRect(165, 10, 100, 2, TFT_RED) ;
+      usbIconDraw(2,false,false);      
+    }
+    else{
+      //img.setTextColor(TFT_YELLOW);
+      //img.drawRightString("DATA", 238, 2, 4);
+      Screen.tProp.usbType == 2 && Screen.pconnected ? usbIconDraw(2,true,true) : usbIconDraw(2,true,false);                  
+    }
   }
-  else{
-    img.setTextColor(TFT_YELLOW);
-    img.drawRightString("DATA", 238, 2, 4);
-  }  
+  
   
   img.unloadFont();
   
@@ -277,4 +288,52 @@ void Screen::screenDefaultRender(chScreenData Screen){
 
   digitalWrite(Screen.dProp.cs_pin, HIGH);
   
+}
+
+void Screen::usbIconDraw(uint8_t type, bool active, bool com){
+
+  uint32_t x, y, w, h, color;
+
+  if (type != 2 && type != 3) return;
+
+  udata.fillScreen(TFT_BLACK);
+
+  if(type == 2){
+    udata.pushImage(0, 0, 12, 19, NARROW2);
+    if(active){
+      x=168; y=1; w=34; h=28; color=TFT_RED;
+    }
+    else{      
+      x=168; y=1; w=34; h=28; color=DARKGREY;
+    }
+  }
+  if(type == 3){
+    udata.pushImage(0, 0, 12, 19, NARROW3);
+    if(active){
+      x=206; y=1; w=34; h=28; color=TFT_BLUE;
+    }
+    else{
+      x=206; y=1; w=34; h=28; color=DARKGREY;
+    }
+  }
+
+  img.fillRoundRect(x, y, w, h, 3, color);
+
+  udata.pushToSprite(&img, x+20, 5, TFT_BLACK);
+  
+  udata.fillScreen(TFT_BLACK);
+  if(active){
+    if(com){
+      udata.pushImage(0, 0, 19, 21, COMARROW);
+      udata.pushToSprite(&img, x+1, 5, TFT_BLACK);
+    } else {
+      udata.pushImage(0, 0, 11, 26, CSWITCH);
+      udata.pushToSprite(&img, x+3, 1, TFT_BLACK);      
+    }
+
+  } else {
+    udata.pushImage(0, 0, 11, 26, NOSWITCH);
+    udata.pushToSprite(&img, x+3, 1, TFT_BLACK);
+  }
+
 }

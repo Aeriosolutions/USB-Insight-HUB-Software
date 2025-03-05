@@ -21,7 +21,15 @@ void Screen::start(){
   //PWM signals for backlight control
   //On Espressif library 2.0.14
   analogWriteResolution(PWN_RESOLUTION);
-  analogWriteFrequency(BACKLIGHT_FREQ);
+  if (esp_clk_cpu_freq() == 240000000){ 
+    analogWriteFrequency(BACKLIGHT_FREQ_240);
+    ESP_LOGI("Screen","Backlight for 240MHZ set");
+  }
+  else{
+    analogWriteFrequency(BACKLIGHT_FREQ_160);  
+    ESP_LOGI("Screen","Backlight for 160MHZ set");
+  }
+    
 
   screenSetBackLight(0);
   delay(50); //50ms wait after power up before reset
@@ -53,6 +61,10 @@ void Screen::start(){
   pcimg.setSwapBytes(true);
   wifiimg.createSprite(33, 30);
   wifiimg.setSwapBytes(true);
+  udata.createSprite(32,28);
+  udata.setSwapBytes(true);
+  udata.fillScreen(TFT_BLACK);
+  
   
   tft.setTextSize(2);
   tft.setRotation(2);

@@ -5,8 +5,8 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("UsbInfoHub")]
-[assembly: AssemblyDescription("Send the information of the devices connected to the USB Info Hub ")]
+[assembly: AssemblyTitle("UsbInsightHub")]
+[assembly: AssemblyDescription("Send the information of the devices connected to the USB Insight Hub ")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Aerio Solutions")]
 [assembly: AssemblyProduct("Device Finder")]

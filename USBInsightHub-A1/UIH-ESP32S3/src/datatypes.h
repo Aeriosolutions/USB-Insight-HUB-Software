@@ -101,11 +101,11 @@ static const char* t_rotation[] = {"0","90","180","270"};
 
 //State BaseMCUExtra vx_cc
 #define UNKNOWN    0
-#define MINIMAL    1
+#define DEFAULT    1
 #define C_1_5A     2
 #define C_3_0A     3
 
-static const char* t_vx_cc[] = {"unknown", "minimal", "1.5A", "3.0A"};
+static const char* t_vx_cc[] = {"unknown", "default", "1.5A", "3.0A"};
 
 //State BaseMCUExtra vx_stat
 #define NO_PULLUPS    0
@@ -127,7 +127,7 @@ struct System {
   bool saveMCUState;
   String APSSID;
   bool congigChangedToMenu;
-  bool configChangedFromMenu;
+  bool configChangedFromMenu;  
 };
 
 struct FeaturesState {
