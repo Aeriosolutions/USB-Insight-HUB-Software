@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "datatypes.h"
 #include <Wire.h>
+#include <WiFi.h>
 #include "BaseMCU.h"
 #include "PAC194x.h"
 #include "esp_system.h"

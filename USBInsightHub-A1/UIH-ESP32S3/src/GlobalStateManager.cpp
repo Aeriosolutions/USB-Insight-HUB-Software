@@ -19,6 +19,8 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     globlState  = globalState;
     globlConfig = globalConfig;
 
+    pinMode(AUX_LED,OUTPUT);
+
     //Load the Configuration from NVS system
     flashstorage.begin(UIH_NAMESPACE,false);
     if(flashstorage.getInt("ConfigInit")!=MEM_INITIALIZED_NUM){
@@ -81,11 +83,17 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     globalState->system.APSSID = "";
     globalState->system.congigChangedToMenu = false;
     globalState->system.configChangedFromMenu = false;
+    globalState->system.firstStart = true;
+    globalState->system.ledState = false;
+    String mac = WiFi.macAddress();
+    mac.replace(":", "");
+    globalState->system.wifiMAC = mac;
+    globalState->system.menuIsActive = false;
 
     //---Features
     globalConfig->features.startUpmode != STARTUP_SEC ? globalState->features.startUpActive = false : globalState->features.startUpActive = true;
     globalState->features.pcConnected   = false;
-    globalState->features.vbusVoltage   = 5.000; //Fixed value, Not implemented yet
+    globalState->features.vbus   = 5000; //mV Fixed value, Not implemented yet
     globalConfig->features.wifi_enabled == ENABLE ? globalState->features.wifiState = WIFI_OFFLINE : globalState->features.wifiState = WIFI_OFF;
     globalState->features.wifiState     = WIFI_OFF;
     globalState->features.wifiAPIP      = "192.168.4.1";

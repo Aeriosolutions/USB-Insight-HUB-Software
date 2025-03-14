@@ -292,6 +292,9 @@ void taskIntercomms(void *pvParameters){
     }    
     //ESP_LOGI("I2C","%u",millis()-timer); //----------------------------------
     //this task takes 2 ms
+
+    //Front panel LED update
+    digitalWrite(AUX_LED,glState->system.ledState);
     
     if(glState->system.taskDefaultScreenLoopHandle != NULL)
       xTaskNotifyGive(glState->system.taskDefaultScreenLoopHandle);

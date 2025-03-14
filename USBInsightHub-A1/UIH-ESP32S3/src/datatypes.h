@@ -127,13 +127,17 @@ struct System {
   bool saveMCUState;
   String APSSID;
   bool congigChangedToMenu;
-  bool configChangedFromMenu;  
+  bool configChangedFromMenu;
+  bool firstStart;
+  bool ledState;
+  String wifiMAC;
+  bool menuIsActive;  
 };
 
 struct FeaturesState {
   bool startUpActive;
   bool pcConnected;
-  float vbusVoltage;
+  float vbus;
   String ssid;
   uint8_t wifiState;
   String wifiIP;

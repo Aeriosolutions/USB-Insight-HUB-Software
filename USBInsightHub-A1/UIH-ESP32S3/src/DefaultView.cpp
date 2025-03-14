@@ -28,9 +28,7 @@ void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Scree
   gConfig = globalConfig;
   iScreen = screen;
   
-  //pinMode(AUX_LED,OUTPUT);
-  //digitalWrite(AUX_LED,HIGH);
-
+  
   screen_Semaphore = xSemaphoreCreateMutex();
 
   ESP_LOGI(TAG,"Started on Core %u",xPortGetCoreID());

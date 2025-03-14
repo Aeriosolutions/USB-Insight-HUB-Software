@@ -179,6 +179,11 @@ void processJsonRpcMessage(const char* jsonString) {
         result["brightness"] = "fail";
     } 
     
+    if(params["ledState"]){
+      int inx = getEnumIndex(params["ledState"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
+      inx != -1 ? gloState->system.ledState = inx : result["ledState"] = "fail";        
+    }
+
     for(int i = 0; i<3; i++){
 
       if(params["CH"+String(i+1)]["powerEn"]){
@@ -201,6 +206,19 @@ void processJsonRpcMessage(const char* jsonString) {
         uint16_t inx = params["CH"+String(i+1)]["backLimit"].as<unsigned int>();
         (inx >= 1 && inx <= 200) ? gloConfig->meter[i].backCLim = inx : result["CH"+String(i+1)]["backLimit"] = "out of range";
       }
+
+      if(params["CH"+String(i+1)]["fwdAlert"]){
+        int inx = getEnumIndex(params["CH"+String(i+1)]["fwdAlert"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
+        inx != -1 ? gloState->meter[i].fwdAlertSet = inx : result["CH"+String(i+1)]["fwdAlert"] = "fail";        
+      }
+      if(params["CH"+String(i+1)]["backAlert"]){
+        int inx = getEnumIndex(params["CH"+String(i+1)]["backAlert"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
+        inx != -1 ? gloState->meter[i].backAlertSet = inx : result["CH"+String(i+1)]["backAlert"] = "fail";        
+      }
+      if(params["CH"+String(i+1)]["shortAlert"]){
+        int inx = getEnumIndex(params["CH"+String(i+1)]["shortAlert"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
+        inx != -1 ? gloState->baseMCUIn[i].fault = inx : result["CH"+String(i+1)]["shortAlert"] = "fail";        
+      }          
 
       if(params["CH"+String(i+1)]["numDev"]){
         uint8_t inx = params["CH"+String(i+1)]["numDev"].as<unsigned int>();
@@ -225,7 +243,7 @@ void processJsonRpcMessage(const char* jsonString) {
     
   }  
 
-  if (action == "get") {  
+  if(action == "get") {  
     JsonArray params = doc["params"].as<JsonArray>();
     JsonDocument responseDoc;
     JsonObject result = responseDoc.to<JsonObject>();
@@ -259,8 +277,8 @@ void processJsonRpcMessage(const char* jsonString) {
         result["startUpActive"] = gloState->features.startUpActive;
       if(pName == "pcConnected"   || all || state)  
         result["pcConnected"]   = gloState->features.pcConnected;
-      if(pName == "vbusVoltage"   || all || state)  
-        result["vbusVoltage"]   = gloState->features.vbusVoltage;
+      if(pName == "vbus"   || all || state)  
+        result["vbus"]   = String(gloState->features.vbus,0);
       if(pName == "vext_cc"       || all || state)      
         result["vext_cc"]       = t_vx_cc[gloState->baseMCUExtra.vext_cc];
       if(pName == "vhost_cc"      || all || state)     
@@ -270,7 +288,7 @@ void processJsonRpcMessage(const char* jsonString) {
       if(pName == "vhost_stat"    || all || state)   
         result["vhost_stat"]    = t_vx_stat[gloState->baseMCUExtra.vhost_stat];
       if(pName == "pwr_source"    || all || state)   
-        gloState->baseMCUExtra.pwr_source ? result["pwr_source"] = "vhost": result["pwr_source"] = "vext";
+        gloState->baseMCUExtra.pwr_source ? result["pwr_source"] = "vext": result["pwr_source"] = "vhost";
       if(pName == "usb3_mux_out_en" || all || state) 
         result["usb3_mux_out_en"] = gloState->baseMCUExtra.usb3_mux_out_en;
       if(pName == "usb3_mux_sel_pos" || all || state) 
@@ -278,11 +296,23 @@ void processJsonRpcMessage(const char* jsonString) {
       if(pName == "base_ver"      || all || state)     
         result["base_ver"]      = gloState->baseMCUExtra.base_ver;
       if(pName == "esp32_ver"     || all || state)
-        result["cpu_ver"]     = APP_VERSION;
-      if(pName == "cpu_freq"    || all || state)
-        result["cpu_freq"]    = String(ESP.getCpuFreqMHz());     
+        result["cpu_ver"]       = APP_VERSION;
+      if(pName == "mac"           || all || state)
+        result["mac"]           = gloState->system.wifiMAC; 
       
-
+      //production specific getters
+    
+      if(pName == "cpu_freq"    || all || state)
+        result["cpu_freq"]      = String(ESP.getCpuFreqMHz());
+      if(pName == "ledState"    || all || state)
+        result["ledState"]      = gloState->system.ledState;     
+      if(pName == "firstStart"    || all || state){
+        result["firstStart"]    = gloState->system.firstStart;
+        gloState->system.firstStart = false;
+      }
+      if(pName == "menuIsActive"    || all || state)
+        result["menuIsActive"]      = gloState->system.menuIsActive;
+                 
       for(int i = 0; i<3; i++){
         if (pName == "CH"+String(i+1) || pName == "CH"+String(i+1)+"_all"){
           result["CH"+String(i+1)]["voltage"]     = String(gloState->meter[i].AvgVoltage,1);

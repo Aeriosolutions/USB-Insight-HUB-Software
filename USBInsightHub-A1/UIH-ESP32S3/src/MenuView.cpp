@@ -121,6 +121,7 @@ void taskMenuViewLoop(void *pvParameters){
         iScr->screenSetBackLight(0);
         rootLayout(currentMenu,mIndex);
         iScr->screenSetBackLight(800);
+        gSte->system.menuIsActive = true;
 
         for(;;){
 
@@ -133,6 +134,7 @@ void taskMenuViewLoop(void *pvParameters){
                     btnClearAll();
                     defaultViewStart();
                     ESP_LOGI(TAG,"Delete Task Loop");
+                    gSte->system.menuIsActive = false;
                     vTaskDelete(NULL);                    
                 }                
                 //Back soft button
@@ -242,6 +244,7 @@ void taskMenuViewLoop(void *pvParameters){
                 btnClearAll();
                 defaultViewStart();
                 ESP_LOGI(TAG,"Delete Task Loop");
+                gSte->system.menuIsActive = false;
                 vTaskDelete(NULL);
             }
 
@@ -277,6 +280,7 @@ void taskMenuViewLoop(void *pvParameters){
         ESP_LOGE(TAG, "Screen resource taken, could not initialize");
         defaultViewStart();
         ESP_LOGI(TAG,"Delete Task Loop");
+        gSte->system.menuIsActive = false;
         vTaskDelete(NULL);    
     }
 

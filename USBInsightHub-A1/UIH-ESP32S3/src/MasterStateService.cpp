@@ -245,7 +245,7 @@ void MasterStateService::copyGlobalToBackend(JsonObject &root){
   root["features_conf_refreshRate"] = gConfig->features.refreshRate;
   root["features_startUpActive"]    = gState->features.startUpActive;
   root["features_pcConnected"]      = gState->features.pcConnected;
-  root["features_vbusVoltage"]      = gState->features.vbusVoltage;
+  root["features_vbusVoltage"]      = gState->features.vbus;
   root["screen_conf_rotation"]      = gConfig->screen[0].rotation;
   root["screen_conf_brightness"]    = gConfig->screen[0].brightness;
   root["BaseMCU_vext_cc"]           = gState->baseMCUExtra.vext_cc;
