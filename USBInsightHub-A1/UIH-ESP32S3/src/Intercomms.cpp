@@ -24,12 +24,21 @@ uint8_t meterBoardMap[3]={2,0,1};
 //Route the board channels to power meter physical channels
 uint8_t boardMeterMap[3]={1,2,0};
 
+//ADC
+//calibration
+esp_adc_cal_characteristics_t adc_chars;
+uint32_t adc_samples[ADC_NUMSAMPLES];
+int adc_idx = 0;
+uint32_t adc_sum = 0;
+
+
 //Internal functions
 void taskIntercomms(void *pvParameters);
 void interMcuWriteAll(void);
 void interMcuReadAll(void);
 void interSetCurrentLimits(void);
 void interAvgMeterRead(void);
+float read5Vrail(void);
 
 void interPacAlertInterruptHandler(void);
 void inter_pac_alert_handler_task(void *pvParameters);
@@ -49,6 +58,10 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
     //memcpy(prevMCUConfig,glState->baseMCUOut,sizeof(prevMCUConfig));
     //memcpy(prevMeterConfig,glConfig->meter,sizeof(prevMeterConfig));
     //prevHubMode = glConfig->features.hubMode;
+
+    // Characterize ADC (helps improve accuracy)
+    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
+    analogSetPinAttenuation(VBUS_MONITOR, ADC_11db);
 
     //I2C initialization
     ESP_LOGI(TAG,"Core %u",xPortGetCoreID());
@@ -92,6 +105,21 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
 }
 
 
+float read5Vrail(void){
+  
+  uint32_t lin_value = esp_adc_cal_raw_to_voltage(analogRead(VBUS_MONITOR), &adc_chars);
+  adc_sum -= adc_samples[adc_idx];  // Remove oldest value from sum
+  adc_samples[adc_idx] = lin_value;  // Store new value
+  adc_sum += lin_value;  // Add new value to sum
+
+  adc_idx = (adc_idx + 1) % ADC_NUMSAMPLES;  // Move index in circular buffer
+
+  float average = (adc_sum / (float)ADC_NUMSAMPLES)*DIV5VRATIO;  
+  
+  //ESP_LOGI(TAG, "voltage: %f",average);
+  return average;
+}
+
 void interMcuWriteAll(void){
 
   if(i2c_Semaphore != NULL){
@@ -103,7 +131,6 @@ void interMcuWriteAll(void){
       ESP_LOGE(TAG,"Timeout to write I2C mcu");
     }
   }
-
 }
 
 
@@ -295,6 +322,9 @@ void taskIntercomms(void *pvParameters){
 
     //Front panel LED update
     digitalWrite(AUX_LED,glState->system.ledState);
+
+    //Read 5V rail voltage
+    glState->features.vbus = read5Vrail();
     
     if(glState->system.taskDefaultScreenLoopHandle != NULL)
       xTaskNotifyGive(glState->system.taskDefaultScreenLoopHandle);

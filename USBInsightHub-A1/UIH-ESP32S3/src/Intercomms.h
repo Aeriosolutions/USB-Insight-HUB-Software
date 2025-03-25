@@ -9,6 +9,7 @@ communitcaion between the Main MCU, the BaseMCU and the Power Meter
 
 #include <Arduino.h>
 #include <Wire.h>
+#include "esp_adc_cal.h"
 #include "BaseMCU.h"
 #include "PAC194x.h"
 #include "datatypes.h"
@@ -20,7 +21,11 @@ communitcaion between the Main MCU, the BaseMCU and the Power Meter
 
 #define INTERCOMMS_PERIOD 50 //ms
 
+#define ADC_NUMSAMPLES 10
+#define DIV5VRATIO 3.21 //22.1k|10.0k
+
 void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig);
 
+float read5Vrail();
 
 #endif

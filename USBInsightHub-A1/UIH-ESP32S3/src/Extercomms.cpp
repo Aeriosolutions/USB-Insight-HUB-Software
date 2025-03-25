@@ -145,11 +145,12 @@ void processJsonRpcMessage(const char* jsonString) {
       int inx = getEnumIndex(params["wifi_enabled"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
       inx != -1 ? gloConfig->features.wifi_enabled = inx : result["wifi_enabled"] = "fail";
     }
-    
     if(params["hubMode"]){
       int inx = getEnumIndex(params["hubMode"].as<const char*>(),t_hubMode,ARR_SIZE(t_hubMode));
       inx != -1 ? gloConfig->features.hubMode = inx : result["hubMode"] = "fail";
-    }
+      //delay to allow other json elements downstream not to be overwritten
+      vTaskDelay(pdMS_TO_TICKS(150)); 
+    }        
     if(params["filterType"]){
       int inx = getEnumIndex(params["filterType"].as<const char*>(),t_filterType,ARR_SIZE(t_filterType));
       inx != -1 ? gloConfig->features.filterType = inx : result["filterType"] = "fail";
