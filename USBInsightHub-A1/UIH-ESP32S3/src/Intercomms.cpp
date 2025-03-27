@@ -1,4 +1,21 @@
 
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
+
+//Logic related to the I2C communitcaion between the ESP32, the BaseMCU and the Power Meter
+//Handles power meter interrupts and analog readings
+
+
 #include "Intercomms.h"
 
 static const char* TAG = "Intercoms";
@@ -95,7 +112,7 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
         xSemaphoreGive(i2c_Semaphore);
 
         attachInterrupt(PAC_ALERT, inter_pac_alert_isr, FALLING);        
-        xTaskCreatePinnedToCore(taskIntercomms, "Intercomms", 6144, NULL, 1,&(glState->system.taskIntercommHandle),APP_CORE);
+        xTaskCreatePinnedToCore(taskIntercomms, "Intercomms", 7168, NULL, 1,&(glState->system.taskIntercommHandle),APP_CORE);
         xTaskCreatePinnedToCore(inter_pac_alert_handler_task, "pac alert handler", 2048,  NULL, 1,  &inter_pac_alert_handle, APP_CORE);
     } 
     else {

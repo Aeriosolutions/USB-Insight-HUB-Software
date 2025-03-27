@@ -1,5 +1,17 @@
-//Add licence text
-//PAC1943 definitions
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
+
+//PAC1943 non-comprehensive driver. Implements only required functions for the USB Insight Hub project.
 
 #include <Arduino.h>
 #include "PAC194x.h"

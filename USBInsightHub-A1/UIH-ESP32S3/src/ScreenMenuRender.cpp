@@ -1,3 +1,18 @@
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
+
+ //Menu view rendering functions
+
 #include "Screen.h"
 #include "MenuView.h"
 #include <WiFi.h>

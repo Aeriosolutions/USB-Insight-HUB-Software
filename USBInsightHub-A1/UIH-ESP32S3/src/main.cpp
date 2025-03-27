@@ -1,16 +1,16 @@
 /**
- *   ESP32 SvelteKit
+ *   USB Insight Hub
  *
- *   A simple, secure and extensible framework for IoT projects for ESP32 platforms
- *   with responsive Sveltekit front-end built with TailwindCSS and DaisyUI.
- *   https://github.com/theelims/ESP32-sveltekit
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
  *
- *   Copyright (C) 2018 - 2023 rjwats
- *   Copyright (C) 2023 - 2024 theelims
- *
- *   All Rights Reserved. This software may be modified and distributed under
- *   the terms of the LGPL v3 license. See the LICENSE file for details.
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
  **/
+
 
 
 #include <Arduino.h>

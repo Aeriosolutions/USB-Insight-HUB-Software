@@ -30,7 +30,7 @@ UploadFirmwareService::UploadFirmwareService(PsychicHttpServer *server,
 
 void UploadFirmwareService::begin()
 {
-    _server->maxUploadSize = 2300000; // 2.3 MB
+    _server->maxUploadSize = 3800000; // 2.3 MB -> 3.8 MB //to match the partition of 3866624
 
     PsychicUploadHandler *uploadHandler = new PsychicUploadHandler();
 

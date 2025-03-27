@@ -1,5 +1,5 @@
 <script lang="ts">
-	import logo from '$lib/assets/logo.png';
+	import logo from '$lib/assets/logo_s.png';
 	import Github from '~icons/tabler/brand-github';
 	import Discord from '~icons/tabler/brand-discord';
 	import Users from '~icons/tabler/users';
@@ -18,6 +18,7 @@
 	import MQTT from '~icons/tabler/topology-star-3';
 	import NTP from '~icons/tabler/clock-check';
 	import Metrics from '~icons/tabler/report-analytics';
+	import About from '~icons/tabler/clipboard-list'; //file-info
 	import { page } from '$app/stores';
 	import { user } from '$lib/stores/user';
 	import { createEventDispatcher } from 'svelte';
@@ -44,13 +45,13 @@
 	};
 
 	let menuItems = [
-/* 		{
+ 		{
 			title: 'Control Panel',
 			icon: Panel,
 			href: '/panel',
 			feature: true,
 			
-		},	 */	
+		},	 	
 		{
 			title: 'Settings',
 			icon: Control,
@@ -135,7 +136,14 @@
 							$page.data.features.upload_firmware ||
 							$page.data.features.download_firmware) &&
 						(!$page.data.features.security || $user.admin),
-				}
+				},
+				{
+					title: 'About',
+					icon: About,
+					href: '/system/about',
+					feature: true,
+					
+				}				
 			]
 		}
 	] as menuItem[];
@@ -163,7 +171,7 @@
 		class="rounded-box mb-4 flex items-center hover:scale-[1.02] active:scale-[0.98]"
 		on:click={() => setActiveMenuItem('')}
 	>
-		<img src={logo} alt="Logo" class="h-12 w-12" />
+		<img src={logo} alt="Logo" class="h-6 w-12" />
 		<h1 class="px-4 text-2xl font-bold">{$page.data.appName}</h1>
 	</a>
 	<ul class="menu rounded-box menu-vertical flex-nowrap overflow-y-auto">

@@ -1,5 +1,17 @@
-//Add licence text
-//Screen class defiitions and data structures
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
+
+//Screen class definitions and data structures for default view
 
 #ifndef SCREEN_H
 #define SCREEN_H
@@ -71,6 +83,7 @@ struct chScreenData {
   uint8_t rssiBars;
   uint8_t wifiState;
   uint8_t hubMode;
+  bool showMenuInfoSplash;
 };
 
 

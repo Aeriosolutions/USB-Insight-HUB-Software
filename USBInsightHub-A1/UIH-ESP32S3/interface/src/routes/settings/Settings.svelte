@@ -10,6 +10,7 @@
 	import { socket } from '$lib/stores/socket';
 	import type { MasterState } from '$lib/types/models';
 	import { writable} from 'svelte/store';
+	import {Help} from '$lib/types/help';
 
 
 	//let masterState = null;
@@ -160,7 +161,8 @@
 <div class="space-y-4 p-4" style="font-size: 20px;">
 	<!-- Startup Mode -->
 	<div class="bg-gray-200 p-4 rounded-lg shadow-md">
-	  <h2 class="font-bold">Startup Mode</h2>
+	  <h2 class="font-bold inline-block">Startup Mode</h2>
+	  <span class="text-sm cursor-help inline-block" title={Help.SETTINGS.STARTUP_MODE}>ℹ️</span>
 	  <div class="flex gap-4 mt-2 ml-4">
 		{#each ['Persistence', 'On at startup', 'Off at startup', 'Timed'] as mode}
 		  <label class="flex items-center gap-2">
@@ -178,7 +180,8 @@
 	<div class="bg-gray-200 p-4 rounded-lg shadow-md">
 	  <h2 class="font-bold">Meter</h2>
 	  <div class="mt-2 ml-6">
-		<label class="block font-semibold">Refresh rate:</label>
+		<label class="block font-semibold inline-block">Refresh rate:</label>
+		<span class="text-sm cursor-help inline-block" title={Help.SETTINGS.METER.REFRESH_RATE}>ℹ️</span>
 		<div class="flex gap-4">
 		  {#each ['0.5s', '1.0s'] as rate}
 			<label class="flex items-center gap-2">
@@ -192,7 +195,8 @@
 		</div>
 	  </div>
 	  <div class="mt-2 ml-6">
-		<label class="block font-semibold">Filter Type:</label>
+		<label class="block font-semibold inline-block">Filter Type:</label>
+		<span class="text-sm cursor-help inline-block" title={Help.SETTINGS.METER.FILTER_TYPE}>ℹ️</span>
 		<div class="flex gap-4">
 		  {#each ['Moving Avg.', 'Median'] as filter}
 			<label class="flex items-center gap-2">
@@ -237,7 +241,8 @@
   
 	<!-- Hub Mode -->
 	<div class="bg-gray-200 p-4 rounded-lg shadow-md">
-	  <h2 class="font-bold">Hub Mode</h2>
+	  <h2 class="font-bold inline-block">Hub Mode</h2>
+	  <span class="text-sm cursor-help inline-block" title={Help.SETTINGS.HUB_MODE}>ℹ️</span>
 	  <div class="flex gap-4 mt-2 ml-6">
 		{#each ['USB2 & USB3', 'USB2 Only', 'USB3 Only'] as mode}
 		  <label class="flex items-center gap-2">

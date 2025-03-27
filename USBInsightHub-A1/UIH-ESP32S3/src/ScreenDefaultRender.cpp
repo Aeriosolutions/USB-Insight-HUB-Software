@@ -1,3 +1,18 @@
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
+
+//Default view rendering logic
+
 #include "Screen.h"
 
 void Screen::screenDefaultRender(chScreenData Screen){
@@ -268,11 +283,19 @@ void Screen::screenDefaultRender(chScreenData Screen){
     img.unloadFont();
   }
 
+  if(Screen.dProp.cs_pin == DISPLAY_CS_3 && Screen.showMenuInfoSplash){
+    img.loadFont(SMALLFONT);
+    img.fillRoundRect(5, 40, 235, 80, 5, TFT_BLUE);
+    img.fillRoundRect(9, 44, 229, 76, 5, TFT_WHITE);
+    img.setTextColor(TFT_BLACK);
+    img.drawString("Long press to",10,50,4);
+    img.drawString("enter Setup",10,80,4);
+    img.fillTriangle(204,45,204,75,230,60,TFT_BLACK);
+    img.unloadFont();
+  }
 
- 
   //ESP_LOGI("4","%u",millis()-timers); //---------------------------------------- 
   
-
   //timers=millis();
   img.pushSprite(0, 0);
   //tft.pushImageDMA(0,0,240,240,imgPtr); // use only with 16bit color depth

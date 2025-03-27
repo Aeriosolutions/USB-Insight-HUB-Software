@@ -16,7 +16,8 @@ export const nodes = [
 	() => import('./nodes/12'),
 	() => import('./nodes/13'),
 	() => import('./nodes/14'),
-	() => import('./nodes/15')
+	() => import('./nodes/15'),
+	() => import('./nodes/16')
 ];
 
 export const server_loads = [];
@@ -29,13 +30,14 @@ export const dictionary = {
 		"/panel": [6],
 		"/settings": [7],
 		"/system": [8],
-		"/system/metrics": [9],
-		"/system/status": [10],
-		"/system/update": [11],
-		"/user": [12],
-		"/wifi": [13],
-		"/wifi/ap": [14],
-		"/wifi/sta": [15]
+		"/system/about": [9],
+		"/system/metrics": [10],
+		"/system/status": [11],
+		"/system/update": [12],
+		"/user": [13],
+		"/wifi": [14],
+		"/wifi/ap": [15],
+		"/wifi/sta": [16]
 	};
 
 export const hooks = {

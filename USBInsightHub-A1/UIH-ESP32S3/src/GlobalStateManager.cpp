@@ -1,3 +1,18 @@
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
+
+//Global variables initialization and non-volatile variables handling
+
 #include "GlobalStateManager.h"
 
 static const char* TAG = "GlobalStateManager";
@@ -15,6 +30,7 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
 void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig){
 
     //check_reset_reason();
+    
 
     globlState  = globalState;
     globlConfig = globalConfig;
@@ -89,6 +105,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     mac.replace(":", "");
     globalState->system.wifiMAC = mac;
     globalState->system.menuIsActive = false;
+    globalState->system.resetToDefault = false;
 
     //---Features
     globalConfig->features.startUpmode != STARTUP_SEC ? globalState->features.startUpActive = false : globalState->features.startUpActive = true;
@@ -163,8 +180,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
 void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig){
     
     globalConfig->features.startView = DEFAULT_VIEW;
-    globalConfig->features.startUpmode = PERSISTANCE;
-    //globalConfig->features.startUpmode = STARTUP_SEC;
+    globalConfig->features.startUpmode = PERSISTANCE;    
     globalConfig->features.wifi_enabled = ENABLE;
     globalConfig->features.hubMode = USB2_3;
     globalConfig->features.filterType = FILTER_TYPE_MEDIAN;
@@ -193,7 +209,10 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
 
 void taskConfigAutoSave(void *pvParameters){
   TickType_t xLastWakeTime = xTaskGetTickCount();
+  uint8_t dumb = 0;
+  long index = 0;
   for(;;){
+    //check if is a change in config parameters
     if( memcmp(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig)) != 0 ){
         saveConfig();
         //discriminate if the configuration change comes from the Menu or elsewhere
@@ -210,7 +229,21 @@ void taskConfigAutoSave(void *pvParameters){
         saveMCUState();
         globlState->system.saveMCUState = false;
     }
-    //check if is a change in config parameters
+
+    //check if it is needed to reset to defaults
+    if(globlState->system.resetToDefault){
+        ESP_LOGI(TAG,"Command: Reset to default values");
+        globlState->system.resetToDefault = false;
+        setDefaultGlobalConfig(globlState,globlConfig);
+    }
+    
+    //Uncomment to increase flash size by 1575783 bytes to test big file OTA
+    /*
+    dumb = blobdata[index];
+    if(dumb == 0) ESP_LOGI(TAG,"Never value");     
+    if (index < sizeof(blobdata)-1) index++;
+    else index = 0;
+    */      
     vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(CONFIG_AUTO_SAVE_PERIOD));
   }
 }

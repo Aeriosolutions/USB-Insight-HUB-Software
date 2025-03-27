@@ -1,4 +1,17 @@
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
 
+ * MIT License. Check full description on LICENSE file.
+ **/
+
+//bridges communication between the low level logic and the web interface
 
 #include "MasterStateService.h"
 
@@ -6,7 +19,7 @@ void logJsonObject(JsonObject &root);
 
 
 //default json structure. 
-//Not necessary as json is populated from Global state at initialization
+
 static const char *jsonDefault = R"rawliteral(
 {
   "power_on": false,
@@ -29,6 +42,7 @@ static const char *jsonDefault = R"rawliteral(
   "BaseMCU_usb3_mux_out_en": false,
   "BaseMCU_usb3_mux_sel_pos": false,
   "BaseMCU_base_ver": 0,
+  "system_resetToDefault": false,
   "c1_startup_counter": 0,
   "c1_startup_conf_timer": 0,
   "c1_meter_voltage": 0,
@@ -196,6 +210,7 @@ void MasterStateService::copyBackendToGlobal(JsonObject &root){
   gConfig->features.hubMode       = root["features_conf_hubMode"].as<uint8_t>();
   gConfig->features.filterType    = root["features_conf_filterType"].as<uint8_t>();
   gConfig->features.refreshRate   = root["features_conf_refreshRate"].as<uint8_t>();
+  gState->system.resetToDefault   = root["system_resetToDefault"] | false;
   //gState->features.startUpActive = root["features_startUpActive"] | false;
   //gState->features.pcConnected  = root["features_pcConnected"] | false;
   //gState->features.vbusVoltage  = root["features_vbusVoltage"].as<float>();
@@ -256,6 +271,7 @@ void MasterStateService::copyGlobalToBackend(JsonObject &root){
   root["BaseMCU_usb3_mux_out_en"]   = gState->baseMCUExtra.usb3_mux_out_en;
   root["BaseMCU_usb3_mux_sel_pos"]  = gState->baseMCUExtra.usb3_mux_sel_pos;
   root["BaseMCU_base_ver"]          = gState->baseMCUExtra.base_ver;
+  root["system_resetToDefault"]     = gState->system.resetToDefault;
 
   
   for(int i =0; i<3; i++){

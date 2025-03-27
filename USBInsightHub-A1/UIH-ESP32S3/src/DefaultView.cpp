@@ -1,3 +1,18 @@
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
+
+ //Logic for the default view (Devices metadata, voltage/current meter, etc.)
+
 #include "DefaultView.h"
 
 GlobalState *gState;
@@ -20,7 +35,8 @@ void taskDefaultScreenLoop(void *pvParameters);
 
 bool defaultViewActive = false;
 SemaphoreHandle_t screen_Semaphore;
-
+unsigned long infoSplashTimer = 0;
+uint8_t prevRefreshRate = 0;
 
 void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Screen *screen){
 
@@ -42,6 +58,7 @@ void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Scree
   ScreenArr[2].dProp = {DISPLAY_CS_3, DLIT_3, ROT_180_DEG, 800};
   
   defaultScreenFastDataUpdate();
+  prevRefreshRate = gConfig->features.refreshRate;
 
     
   if(xSemaphoreTake(screen_Semaphore,( TickType_t ) 20 ) == pdTRUE){
@@ -108,12 +125,14 @@ void taskDefaultViewLoop(void *pvParameters){
             gState->baseMCUOut[i].data_en = !gState->baseMCUOut[i].data_en;
         }
       }
-
       
       if (btnShortCheck(3)) {
         
         ESP_LOGI(TAG,"Setup button short press");
         uint16_t oclimit=2000;
+        gState->system.showMenuInfoSplash = true;
+        infoSplashTimer = millis();
+        /*
         for (int i=0; i<3 ; i++){
           switch(gState->baseMCUOut[i].ilim){
               case 0:                 
@@ -138,7 +157,7 @@ void taskDefaultViewLoop(void *pvParameters){
             gState->meter[i].fwdAlertSet  = false;
             gState->baseMCUOut[i].pwr_en = false;
           }          
-        } 
+        } */
       }
       if (btnLongCheck(3)){
         
@@ -184,8 +203,12 @@ void taskDefaultScreenLoop(void *pvParameters){
       if(!firstPass) iScreen->screenSetBackLight(0);
 
       defaultScreenFastDataUpdate();
-      if(gConfig->features.refreshRate == S0_5) slowPeriod = SLOW_DATA_DOWNSAMPLES_0_5;
-      if(gConfig->features.refreshRate == S1_0) slowPeriod = SLOW_DATA_DOWNSAMPLES_1_0;
+      if(prevRefreshRate != gConfig->features.refreshRate){
+        if(gConfig->features.refreshRate == S0_5) slowPeriod = SLOW_DATA_DOWNSAMPLES_0_5;
+        if(gConfig->features.refreshRate == S1_0) slowPeriod = SLOW_DATA_DOWNSAMPLES_1_0;
+        slowCnt=0;
+        prevRefreshRate = gConfig->features.refreshRate;
+      }
       slowCnt++;
       if(slowCnt == slowPeriod){
         slowCnt=0;
@@ -209,7 +232,14 @@ void taskDefaultScreenLoop(void *pvParameters){
         xSemaphoreGive(screen_Semaphore);
         gState->system.taskDefaultScreenLoopHandle = NULL;
         vTaskDelete(NULL);
-      } 
+      }
+      
+      if(infoSplashTimer != 0){
+        if(millis()-infoSplashTimer > MENU_INFO_SPLASH_TIMEOUT){
+          gState->system.showMenuInfoSplash = false;
+          infoSplashTimer = 0;
+        }
+      }
 
       vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(DISPLAY_REFRESH_PERIOD));
     }
@@ -245,7 +275,8 @@ void defaultScreenFastDataUpdate(){
       ScreenArr[i].startup_timer    = gConfig->startup[i].startup_timer;
       ScreenArr[i].rssiBars         = getRssiBars(gState->features.wifiRSSI);
       ScreenArr[i].wifiState        = gState->features.wifiState;
-      ScreenArr[i].hubMode          = gConfig->features.hubMode;       
+      ScreenArr[i].hubMode          = gConfig->features.hubMode; 
+      ScreenArr[i].showMenuInfoSplash   = gState->system.showMenuInfoSplash;      
       if( memcmp(&prevDevInfo[i],&(ScreenArr[i].tProp),sizeof(prevDevInfo[i])) != 0 ){
         ESP_LOGI(TAG, "CH %u: #d %u, D1: %s, D2: %s, t: %u",i,ScreenArr[i].tProp.numDev,
         gState->usbInfo[i].Dev1_Name,

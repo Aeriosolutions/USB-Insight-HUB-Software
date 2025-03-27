@@ -27,6 +27,10 @@
 		"src/routes/system/+page.ts",
 		"src/routes/+layout.ts"
 	],
+	"/system/about": [
+		"src/routes/system/about/+page.ts",
+		"src/routes/+layout.ts"
+	],
 	"/system/metrics": [
 		"src/routes/system/metrics/+page.ts",
 		"src/routes/+layout.ts"

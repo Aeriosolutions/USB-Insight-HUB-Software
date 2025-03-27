@@ -1,6 +1,20 @@
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
+
+ //bridges communication between the low level logic and the web interface
+
 #ifndef MasterStateService_h
 #define MasterStateService_h
-
 
 #include <ESP32SvelteKit.h>
 #include <EventSocket.h>
@@ -74,6 +88,7 @@ public:
     bool BaseMCU_usb3_mux_out_en;
     bool BaseMCU_usb3_mux_sel_pos;
     uint8_t BaseMCU_base_ver;
+    bool system_resetToDefault;
 
     static void read(MasterState &settings, JsonObject &root)
     {
@@ -99,6 +114,7 @@ public:
         root["BaseMCU_usb3_mux_out_en"]     = settings.BaseMCU_usb3_mux_out_en;
         root["BaseMCU_usb3_mux_sel_pos"]    = settings.BaseMCU_usb3_mux_sel_pos;
         root["BaseMCU_base_ver"]            = settings.BaseMCU_base_ver;
+        root["system_resetToDefault"]       = settings.system_resetToDefault;
 
         for(int i =0; i<3; i++){
             
@@ -144,7 +160,8 @@ public:
         settings.BaseMCU_pwr_source         = root["BaseMCU_pwr_source"] | false;
         settings.BaseMCU_usb3_mux_out_en    = root["BaseMCU_usb3_mux_out_en"] | false;
         settings.BaseMCU_usb3_mux_sel_pos   = root["BaseMCU_usb3_mux_sel_pos"] | false;
-        settings.BaseMCU_base_ver           = root["BaseMCU_base_ver"].as<uint8_t>();                
+        settings.BaseMCU_base_ver           = root["BaseMCU_base_ver"].as<uint8_t>(); 
+        settings.system_resetToDefault      = root["system_resetToDefault"] | false;               
 
         for(int i =0; i<3; i++){
             

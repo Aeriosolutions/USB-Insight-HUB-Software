@@ -24,10 +24,11 @@
 	import Health from '~icons/tabler/stethoscope';
 	import Stopwatch from '~icons/tabler/24-hours';
 	import SDK from '~icons/tabler/sdk';
-	import type { SystemInformation, Analytics } from '$lib/types/models';
+	import type { SystemInformation, Analytics, MasterState } from '$lib/types/models';
 	import { socket } from '$lib/stores/socket';
 
 	let systemInformation: SystemInformation;
+	let masterState: MasterState;
 
 	async function getSystemStatus() {
 		try {
@@ -45,9 +46,18 @@
 		return systemInformation;
 	}
 
-	onMount(() => socket.on('analytics', handleSystemData));
+	//onMount(() => socket.on('analytics', handleSystemData));
+	onMount(() => {
+		socket.on('analytics', handleSystemData);
+		socket.on<MasterState>('master', (data)=> masterState = data)
+		} 
+	);
 
-	onDestroy(() => socket.off('analytics', handleSystemData));
+	onDestroy(() => {
+		socket.off('analytics', handleSystemData);
+		socket.off('master');
+		}
+	);
 
 	const handleSystemData = (data: Analytics) =>
 		(systemInformation = { ...systemInformation, ...data });
@@ -77,18 +87,23 @@
 	}
 
 	async function postFactoryReset() {
+		//set flag to reset the unit to defaul values
+		masterState[`system_resetToDefault`] = true;
+		socket.sendEvent('master', masterState);
+		
+		/*
 		const response = await fetch('/rest/factoryReset', {
 			method: 'POST',
 			headers: {
 				Authorization: $page.data.features.security ? 'Bearer ' + $user.bearer_token : 'Basic'
 			}
-		});
+		});*/
 	}
 
 	function confirmReset() {
 		openModal(ConfirmDialog, {
 			title: 'Confirm Factory Reset',
-			message: 'Are you sure you want to reset the device to its factory defaults?',
+			message: 'Are you sure you want to reset the device to its factory defaults? \nTo reset WiFi credentials, use the Setup Menu in the device.',			
 			labels: {
 				cancel: { label: 'Abort', icon: Cancel },
 				confirm: { label: 'Factory Reset', icon: FactoryReset }
@@ -193,9 +208,9 @@
 						<CPP class="text-primary-content h-auto w-full scale-75" />
 					</div>
 					<div>
-						<div class="font-bold">Firmware Version</div>
+						<div class="font-bold">ESP32 Firmware Version_STM8 version</div>
 						<div class="text-sm opacity-75">
-							{systemInformation.firmware_version}
+							{systemInformation.firmware_version}_{masterState.BaseMCU_base_ver}
 						</div>
 					</div>
 				</div>

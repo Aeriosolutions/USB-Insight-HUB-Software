@@ -169,6 +169,7 @@ export type MasterState = {
 	BaseMCU_usb3_mux_out_en: boolean;
 	BaseMCU_usb3_mux_sel_pos: boolean;
 	BaseMCU_base_ver: number;
+	system_resetToDefault: boolean;
 
 //--------------------------------------------
 

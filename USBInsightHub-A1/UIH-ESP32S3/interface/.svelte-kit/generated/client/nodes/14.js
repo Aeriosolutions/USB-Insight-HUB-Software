@@ -1,3 +1,2 @@
-import * as universal from "../../../../src/routes/wifi/ap/+page.ts";
+import * as universal from "../../../../src/routes/wifi/+page.ts";
 export { universal };
-export { default as component } from "../../../../src/routes/wifi/ap/+page.svelte";

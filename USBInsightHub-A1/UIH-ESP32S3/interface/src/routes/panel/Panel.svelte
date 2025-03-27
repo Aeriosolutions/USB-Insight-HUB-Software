@@ -4,12 +4,9 @@
 	import { page } from '$app/stores';
 	import { notifications } from '$lib/components/toasts/notifications';
 	import SettingsCard from '$lib/components/SettingsCard.svelte';
-	import Light from '~icons/tabler/bulb';
-	import Info from '~icons/tabler/info-circle';
-	import Save from '~icons/tabler/device-floppy';
-	import Reload from '~icons/tabler/reload';
 	import { socket } from '$lib/stores/socket';
 	import type { MasterState } from '$lib/types/models';
+	import {Help} from '$lib/types/help';
 
 
 	//let masterState = null;
@@ -164,7 +161,6 @@
 </script>
 
 <div class="bg-gray-100 min-h-screen p-4" style="font-size: 20px;">
-
 	<!-- Header -->
 	<div class="flex justify-around items-center bg-gray-300 p-4 rounded-lg shadow-md mb-4">
 	  <div class="flex items-center gap-2">
@@ -172,7 +168,8 @@
 		<span class="text-green-500 font-bold">✔</span>
 	  </div>
 	  <div class="flex items-center gap-2">
-		<span>PC Comm</span>
+		<span >PC Comm</span>
+		<span class="text-sm cursor-help" title={Help.CONTROL.PCCOM}>ℹ️:</span>
 		<span class="text-green-500 font-bold">
 			{#if masterState[`features_pcConnected`]} ✔
 			{:else} -		
@@ -180,7 +177,8 @@
 		</span>
 	  </div>
 	  <div class="flex items-center gap-2">
-		<span>Power: </span>
+		<span>Power</span>
+		<span class="text-sm cursor-help" title={Help.CONTROL.POWER}>ℹ️:</span>
 		{#if masterState[`BaseMCU_pwr_source`]} AUX
 		{:else} HOST		
 		{/if}
@@ -308,7 +306,8 @@
 		  <hr class="separator">
 		  <!-- Limits -->
 		  <div class="text-sm text-gray-600 mb-2" style="font-size: 20px;">
-			<span class="tab-space">Over Current Limit :</span>  
+			<span class="tab-space">Over Current Limit :</span>
+		
 			<input 
 				type="number" 
 				class="border rounded p-1" 
@@ -319,6 +318,7 @@
 				style="width: 80px;"
 				on:change={(e) => validateInput(e, `c${ch.id}_fwdCLim`, 100, 2000)} 
 			/> mA
+			{#if ch.id == 1}  <span class="text-sm cursor-help" title={Help.CONTROL.OVER_CURRENT}>ℹ️</span> {/if}
 		  </div>
 		  <div class="text-sm text-gray-600 mb-2" style="font-size: 20px;">
 			<span class="tab-space">Back Current Limit :</span>			 
@@ -332,6 +332,7 @@
 				style="width: 80px;"
 				on:change={(e) => validateInput(e, `c${ch.id}_backCLim`, 20, 100)}
 			/> mA
+			{#if ch.id == 1}  <span class="text-sm cursor-help" title={Help.CONTROL.BACK_CURRENT}>ℹ️</span> {/if}
 		  </div>
 		  <div class="text-sm text-gray-600 mb-4" style="font-size: 20px;">
 			<span class="tab-space">Startup Time Delay:</span>			 
@@ -345,6 +346,7 @@
 				style="width: 80px;"
 				on:change={(e) => validateInput(e, `c${ch.id}_startupTime`, 0.1, 10)}
 			/> s
+			{#if ch.id == 1}  <span class="text-sm cursor-help" title={Help.CONTROL.STARTUP_DELAY}>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ℹ️</span> {/if}
 		  </div>
   
 		  <button 

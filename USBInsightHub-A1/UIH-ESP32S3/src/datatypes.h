@@ -1,4 +1,17 @@
-//LICENCE
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
+
+ //definition of global variables and data structures
 
 #ifndef DATATYPES_H
 #define DATATYPES_H
@@ -131,7 +144,9 @@ struct System {
   bool firstStart;
   bool ledState;
   String wifiMAC;
-  bool menuIsActive;  
+  bool menuIsActive;
+  bool showMenuInfoSplash;
+  bool resetToDefault;  
 };
 
 struct FeaturesState {

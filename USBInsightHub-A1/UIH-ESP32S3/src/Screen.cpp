@@ -1,5 +1,18 @@
-//Add licence text
-//Screen class function and draw logic
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts wrapped 
+ *   around ESP32 SvelteKit framework.
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
+
+
+//Screen initialization and helpers
 
 //TFT_eSPI version: 2.5.43
 //esp32 arduino version: 2.0.14
