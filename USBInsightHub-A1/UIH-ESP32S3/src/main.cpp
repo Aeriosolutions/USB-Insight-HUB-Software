@@ -36,7 +36,7 @@ Screen screen;
 
 PsychicHttpServer server;
 
-ESP32SvelteKit esp32sveltekit(&server, 120);
+ESP32SvelteKit esp32sveltekit(&server, 160); //defaul 120
 
 MasterStateService masterStateService = MasterStateService(&server,
                                                         esp32sveltekit.getSocket(),
@@ -49,13 +49,16 @@ void setup()
     // start serial and filesystem
     //Serial.begin(SERIAL_BAUD_RATE);   
     globalStateInitializer(&globalState,&globalConfig);
+    iniIntercomms(&globalState, &globalConfig);
+    delay(10);
+    iniPowerStartUp(&globalState,&globalConfig);     
     iniExtercomms(&globalState,&globalConfig);
     delay(40); //to give time to print
     ESP_LOGI("Main","Running Firmware Version: %s\n", APP_VERSION);
-    iniIntercomms(&globalState, &globalConfig);
+
     iniButtons();
     iniDefaultView(&globalState,&globalConfig, &screen);
-    iniPowerStartUp(&globalState,&globalConfig);    
+       
     
     // start ESP32-SvelteKit if WiFi is enabled
     if(globalConfig.features.wifi_enabled == ENABLE){

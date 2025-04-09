@@ -14,6 +14,7 @@
 	import Home from '~icons/tabler/home';
 	import Devices from '~icons/tabler/devices';
 	import type { ApSettings, ApStatus } from '$lib/types/models';
+	import { socket } from '$lib/stores/socket';
 
 	let apSettings: ApSettings;
 	let apStatus: ApStatus;
@@ -56,12 +57,16 @@
 		getAPStatus();
 	}, 5000);
 
-	onDestroy(() => clearInterval(interval));
+	onDestroy(() => {
+		clearInterval(interval);
+		socket.off('master');
+	});
 
 	onMount(() => {
 		if (!$page.data.features.security || $user.admin) {
 			getAPSettings();
 		}
+		socket.on('master', (data)=> void 0);
 	});
 
 	let provisionMode = [

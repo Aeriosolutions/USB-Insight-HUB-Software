@@ -73,6 +73,7 @@ public:
     uint8_t features_conf_hubMode;
     uint8_t features_conf_filterType;
     uint8_t features_conf_refreshRate;
+    uint8_t features_usbHostState;
     bool features_startUpActive;
     bool features_pcConnected;
     float features_vbusVoltage;
@@ -88,13 +89,10 @@ public:
     bool BaseMCU_usb3_mux_out_en;
     bool BaseMCU_usb3_mux_sel_pos;
     uint8_t BaseMCU_base_ver;
-    bool system_resetToDefault;
+    uint8_t system_resetToDefault;
 
     static void read(MasterState &settings, JsonObject &root)
     {
-        root["power_on"] = settings.powerOn;
-        root["switch_on"] = settings.switchOn;
-
         //move MasterState data to Stateles json structures
         root["features_conf_startUpmode"]   = settings.features_conf_startUpmode;
         root["features_conf_wifi_enabled"]  = settings.features_conf_wifi_enabled;
@@ -104,6 +102,7 @@ public:
         root["features_startUpActive"]      = settings.features_startUpActive;
         root["features_pcConnected"]        = settings.features_pcConnected;
         root["features_vbusVoltage"]        = settings.features_vbusVoltage;
+        root["features_usbHostState"]       = settings.features_usbHostState;
         root["screen_conf_rotation"]        = settings.screen_conf_rotation;
         root["screen_conf_brightness"]      = settings.screen_conf_brightness;
         root["BaseMCU_vext_cc"]             = settings.BaseMCU_vext_cc;
@@ -115,6 +114,7 @@ public:
         root["BaseMCU_usb3_mux_sel_pos"]    = settings.BaseMCU_usb3_mux_sel_pos;
         root["BaseMCU_base_ver"]            = settings.BaseMCU_base_ver;
         root["system_resetToDefault"]       = settings.system_resetToDefault;
+        
 
         for(int i =0; i<3; i++){
             
@@ -140,8 +140,6 @@ public:
 
     static StateUpdateResult update(JsonObject &root, MasterState &settings)
     {
-        settings.powerOn = root["power_on"] | false;
-        settings.switchOn = root["switch_on"] | false;
         
         settings.features_conf_startUpmode  = root["features_conf_startUpmode"].as<uint8_t>();
         settings.features_conf_wifi_enabled = root["features_conf_wifi_enabled"].as<uint8_t>();
@@ -151,6 +149,7 @@ public:
         settings.features_startUpActive     = root["features_startUpActive"] | false;
         settings.features_pcConnected       = root["features_pcConnected"] | false;
         settings.features_vbusVoltage       = root["features_vbusVoltage"].as<float>();
+        settings.features_usbHostState      = root["features_usbHostState"].as<uint8_t>();               
         settings.screen_conf_rotation       = root["screen_conf_rotation"].as<uint8_t>();
         settings.screen_conf_brightness     = root["screen_conf_brightness"].as<uint16_t>();
         settings.BaseMCU_vext_cc            = root["BaseMCU_vext_cc"].as<uint8_t>();
@@ -161,7 +160,8 @@ public:
         settings.BaseMCU_usb3_mux_out_en    = root["BaseMCU_usb3_mux_out_en"] | false;
         settings.BaseMCU_usb3_mux_sel_pos   = root["BaseMCU_usb3_mux_sel_pos"] | false;
         settings.BaseMCU_base_ver           = root["BaseMCU_base_ver"].as<uint8_t>(); 
-        settings.system_resetToDefault      = root["system_resetToDefault"] | false;               
+        settings.system_resetToDefault      = root["system_resetToDefault"].as<uint8_t>();
+        
 
         for(int i =0; i<3; i++){
             
@@ -212,6 +212,7 @@ private:
 
     TaskHandle_t taskMSSHandle;
     uint32_t lastHash;
+    uint8_t lastNumClients;
 
     void onConfigUpdated();
     static void taskMSSImpl(void *pvParameters);
@@ -222,6 +223,7 @@ private:
     uint32_t calculateJsonHash(JsonObject &root);
     void getNetworkInfo();
     void wifiFallBackCheck();
+    void limitClientConnections();
 
 };
 

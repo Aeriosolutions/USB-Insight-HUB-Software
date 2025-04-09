@@ -23,11 +23,13 @@
 #include "modenine50.h"
 #include "aptossb52l.h"
 #include "aptossb30l.h"
+#include "monofonto30.h"
 #include "icons.h"
 #include "datatypes.h"
 #include "esp_clk.h"
+#include <ArduinoJson.h>
 
-
+#define ALT_DISPLAY_CONFIG 0
 
 #define DISPLAY_CS_1 6
 #define DISPLAY_CS_2 16
@@ -84,6 +86,9 @@ struct chScreenData {
   uint8_t wifiState;
   uint8_t hubMode;
   bool showMenuInfoSplash;
+  uint8_t startUpmode;
+  bool pwr_source;
+  uint8_t usbHostState;
 };
 
 
@@ -94,6 +99,7 @@ class Screen{
     void screenDefaultRender(chScreenData Screen);
     void screenSetBackLight(int pwm);
     void usbIconDraw(uint8_t type, bool active,bool com);
+    void flexDevicePrint(String jsonStr, bool pcCon);
 
     displayProp dProp[3];
     TFT_eSPI tft       = TFT_eSPI();       // Invoke custom library
@@ -102,7 +108,7 @@ class Screen{
   private:    
 
     TFT_eSprite pcimg  = TFT_eSprite(&tft);
-    TFT_eSprite wifiimg  = TFT_eSprite(&tft);
+    TFT_eSprite ibuff  = TFT_eSprite(&tft);
     TFT_eSprite udata = TFT_eSprite(&tft);
 
     uint16_t* imgPtr;

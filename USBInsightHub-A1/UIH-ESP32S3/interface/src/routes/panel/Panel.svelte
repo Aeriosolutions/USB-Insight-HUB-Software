@@ -10,7 +10,7 @@
 
 
 	//let masterState = null;
-	//let masterState: MasterState = {power_on: false, switch_on:false};
+	
 	let masterState: MasterState = {};
 	
 	//let tempParams ={};
@@ -63,20 +63,23 @@
   	];
 
 	onMount(() => {
-
+		
 		socket.on<MasterState>('master', (data)=>{
 			masterState = data;					
 			checkChangesAndUpdate();
 			needUpdate();
 			initialized = true;	
-			sync = true;									
+			sync = true;
+												
 		});
-
+		
 	});
 
 
 	onDestroy(() => {		
-			socket.off('master');
+			//socket.sendEvent('unsubscribe','master');
+			socket.off('master');						
+			
 		});
 
 	function validateInput(event, key, min, max) {
@@ -164,12 +167,17 @@
 	<!-- Header -->
 	<div class="flex justify-around items-center bg-gray-300 p-4 rounded-lg shadow-md mb-4">
 	  <div class="flex items-center gap-2">
-		<span>Host Data</span>
-		<span class="text-green-500 font-bold">✔</span>
+		<span>Host Link</span>
+		<span class="text-sm cursor-help" title={Help.CONTROL.HOSTLINK}>ℹ️:</span>
+		<span class="text-green-500 font-bold">
+			{#if masterState[`features_usbHostState`] != 0} ✔
+			{:else} -		
+			{/if}
+		</span>
 	  </div>
 	  <div class="flex items-center gap-2">
-		<span >PC Comm</span>
-		<span class="text-sm cursor-help" title={Help.CONTROL.PCCOM}>ℹ️:</span>
+		<span >Host Comm</span>
+		<span class="text-sm cursor-help" title={Help.CONTROL.HOSTCOM}>ℹ️:</span>
 		<span class="text-green-500 font-bold">
 			{#if masterState[`features_pcConnected`]} ✔
 			{:else} -		

@@ -80,7 +80,8 @@ Menu generalConfig = {
             {TYPE_RANGE,"Brightness",{},{"50","1000","50"},"%",{H_SCRBRI}}
         },{},"",{H_SCREEN}},
         {TYPE_SELECT, "HUB Mode",{},{"USB2 & USB3", "USB2 Only", "USB3 Only"},"",
-        {H_USBTYP,H_USBTYP23,H_USBTYP2,H_USBTYP3}}
+        {H_USBTYP,H_USBTYP23,H_USBTYP2,H_USBTYP3}},
+        {TYPE_SELECT,"Restore Default",{},{"No Action", "Restore Def"},"",{H_DEF,H_DEFxNA,H_DEFRES}}        
     },
     {"0"},"", {H_GLOCONF}
 };
@@ -466,7 +467,9 @@ uint16_t getParamValue(String param, String channel){
     if(param =="HUB Mode") {    
         return ((uint16_t)(gCon->features.hubMode));
     }
-
+    if(param =="Restore Default") {            
+        return ((uint16_t)(gSte->system.resetToDefault));
+    }
     return (0);   
 }
 
@@ -522,6 +525,10 @@ void setParamValue(String param, uint16_t value, String channel){
     }
     if(param =="HUB Mode") {    
         gCon->features.hubMode = (uint8_t)(value);
+        return;
+    }
+    if(param =="Restore Default") {    
+        gSte->system.resetToDefault = (uint8_t)(value);        
         return;
     }
     return;

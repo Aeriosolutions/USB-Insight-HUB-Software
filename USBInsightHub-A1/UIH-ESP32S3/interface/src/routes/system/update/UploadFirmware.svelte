@@ -8,6 +8,17 @@
 	import Warning from '~icons/tabler/alert-triangle';
 	import Cancel from '~icons/tabler/x';
 
+	import { onMount, onDestroy } from 'svelte';
+	import { socket } from '$lib/stores/socket';
+
+	onMount(() => {		
+		socket.on('master', (data)=> void 0);		
+	});
+
+	onDestroy(() => {					
+		socket.off('master');						
+	});	
+
 	let files: FileList;
 
 	async function uploadBIN() {

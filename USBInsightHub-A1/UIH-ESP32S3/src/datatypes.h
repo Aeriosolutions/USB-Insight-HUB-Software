@@ -22,13 +22,15 @@
 #include "PAC194x.h"
 #include "Screen.h"
 
-#define DATATYPES_VER 4
+#define DATATYPES_VER 4 //change this number every time globalconfig members are added
 
 #define APP_CORE 1
 
 #define DISPLAY_REFRESH_PERIOD    63 //note that for each screen the effective rate is 189ms
 #define SLOW_DATA_DOWNSAMPLES_0_5  8 //504ms //multiples of DISPLAY_REFRESH_PERIOD 
 #define SLOW_DATA_DOWNSAMPLES_1_0 16 //1008ms //multiples of DISPLAY_REFRESH_PERIOD 
+
+#define USE_FAST_CURRENT_SETUP 0 //if >0, a short press of SETUP button changes the current limit of all channels. 
 //------------ Start Pin definitions ------------
 
 //STEMMA
@@ -132,6 +134,13 @@ static const char* t_vx_stat[] = {"no_pullups","cc1_pu","cc2_pu","both"};
 #define VHOST   false
 #define VEXT    true
 
+//USB Host state
+#define USB_UNPLUGGED  0
+#define USB_PLUGGED    1
+#define USB_SUSPENDED  2
+#define USB_RESUME     3
+
+
 
 struct System {
   uint8_t currentView;
@@ -146,7 +155,7 @@ struct System {
   String wifiMAC;
   bool menuIsActive;
   bool showMenuInfoSplash;
-  bool resetToDefault;  
+  uint8_t resetToDefault;  
 };
 
 struct FeaturesState {
@@ -160,7 +169,8 @@ struct FeaturesState {
   int8_t wifiRSSI;
   uint8_t wifiClients;
   uint8_t wifiRecovery;
-  uint8_t wifiReset;      
+  uint8_t wifiReset;
+  uint8_t usbHostState;       
 };
 
 struct FeaturesConfig {

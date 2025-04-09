@@ -32,8 +32,9 @@
 		socket.on<MasterState>('master', (data)=>{
 			masterState = data;
 			getFromMaster();
+			
 		});
-
+				
 		startupMode.set('Persistence');
 		refreshRate.set('0.5s');
 		filterType.set('Median');
@@ -44,7 +45,9 @@
 	});
 
 	onDestroy(() => {		
-		socket.off('master');
+		//socket.sendEvent('unsubscribe','master');
+		socket.off('master');				
+		
 	});
 
 	function getFromMaster(){

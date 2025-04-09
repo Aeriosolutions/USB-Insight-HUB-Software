@@ -52,14 +52,86 @@ void Screen::start(){
   digitalWrite(DISPLAY_ALL_DRES, LOW);
   delay(10); //10ms wait before sending commands
   // We need to 'init' all displays
-  // at the same time. so set both cs pins low
+  // at the same time. so set all cs pins low
   setCSPins(LOW);
 
 
   tft.init();
   tft.initDMA();
+  
   tft.writecommand(ST7789_TEON); //Enable tearing effect signal
   tft.writedata(0x00);
+
+  if(ALT_DISPLAY_CONFIG > 0)
+  {
+    tft.writecommand(ST7789_PORCTRL); //PORCH Control 0xB2
+    tft.writedata(0x1F);
+    tft.writedata(0x1F);
+    tft.writedata(0x00);
+    tft.writedata(0x33);
+    tft.writedata(0x33);
+    
+    tft.writecommand(ST7789_GCTRL); //GATE CONTROL Control 0xB7
+    tft.writedata(0x00); //VGH=12.2V,VGL=-7.16V
+
+    tft.writecommand(ST7789_VCOMS); //VCOM Settings 0xBB
+    tft.writedata(0x3F); //1.675V
+
+    //tft.writecommand(ST7789_LCMCTRL); //LCM CONTROL 0xC0
+    //tft.writedata(0x2C); //S7W Reset library is 0xC
+
+    tft.writecommand(ST7789_VRHS); //VRH Set 0xC3
+    tft.writedata(0x0F); //4.3V
+
+    //tft.writecommand(ST7789_VDVSET); //VDV Set 0xC4
+    //tft.writedata(0x20); //0.0V - Same as driver
+
+    tft.writecommand(ST7789_FRCTR2); //Frame Rate control in Normal Mode 0xC6
+    tft.writedata(0x13); //53Hz
+
+    tft.writecommand(ST7789_PWCTRL1);
+    tft.writedata(0xa4);
+    tft.writedata(0xa1);
+
+    tft.writecommand(ST7789_PVGAMCTRL); //Positive Voltage Gamma Control 0xE0
+    tft.writedata(0xF0);
+    tft.writedata(0x06);
+    tft.writedata(0x0D);
+    tft.writedata(0x0B);
+    tft.writedata(0x0A);
+    tft.writedata(0x07);
+    tft.writedata(0x2E);
+    tft.writedata(0x43);
+    tft.writedata(0x45);
+    tft.writedata(0x38);
+    tft.writedata(0x14);
+    tft.writedata(0x13);
+    tft.writedata(0x25);
+    tft.writedata(0x29);
+
+    tft.writecommand(ST7789_NVGAMCTRL); //Negative Voltage Gamma Control 0xE0
+    tft.writedata(0xF0);
+    tft.writedata(0x07);
+    tft.writedata(0x0A);
+    tft.writedata(0x08);
+    tft.writedata(0x07);
+    tft.writedata(0x23);
+    tft.writedata(0x2E);
+    tft.writedata(0x33);
+    tft.writedata(0x44);
+    tft.writedata(0x3A);
+    tft.writedata(0x16);
+    tft.writedata(0x17);
+    tft.writedata(0x26);
+    tft.writedata(0x2C);
+
+    //GATECTRL is left untouched, use driver config
+    tft.writecommand(ST7789_INVON); //Inversion ON 0x21
+    tft.writecommand(ST7789_SLPOUT); //Sleep Out 0x11
+    delay(120);
+    tft.writecommand(ST7789_DISPON); //Display ON 0x29
+
+  }
 
   // Create the RGB332 palette (256 colors)
   for (int i = 0; i < 256; i++) {
@@ -72,8 +144,8 @@ void Screen::start(){
   
   pcimg.createSprite(33, 29);
   pcimg.setSwapBytes(true);
-  wifiimg.createSprite(33, 30);
-  wifiimg.setSwapBytes(true);
+  ibuff.createSprite(33, 30);
+  ibuff.setSwapBytes(true);
   udata.createSprite(32,28);
   udata.setSwapBytes(true);
   udata.fillScreen(TFT_BLACK);

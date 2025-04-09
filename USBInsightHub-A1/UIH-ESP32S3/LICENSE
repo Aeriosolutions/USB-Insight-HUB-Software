@@ -1,8 +1,9 @@
 
-USB Insight Hub specific code is under the MIT License. This project is based or and uses components of other projects:
+USB Insight Hub specific code is under the MIT License. This project is based on or uses components of other projects:
 
 ESP32 SvelteKit: https://github.com/theelims/ESP32-sveltekit
 TFT-eSPI: https://github.com/Bodmer/TFT_eSPI
+ArduinoJSON: https://arduinojson.org/
 
 MIT License
 

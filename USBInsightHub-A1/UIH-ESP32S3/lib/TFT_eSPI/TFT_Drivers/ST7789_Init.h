@@ -32,18 +32,30 @@
 
   //--------------------------------ST7789V Frame rate setting----------------------------------//
   writecommand(ST7789_PORCTRL);
+  /*
   writedata(0x0c);
   writedata(0x0c);
   writedata(0x00);
   writedata(0x33);
   writedata(0x33);
+  */
+  writedata(0x1F);
+  writedata(0x1F);
+  writedata(0x00);
+  writedata(0x33);
+  writedata(0x33);
 
   writecommand(ST7789_GCTRL);      // Voltages: VGH / VGL
-  writedata(0x35);
+  //writedata(0x35);
+  writedata(0x00);
 
   //---------------------------------ST7789V Power setting--------------------------------------//
   writecommand(ST7789_VCOMS);
-  writedata(0x28);		// JLX240 display datasheet
+  //writedata(0x28);		// JLX240 display datasheet
+  writedata(0x3F);
+
+  writecommand(ST7789_VRHS); //VRH Set 0xC3 //change
+  writedata(0x0F); //4.3V
 
   writecommand(ST7789_LCMCTRL);
   writedata(0x0C);
@@ -59,13 +71,15 @@
   writedata(0x20);
 
   writecommand(ST7789_FRCTR2);
-  writedata(0x0f);
+  //writedata(0x0f);
+  writedata(0x13);
 
   writecommand(ST7789_PWCTRL1);
   writedata(0xa4);
   writedata(0xa1);
 
   //--------------------------------ST7789V gamma setting---------------------------------------//
+  /*
   writecommand(ST7789_PVGAMCTRL);
   writedata(0xd0);
   writedata(0x00);
@@ -81,7 +95,7 @@
   writedata(0x12);
   writedata(0x14);
   writedata(0x17);
-
+  
   writecommand(ST7789_NVGAMCTRL);
   writedata(0xd0);
   writedata(0x00);
@@ -97,6 +111,39 @@
   writedata(0x17);
   writedata(0x1b);
   writedata(0x1e);
+  */
+
+  writecommand(ST7789_PVGAMCTRL); //Positive Voltage Gamma Control 0xE0
+  writedata(0xF0);
+  writedata(0x06);
+  writedata(0x0D);
+  writedata(0x0B);
+  writedata(0x0A);
+  writedata(0x07);
+  writedata(0x2E);
+  writedata(0x43);
+  writedata(0x45);
+  writedata(0x38);
+  writedata(0x14);
+  writedata(0x13);
+  writedata(0x25);
+  writedata(0x29);
+
+  writecommand(ST7789_NVGAMCTRL); //Negative Voltage Gamma Control 0xE0
+  writedata(0xF0);
+  writedata(0x07);
+  writedata(0x0A);
+  writedata(0x08);
+  writedata(0x07);
+  writedata(0x23);
+  writedata(0x2E);
+  writedata(0x33);
+  writedata(0x44);
+  writedata(0x3A);
+  writedata(0x16);
+  writedata(0x17);
+  writedata(0x26);
+  writedata(0x2C);
 
   writecommand(ST7789_INVON);
 

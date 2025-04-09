@@ -105,7 +105,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     mac.replace(":", "");
     globalState->system.wifiMAC = mac;
     globalState->system.menuIsActive = false;
-    globalState->system.resetToDefault = false;
+    globalState->system.resetToDefault = 0;
 
     //---Features
     globalConfig->features.startUpmode != STARTUP_SEC ? globalState->features.startUpActive = false : globalState->features.startUpActive = true;
@@ -231,9 +231,9 @@ void taskConfigAutoSave(void *pvParameters){
     }
 
     //check if it is needed to reset to defaults
-    if(globlState->system.resetToDefault){
+    if(globlState->system.resetToDefault != 0){
         ESP_LOGI(TAG,"Command: Reset to default values");
-        globlState->system.resetToDefault = false;
+        globlState->system.resetToDefault = 0;
         setDefaultGlobalConfig(globlState,globlConfig);
     }
     
@@ -251,7 +251,7 @@ void taskConfigAutoSave(void *pvParameters){
 void saveMCUState(void){
     flashstorage.begin(UIH_NAMESPACE,false);
     flashstorage.putBytes("MCUBlob",&(globlState->baseMCUOut),sizeof(globlState->baseMCUOut));
-    ESP_LOGI(TAG,"Save MCU blob");
+    ESP_LOGI(TAG,"Save MCU state");
     flashstorage.end();
 }
 

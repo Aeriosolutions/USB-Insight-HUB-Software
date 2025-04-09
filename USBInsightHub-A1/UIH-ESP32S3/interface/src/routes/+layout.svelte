@@ -22,6 +22,9 @@
 	import type { DownloadOTA } from '$lib/types/models';
 
 	export let data: LayoutData;
+	let disconnectTimeout: number;
+	let disconnectTime = 0;
+	
 
 	onMount(async () => {
 		if ($user.bearer_token !== '') {
@@ -52,7 +55,7 @@
 		socket.on('error', handleError);
 		socket.on('rssi', handleNetworkStatus);
 		socket.on('notification', handleNotification);
-		if ($page.data.features.analytics) socket.on('analytics', handleAnalytics);
+		if ($page.data.features.analytics) socket.on('analytics', handleAnalytics);		
 		if ($page.data.features.battery) socket.on('battery', handleBattery);
 		if ($page.data.features.download_firmware) socket.on('otastatus', handleOAT);
 	};
@@ -85,12 +88,24 @@
 	}
 
 	const handleOpen = () => {
-		notifications.success('Connection to device established', 5000);
+		clearTimeout(disconnectTimeout);
+		if ((Date.now() - disconnectTime) >= 3000) {
+          // Calculate elapsed time in seconds
+		  notifications.success('Connection to device established', 5000);  
+      }		
+		
 	};
 
 	const handleClose = () => {
-		notifications.error('Connection to device lost', 5000);
-		telemetry.setRSSI({ rssi: 0, ssid: '' });
+		//clear any pending timeout
+		clearTimeout(disconnectTimeout);
+		disconnectTime = Date.now();
+		//set a timeout to show the notification after 2 seconds connection is lost
+		disconnectTimeout = setTimeout(() => {
+			notifications.error('Connection to device lost', 5000);
+			telemetry.setRSSI({ rssi: 0, ssid: '' });
+		}, 3000);
+		
 	};
 
 	const handleError = (data: any) => console.error(data);

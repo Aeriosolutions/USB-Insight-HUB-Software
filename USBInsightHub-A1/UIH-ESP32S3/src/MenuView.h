@@ -76,8 +76,11 @@
 #define H_USBTYP     40 //USB hub mode help
 #define H_USBTYP23   41 
 #define H_USBTYP2    42
-#define H_USBTYP3    43  
+#define H_USBTYP3    43 
 
+#define H_DEF        45 //restore default help
+#define H_DEFxNA     46 //restore default no action
+#define H_DEFRES     47 //restore default action
 
 struct Menu {
     int menuType;

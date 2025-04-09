@@ -124,7 +124,12 @@
 					title: 'System Metrics',
 					icon: Metrics,
 					href: '/system/metrics',
-					feature: $page.data.features.analytics,
+					//feature: $page.data.features.analytics,
+					//if the analytics is disabled in the features.ini file
+					//then the system status does not refresh correctly
+					//analytics is left eneabled in the background withouth the
+					//page to be shown
+					feature: false,
 					
 				},
 				{

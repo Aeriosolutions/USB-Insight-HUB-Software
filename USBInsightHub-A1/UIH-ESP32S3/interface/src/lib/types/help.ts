@@ -1,6 +1,7 @@
 export const Help = {
     CONTROL: {
-        PCCOM: "Communication status between the Hub and the agent program in the host computer",
+        HOSTLINK: "USB 2 connection status between ESP32 and the host computer",
+        HOSTCOM: "Communication status between the ESP32 and the agent program in the host computer",
         POWER: "Hub is powered by the HOST or the AUX power supply",
         OVER_CURRENT: "Forward current limit. From the Hub to the load",
         BACK_CURRENT: "Reverse current limit. From the load to the Hub",

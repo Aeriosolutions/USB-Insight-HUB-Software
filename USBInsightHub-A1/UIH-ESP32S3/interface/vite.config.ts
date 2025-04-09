@@ -10,7 +10,10 @@ const config: UserConfig = {
 			compiler: 'svelte'
 		}),
 		// Shorten file names for LittleFS 32 char limit
-		viteLittleFS()
+		//is necessary to enable hashing as it allows that a change in files
+		//are reflected in the browser without the need to clear the cache
+
+		//viteLittleFS() //this function deletes the hash as there is a limit of 32 chars in LittleFS
 	],
 	server: {
 		proxy: {

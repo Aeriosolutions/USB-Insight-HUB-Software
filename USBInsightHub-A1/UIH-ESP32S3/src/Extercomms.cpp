@@ -397,18 +397,22 @@ static void usbEventCallback(void* arg, esp_event_base_t event_base, int32_t eve
       case ARDUINO_USB_STARTED_EVENT:
         //HWSerial.println("USB PLUGGED");
         ESP_LOGI(TAG,"USB PLUGGED");
+        gloState->features.usbHostState = USB_PLUGGED;
         break;
       case ARDUINO_USB_STOPPED_EVENT:
         //HWSerial.println("USB UNPLUGGED");
         ESP_LOGI(TAG,"USB UNPLUGGED");
+        gloState->features.usbHostState = USB_UNPLUGGED;
         break;
       case ARDUINO_USB_SUSPEND_EVENT:
         //HWSerial.printf("USB SUSPENDED: remote_wakeup_en: %u\n", data->suspend.remote_wakeup_en);
         ESP_LOGI(TAG,"USB SUSPENDED: remote_wakeup_en: %u\n", data->suspend.remote_wakeup_en);
+        gloState->features.usbHostState = USB_SUSPENDED;
         break;
       case ARDUINO_USB_RESUME_EVENT:
         //HWSerial.println("USB RESUMED");
         ESP_LOGI(TAG,"USB RESUMED");
+        gloState->features.usbHostState = USB_RESUME;
         break;
       
       default:

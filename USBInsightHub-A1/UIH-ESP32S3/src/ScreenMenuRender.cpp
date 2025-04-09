@@ -64,7 +64,9 @@ const char* helpArr[] = {
 /*42*/"USB 2\nLow, Full, High\nSpeeds only",
 /*43*/"USB 3\nSuper-Speed only",
 /*44*/"",
-/*45*/""
+/*45*/"Restore UIH to\nfactory default",
+/*46*/"No action",
+/*47*/"Restore to\nfactory\ndefaults.\nWi-Fi credentials\nare preserved"
 };
 
 

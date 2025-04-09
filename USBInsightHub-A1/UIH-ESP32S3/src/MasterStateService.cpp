@@ -22,8 +22,6 @@ void logJsonObject(JsonObject &root);
 
 static const char *jsonDefault = R"rawliteral(
 {
-  "power_on": false,
-  "switch_on": false,
   "features_conf_startUpmode": 0,
   "features_conf_wifi_enabled": true,
   "features_conf_hubMode": 0,
@@ -32,6 +30,7 @@ static const char *jsonDefault = R"rawliteral(
   "features_startUpActive": 0,
   "features_pcConnected": false,
   "features_vbusVoltage": 0,
+  "features_usbHostState": 0,
   "screen_conf_rotation": 2,
   "screen_conf_brightness": 800,
   "BaseMCU_vext_cc": 0,
@@ -42,7 +41,7 @@ static const char *jsonDefault = R"rawliteral(
   "BaseMCU_usb3_mux_out_en": false,
   "BaseMCU_usb3_mux_sel_pos": false,
   "BaseMCU_base_ver": 0,
-  "system_resetToDefault": false,
+  "system_resetToDefault": 0,
   "c1_startup_counter": 0,
   "c1_startup_conf_timer": 0,
   "c1_meter_voltage": 0,
@@ -133,6 +132,9 @@ void MasterStateService::begin(GlobalState *globalState, GlobalConfig *globalCon
     gConfig = globalConfig;
     _skit = esp32sveltekit;
 
+
+    lastNumClients = 0;
+
     //initialize json document
     deserializeJson(masterStateDoc,jsonDefault);
  
@@ -167,20 +169,16 @@ void MasterStateService::taskMSS(){
     for(;;){
                
         read(masterStateObj,MasterState::read);
+        //check if there is a change in the front end controls
         if(lastHash !=calculateJsonHash(masterStateObj)){
-          copyBackendToGlobal(masterStateObj);          
+          copyBackendToGlobal(masterStateObj);
+          //ESP_LOGI("","Hash: %u",lastHash);          
         }        
         copyGlobalToBackend(masterStateObj);
-        //logJsonObject(masterStateObj);
-        //vTaskDelay(pdMS_TO_TICKS(20));
-        bool power_on = _state.powerOn;
-        bool switch_on = _state.switchOn;
-        switch_on = !switch_on;
-        masterStateObj["switch_on"] = switch_on;
-        //_state.switchOn = switch_on;
+
         update(masterStateObj,MasterState::update,"main");
         lastHash = calculateJsonHash(masterStateObj);        
-        //ESP_LOGI("","Hash: %u",lastHash);
+        
         getNetworkInfo();
 
         if(millis()-fallBackTimer > FALLBACK_TIMER){
@@ -188,16 +186,20 @@ void MasterStateService::taskMSS(){
           wifiFallBackCheck();
         }
         if(gState->features.wifiRecovery == 1){
+          ESP_LOGI("","WiFi Recovery Mode called");           
           _skit->recoveryMode();
           vTaskDelay(pdMS_TO_TICKS(200));
           gState->features.wifiRecovery = 0;
         }
         if(gState->features.wifiReset == 1){
+          ESP_LOGI("","WiFi reset called"); 
           _skit->factoryReset();
           vTaskDelay(pdMS_TO_TICKS(200));
           gState->features.wifiReset = 0;
-        }        
-        
+        }   
+
+        limitClientConnections();
+
         vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(FRONTEND_UPDATE_PERIOD));
     }
 }
@@ -210,7 +212,7 @@ void MasterStateService::copyBackendToGlobal(JsonObject &root){
   gConfig->features.hubMode       = root["features_conf_hubMode"].as<uint8_t>();
   gConfig->features.filterType    = root["features_conf_filterType"].as<uint8_t>();
   gConfig->features.refreshRate   = root["features_conf_refreshRate"].as<uint8_t>();
-  gState->system.resetToDefault   = root["system_resetToDefault"] | false;
+  gState->system.resetToDefault   = root["system_resetToDefault"].as<uint8_t>();
   //gState->features.startUpActive = root["features_startUpActive"] | false;
   //gState->features.pcConnected  = root["features_pcConnected"] | false;
   //gState->features.vbusVoltage  = root["features_vbusVoltage"].as<float>();
@@ -272,6 +274,7 @@ void MasterStateService::copyGlobalToBackend(JsonObject &root){
   root["BaseMCU_usb3_mux_sel_pos"]  = gState->baseMCUExtra.usb3_mux_sel_pos;
   root["BaseMCU_base_ver"]          = gState->baseMCUExtra.base_ver;
   root["system_resetToDefault"]     = gState->system.resetToDefault;
+  root["features_usbHostState"]     = gState->features.usbHostState;
 
   
   for(int i =0; i<3; i++){
@@ -365,4 +368,14 @@ void MasterStateService::wifiFallBackCheck(){
   if(gState->features.wifiState == WIFI_OFFLINE || gState->features.wifiState == AP_NOCLIENT)
     wifiSettingsService->connectToWiFi();
 
+}
+
+void MasterStateService::limitClientConnections(){
+  PsychicHttpServer *_server = _skit->getServer();
+  uint8_t numClients = _server->getClientList().size();
+  if(numClients != lastNumClients){    
+    ESP_LOGI("", "#Clients %u -> %u", lastNumClients, numClients); 
+      lastNumClients = numClients;
+  }
+  
 }

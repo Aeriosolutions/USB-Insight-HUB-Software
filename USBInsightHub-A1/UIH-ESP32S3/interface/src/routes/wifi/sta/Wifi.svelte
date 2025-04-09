@@ -33,6 +33,7 @@
 	import Check from '~icons/tabler/check';
 	import InfoDialog from '$lib/components/InfoDialog.svelte';
 	import type { KnownNetworkItem, WifiSettings, WifiStatus } from '$lib/types/models';
+	import { socket } from '$lib/stores/socket';
 
 	let static_ip_config = false;
 
@@ -122,7 +123,14 @@
 		getWifiStatus();
 	}, 5000);
 
-	onDestroy(() => clearInterval(interval));
+	onMount(() => {		
+		socket.on('master', (data)=> void 0);		
+	});
+
+	onDestroy(() => {
+		clearInterval(interval)
+		socket.off('master');	
+	});
 
 	async function postWiFiSettings(data: WifiSettings) {
 		try {
@@ -475,8 +483,10 @@
 				<Spinner />
 			{:then nothing}
 				<div class="relative w-full overflow-visible">
+					
 					<button
 						class="btn btn-primary text-primary-content btn-md absolute -top-14 right-16"
+						title = "Add a Network"
 						on:click={() => {
 							if (checkNetworkList()) {
 								addNetwork();
@@ -488,6 +498,7 @@
 					>
 					<button
 						class="btn btn-primary text-primary-content btn-md absolute -top-14 right-0"
+						title = "Scan for Networks (EXPERIMENTAL)"
 						on:click={() => {
 							if (checkNetworkList()) {
 								scanForNetworks();

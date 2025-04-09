@@ -146,8 +146,6 @@ export type MQTTSettings = {
 };
 
 export type MasterState = {
-	power_on: boolean;
-	switch_on: boolean;
 
 	features_conf_startUpmode: number;
 	features_conf_wifi_enabled: number;
@@ -157,6 +155,7 @@ export type MasterState = {
 	features_startUpActive: boolean;
 	features_pcConnected: boolean;
 	features_vbusVoltage: number;
+	features_usbHostState: number;
 	
 	screen_conf_rotation: number;
 	screen_conf_brightness: number;
@@ -169,7 +168,7 @@ export type MasterState = {
 	BaseMCU_usb3_mux_out_en: boolean;
 	BaseMCU_usb3_mux_sel_pos: boolean;
 	BaseMCU_base_ver: number;
-	system_resetToDefault: boolean;
+	system_resetToDefault: number;
 
 //--------------------------------------------
 

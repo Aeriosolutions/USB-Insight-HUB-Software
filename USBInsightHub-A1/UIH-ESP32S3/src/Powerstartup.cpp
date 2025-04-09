@@ -31,7 +31,10 @@ void iniPowerStartUp(GlobalState* globalState, GlobalConfig* globalConfig){
     }             
 
     if(globState->features.startUpActive) //start if feature enabled
+    {
         xTaskCreate(taksPowerStartUp, "Power Startup", 2048, NULL, 4, NULL);
+        ESP_LOGI("startup","Startup Start %u",millis());
+    }
 
 }
 

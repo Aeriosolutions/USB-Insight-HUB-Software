@@ -60,11 +60,11 @@ function createWebSocket() {
 	}
 
 	function unsubscribe(event: string, listener?: (data: any) => void) {
-		let eventListeners = listeners.get(event);
-		if (!eventListeners) return;
+		let eventListeners = listeners.get(event);				
+		if (!eventListeners) return;		
 
-		if (!eventListeners.size) {
-			sendEvent('unsubscribe', event);
+		if (eventListeners.size != 0) {
+			sendEvent('unsubscribe', event);			
 		}
 		if (listener) {
 			eventListeners?.delete(listener);
@@ -81,9 +81,9 @@ function createWebSocket() {
 	function send(msg: unknown) {
 		if (!ws || ws.readyState !== WebSocket.OPEN) return;
 		if (event_use_json) {
-			ws.send(JSON.stringify(msg));
+			ws.send(JSON.stringify(msg));			
 		} else {
-			ws.send(msgpack.encode(msg));
+			ws.send(msgpack.encode(msg));			
 		}
 	}
 
@@ -112,7 +112,13 @@ function createWebSocket() {
 			};
 		},
 		off: (event: string, listener?: (data: any) => void) => {
+			
 			unsubscribe(event, listener);
+			//workaround, not solution
+			//to force the disconnection of the client
+			//if this is not done, the client limit of PhysicSercer is reached
+			//and the application hangs
+			disconnect('close');
 		}
 	};
 }

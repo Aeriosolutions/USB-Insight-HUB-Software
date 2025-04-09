@@ -91,7 +91,7 @@ void defaultViewStart(void){
 void taskDefaultViewLoop(void *pvParameters){  
   ESP_LOGI(TAG,"Loop Logic on Core %u",xPortGetCoreID());
   for(;;){
-    if(gState->system.currentView==DEFAULT_VIEW){
+    if(gState->system.currentView==DEFAULT_VIEW && defaultViewActive){
       int tot = 0;
       for (int i=0; i<3; i++){
         //tot=resolveButton(&ButtonArray[i]);
@@ -132,43 +132,50 @@ void taskDefaultViewLoop(void *pvParameters){
         uint16_t oclimit=2000;
         gState->system.showMenuInfoSplash = true;
         infoSplashTimer = millis();
-        /*
-        for (int i=0; i<3 ; i++){
-          switch(gState->baseMCUOut[i].ilim){
-              case 0:                 
-                oclimit=1000;
-                break;
-              case 1:                 
-                oclimit=1500;
-                break;
-              case 2:                 
-                oclimit=2000;
-                break;
-              case 3:                 
-                oclimit=500;
-                break;              
-              default:
-                break;
-          }
-          gConfig->meter[i].fwdCLim=oclimit;
-          if(gState->meter[i].backAlertSet || gState->meter[i].fwdAlertSet){
-            ESP_LOGI(TAG,"Reset OC and BC");
-            gState->meter[i].backAlertSet = false;
-            gState->meter[i].fwdAlertSet  = false;
-            gState->baseMCUOut[i].pwr_en = false;
+        //fast current limit option
+        if(USE_FAST_CURRENT_SETUP > 0) 
+        {
+          for (int i=0; i<3 ; i++){
+            switch(gState->baseMCUOut[i].ilim){
+                case 0:                 
+                  oclimit=1000;
+                  break;
+                case 1:                 
+                  oclimit=1500;
+                  break;
+                case 2:                 
+                  oclimit=2000;
+                  break;
+                case 3:                 
+                  oclimit=500;
+                  break;              
+                default:
+                  break;
+            }
+            gConfig->meter[i].fwdCLim=oclimit;
+            if(gState->meter[i].backAlertSet || gState->meter[i].fwdAlertSet){
+              ESP_LOGI(TAG,"Reset OC and BC");
+              gState->meter[i].backAlertSet = false;
+              gState->meter[i].fwdAlertSet  = false;
+              gState->baseMCUOut[i].pwr_en = false;
+            }
           }          
-        } */
+        } 
       }
       if (btnLongCheck(3)){
         
         ESP_LOGI(TAG,"Setup button long press");
 
         defaultViewActive=false;
-        menuViewStart(gState,gConfig,iScreen);
-        ESP_LOGI(TAG,"Delete Task Loop");
-        vTaskDelete(NULL);
+
 
       }       
+    }
+    if(!defaultViewActive && gState->system.taskDefaultScreenLoopHandle == NULL)
+    {
+      menuViewStart(gState,gConfig,iScreen);
+      ESP_LOGI(TAG,"Delete Default View Task Loop");
+      vTaskDelete(NULL);
     }
     vTaskDelay(pdMS_TO_TICKS(DEFAULT_VIEW_PERIOD));
   }   
@@ -227,19 +234,19 @@ void taskDefaultScreenLoop(void *pvParameters){
       iScnt++;
       if(iScnt==3) {iScnt=0;  firstPass = true;  }
 
-      if(!defaultViewActive){
-        ESP_LOGI(TAG,"Delete Screen Loop");
-        xSemaphoreGive(screen_Semaphore);
-        gState->system.taskDefaultScreenLoopHandle = NULL;
-        vTaskDelete(NULL);
-      }
-      
       if(infoSplashTimer != 0){
         if(millis()-infoSplashTimer > MENU_INFO_SPLASH_TIMEOUT){
           gState->system.showMenuInfoSplash = false;
           infoSplashTimer = 0;
         }
       }
+
+      if(!defaultViewActive){
+        ESP_LOGI(TAG,"Delete Screen Loop");
+        xSemaphoreGive(screen_Semaphore);
+        gState->system.taskDefaultScreenLoopHandle = NULL;
+        vTaskDelete(NULL);
+      }      
 
       vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(DISPLAY_REFRESH_PERIOD));
     }
@@ -276,7 +283,11 @@ void defaultScreenFastDataUpdate(){
       ScreenArr[i].rssiBars         = getRssiBars(gState->features.wifiRSSI);
       ScreenArr[i].wifiState        = gState->features.wifiState;
       ScreenArr[i].hubMode          = gConfig->features.hubMode; 
-      ScreenArr[i].showMenuInfoSplash   = gState->system.showMenuInfoSplash;      
+      ScreenArr[i].showMenuInfoSplash   = gState->system.showMenuInfoSplash;
+      ScreenArr[i].startUpmode      = gConfig->features.startUpmode;
+      ScreenArr[i].pwr_source       = gState->baseMCUExtra.pwr_source; 
+      ScreenArr[i].usbHostState     = gState->features.usbHostState;
+
       if( memcmp(&prevDevInfo[i],&(ScreenArr[i].tProp),sizeof(prevDevInfo[i])) != 0 ){
         ESP_LOGI(TAG, "CH %u: #d %u, D1: %s, D2: %s, t: %u",i,ScreenArr[i].tProp.numDev,
         gState->usbInfo[i].Dev1_Name,

@@ -29,6 +29,7 @@
 
 	let systemInformation: SystemInformation;
 	let masterState: MasterState;
+	let BaseMCUver: number=0;
 
 	async function getSystemStatus() {
 		try {
@@ -49,7 +50,10 @@
 	//onMount(() => socket.on('analytics', handleSystemData));
 	onMount(() => {
 		socket.on('analytics', handleSystemData);
-		socket.on<MasterState>('master', (data)=> masterState = data)
+		socket.on<MasterState>('master', (data)=> {
+			masterState = data;
+			BaseMCUver = masterState.BaseMCU_base_ver;
+		})
 		} 
 	);
 
@@ -88,7 +92,7 @@
 
 	async function postFactoryReset() {
 		//set flag to reset the unit to defaul values
-		masterState[`system_resetToDefault`] = true;
+		masterState[`system_resetToDefault`] = 1;
 		socket.sendEvent('master', masterState);
 		
 		/*
@@ -210,7 +214,7 @@
 					<div>
 						<div class="font-bold">ESP32 Firmware Version_STM8 version</div>
 						<div class="text-sm opacity-75">
-							{systemInformation.firmware_version}_{masterState.BaseMCU_base_ver}
+							{systemInformation.firmware_version}_{BaseMCUver}
 						</div>
 					</div>
 				</div>

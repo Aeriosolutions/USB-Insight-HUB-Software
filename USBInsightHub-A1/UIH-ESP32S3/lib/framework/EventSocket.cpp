@@ -90,7 +90,10 @@ esp_err_t EventSocket::onFrame(PsychicWebSocketRequest *request, httpd_ws_frame 
             }
             else if (event == "unsubscribe")
             {
+                xSemaphoreTake(clientSubscriptionsMutex, portMAX_DELAY);
                 client_subscriptions[doc["data"]].remove(request->client()->socket());
+                xSemaphoreGive(clientSubscriptionsMutex);
+                ESP_LOGI("EventSocket", "Unsubscribed from event: %s", doc["data"].as<String>());
             }
             else
             {

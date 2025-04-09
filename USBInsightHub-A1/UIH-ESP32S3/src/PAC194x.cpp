@@ -148,7 +148,7 @@ void PAC194x::readAvgMeter(){
   i2cwd_timer = millis()-i2cwd_timer;
   if(i2cwd_timer > SLOWDOWN_TIMEOUT){ //*workaround for sudden drop in I2C speed, reported here https://github.com/espressif/arduino-esp32/issues/8480
     //Serial.println("I2C Slow down on PAC detected!!"); //*
-    ESP_LOGW(TAG, "I2C Slow on PAC: %u!",i2cwd_timer);
+    ESP_LOGV(TAG, "I2C Slow on PAC: %u!",i2cwd_timer);
     I2C->flush(); //*
     I2C->setClock(100000); //*
     I2C->setClock(400000); //*
