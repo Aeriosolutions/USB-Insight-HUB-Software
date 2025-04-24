@@ -80,11 +80,17 @@ void taskExterCheckActivity(void *pvParameters){
         if(USBSerialActivity){
           lastPCcom = millis();
           gloState->features.pcConnected = true;
+          gloState->features.clearScreenText = false;
           USBSerialActivity=false;
         }
 
         if(now-lastPCcom > PC_CONNECTION_TIMEOUT){
           gloState->features.pcConnected = false;
+        }
+
+        if(now-lastPCcom > PC_CONNECTION_TIMEOUT+DISPLAY_CLEAR_AFTER_TIMEOUT){
+          //clear display texts.
+          gloState->features.clearScreenText = true;
         }
 
         if(dataReceived){

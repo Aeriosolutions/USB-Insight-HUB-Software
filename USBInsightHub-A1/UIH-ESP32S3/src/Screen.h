@@ -29,8 +29,6 @@
 #include "esp_clk.h"
 #include <ArduinoJson.h>
 
-#define ALT_DISPLAY_CONFIG 0
-
 #define DISPLAY_CS_1 6
 #define DISPLAY_CS_2 16
 #define DISPLAY_CS_3 12

@@ -64,6 +64,7 @@
 	<Compile Include="UsbDeviceInterfaceData.cs" />
 	<Compile Include="Endianness.cs" />
 	<Compile Include="MarshalEx.cs" />
+	<Compile Include="UsbDeviceTreeBuilder.cs" />
 	  
   </ItemGroup>
   <ItemGroup>

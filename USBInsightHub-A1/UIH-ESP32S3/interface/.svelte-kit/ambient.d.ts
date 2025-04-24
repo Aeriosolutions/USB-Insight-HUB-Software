@@ -43,7 +43,7 @@ declare module '$env/static/private' {
 	export const DOTNET_TIEREDPGO: string;
 	export const DRIVERDATA: string;
 	export const EDITOR: string;
-	export const EFC_3488: string;
+	export const EFC_14936: string;
 	export const ELECTRON_RUN_AS_NODE: string;
 	export const GIT_ASKPASS: string;
 	export const HOME: string;
@@ -177,7 +177,7 @@ declare module '$env/dynamic/private' {
 		DOTNET_TIEREDPGO: string;
 		DRIVERDATA: string;
 		EDITOR: string;
-		EFC_3488: string;
+		EFC_14936: string;
 		ELECTRON_RUN_AS_NODE: string;
 		GIT_ASKPASS: string;
 		HOME: string;

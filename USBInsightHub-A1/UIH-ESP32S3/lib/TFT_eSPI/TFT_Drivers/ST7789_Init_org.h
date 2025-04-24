@@ -31,19 +31,19 @@
   delay(10);
 
   //--------------------------------ST7789V Frame rate setting----------------------------------//
-  writecommand(ST7789_PORCTRL); //PORCH Control 0xB2
-  writedata(0x1F); //Orig 0x0c 
-  writedata(0x1F); //Orig 0x0c
-  writedata(0x00); //Orig 0x00
-  writedata(0x33); //Orig 0x33
-  writedata(0x33); //Orig 0x33
+  writecommand(ST7789_PORCTRL);
+  writedata(0x0c);
+  writedata(0x0c);
+  writedata(0x00);
+  writedata(0x33);
+  writedata(0x33);
 
-  writecommand(ST7789_GCTRL);      //GATE CONTROL Control
-  writedata(0x00); //Orig 0x35    //VGH=12.2V,VGL=-7.16V
+  writecommand(ST7789_GCTRL);      // Voltages: VGH / VGL
+  writedata(0x35);
 
   //---------------------------------ST7789V Power setting--------------------------------------//
   writecommand(ST7789_VCOMS);
-  writedata(0x3F); //orig 0x28  //1.675V
+  writedata(0x28);		// JLX240 display datasheet
 
   writecommand(ST7789_LCMCTRL);
   writedata(0x0C);
@@ -52,51 +52,51 @@
   writedata(0x01);
   writedata(0xFF);
 
-  writecommand(ST7789_VRHS); //VRH Set 0xC3 //change
-  writedata(0x0F); //4.3V org 0x10
+  writecommand(ST7789_VRHS);       // voltage VRHS
+  writedata(0x10);
 
   writecommand(ST7789_VDVSET);
   writedata(0x20);
 
-  writecommand(ST7789_FRCTR2); //Frame Rate control in Normal Mode 0xC6
-  writedata(0x13); //org 0x0f  //53Hz
+  writecommand(ST7789_FRCTR2);
+  writedata(0x0f);
 
   writecommand(ST7789_PWCTRL1);
   writedata(0xa4);
   writedata(0xa1);
 
   //--------------------------------ST7789V gamma setting---------------------------------------//
-  writecommand(ST7789_PVGAMCTRL); //Positive Voltage Gamma Control 0xE0
-  writedata(0xF0); //org 0xD0
-  writedata(0x06); //org 0x00
-  writedata(0x0D); //org 0x02
-  writedata(0x0B); //org 0x07
-  writedata(0x0A); //org 0x0a
-  writedata(0x07); //org 0x028
-  writedata(0x2E); //org 0x32
-  writedata(0x43); //org 0x44
-  writedata(0x45); //org 0x42
-  writedata(0x38); //org 0x06
-  writedata(0x14); //org 0x0e
-  writedata(0x13); //org 0x12
-  writedata(0x25); //org 0x14
-  writedata(0x29); //org 0x17
+  writecommand(ST7789_PVGAMCTRL);
+  writedata(0xd0);
+  writedata(0x00);
+  writedata(0x02);
+  writedata(0x07);
+  writedata(0x0a);
+  writedata(0x28);
+  writedata(0x32);
+  writedata(0x44);
+  writedata(0x42);
+  writedata(0x06);
+  writedata(0x0e);
+  writedata(0x12);
+  writedata(0x14);
+  writedata(0x17);
 
-  writecommand(ST7789_NVGAMCTRL); //Negative Voltage Gamma Control 0xE0
-  writedata(0xF0); //org 0xd0
-  writedata(0x07); //org 0x00
-  writedata(0x0A); //org 0x02
-  writedata(0x08); //org 0x07
-  writedata(0x07); //org 0x0a
-  writedata(0x23); //org 0x28
-  writedata(0x2E); //org 0x31
-  writedata(0x33); //org 0x54
-  writedata(0x44); //org 0x47
-  writedata(0x3A); //org 0x0e
-  writedata(0x16); //org 0x1c
-  writedata(0x17); //org 0x17
-  writedata(0x26); //org 0x1b
-  writedata(0x2C); //org 0x1e
+  writecommand(ST7789_NVGAMCTRL);
+  writedata(0xd0);
+  writedata(0x00);
+  writedata(0x02);
+  writedata(0x07);
+  writedata(0x0a);
+  writedata(0x28);
+  writedata(0x31);
+  writedata(0x54);
+  writedata(0x47);
+  writedata(0x0e);
+  writedata(0x1c);
+  writedata(0x17);
+  writedata(0x1b);
+  writedata(0x1e);
 
   writecommand(ST7789_INVON);
 

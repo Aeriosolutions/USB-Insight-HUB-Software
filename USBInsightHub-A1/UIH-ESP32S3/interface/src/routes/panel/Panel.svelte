@@ -56,6 +56,12 @@
 		c3_data: false,
 	}
 
+	let enumText = {
+		c1_txt: '',
+		c2_txt: '',
+		c3_txt: '',
+	}
+
 	let channels = [
     {id: 1,},
     {id: 2,},
@@ -68,6 +74,7 @@
 			masterState = data;					
 			checkChangesAndUpdate();
 			needUpdate();
+			formatEnumerator();
 			initialized = true;	
 			sync = true;
 												
@@ -161,6 +168,60 @@
 		socket.sendEvent('master', masterState);
 	}
 
+	function formatEnumerator(){
+		let ch = [1,2,3];
+		let len = 2;
+		
+		//check max length of lines in all channels
+		ch.forEach((i) => {
+			if(masterState[`c${i}_USBInfo_numDev`] == 10){
+				let pO = {};
+				try {					
+					pO = JSON.parse(masterState[`c${i}_USBInfo_Dev1_Name`]);
+					if(pO?.T1 && pO?.T2 && pO?.T3){						
+						len = 3;
+					}																
+				} catch (e) {
+					console.error('Invalid JSON:', e);
+				}								
+			}
+		});	
+		
+		ch.forEach((i) => {
+			if(masterState[`c${i}_USBInfo_numDev`] == 10){
+				let pO = {};
+				try {
+					
+					pO = JSON.parse(masterState[`c${i}_USBInfo_Dev1_Name`]);
+					if(pO?.T1 && pO?.T2 && pO?.T3){
+						enumText[`c${i}_txt`] = [String(pO.T1.txt), String(pO.T2.txt), String(pO.T3.txt)].join('\n');
+					}
+					else if (pO?.T1 && pO?.T2 && !pO?.T3){
+						if (len ==2) enumText[`c${i}_txt`] = [String(pO.T1.txt), String(pO.T2.txt)].join('\n');
+						if (len ==3) enumText[`c${i}_txt`] = [String(pO.T1.txt), String(pO.T2.txt), ' '].join('\n');
+					}
+					else if (pO?.T1 && !pO?.T2 && !pO?.T3){
+						if (len ==2) enumText[`c${i}_txt`] = [String(pO.T1.txt), '-'].join('\n');
+						if (len ==3) enumText[`c${i}_txt`] = [String(pO.T1.txt), '-', ' '].join('\n');
+					}
+					else{
+						if (len ==2) enumText[`c${i}_txt`] = ['-', '-'].join('\n');
+						if (len ==3) enumText[`c${i}_txt`] = ['-', '-', ' '].join('\n');
+					}										
+					
+				} catch (e) {
+					console.error('Invalid JSON:', e);
+				}				
+					
+			}
+			else {
+				if(len === 2) enumText[`c${i}_txt`] = [masterState[`c${i}_USBInfo_Dev1_Name`],masterState[`c${i}_USBInfo_Dev2_Name`]].join('\n');
+				if(len === 3) enumText[`c${i}_txt`] = [masterState[`c${i}_USBInfo_Dev1_Name`],masterState[`c${i}_USBInfo_Dev2_Name`],' '].join('\n');
+			}
+			
+		});
+	}
+
 </script>
 
 <div class="bg-gray-100 min-h-screen p-4" style="font-size: 20px;">
@@ -234,9 +295,9 @@
   
 		  <!-- Enumerator -->
 		  <div class="mb-4">
-			<label class="text-gray-600 text-sm block" style="font-size: 20px;">Enumerators:</label>
-			<div class="bg-gray-100 p-2 rounded" style="font-size: 20px;">{masterState[`c${ch.id}_USBInfo_Dev1_Name`]}</div>
-			<div class="bg-gray-100 p-2 rounded" style="font-size: 20px;">{masterState[`c${ch.id}_USBInfo_Dev2_Name`]}</div>
+			<label class="text-gray-600 text-sm block" style="font-size: 20px;">Enumerators:</label>			
+			<div class="bg-gray-100 p-2 rounded whitespace-pre-wrap" style="font-size: 20px;">{enumText[`c${ch.id}_txt`]}</div>
+			<!--<div class="bg-gray-100 p-2 rounded" style="font-size: 20px;">{masterState[`c${ch.id}_USBInfo_Dev2_Name`]}</div>-->			
 		  </div>
   
 		  <!-- Voltage and Current -->

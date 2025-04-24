@@ -322,6 +322,24 @@ void Screen::screenDefaultRender(chScreenData Screen){
     img.unloadFont();
   }
 
+  /*
+  //Use for palette evaluation
+  int offset = 0;
+  if(Screen.dProp.cs_pin == DISPLAY_CS_2) offset = 40; 
+
+  img.fillScreen(TFT_BLACK);
+  img.fillRoundRect(offset, 0, 200, 25, 1, TFT_WHITE);
+  img.fillRoundRect(offset, 25, 200, 25, 1, TFT_YELLOW);
+  img.fillRoundRect(offset, 50, 200, 25, 1, TFT_GREEN);
+  img.fillRoundRect(offset, 75, 200, 25, 1, TFT_ORANGE);
+  img.fillRoundRect(offset, 100, 200, 25, 1, TFT_RED);
+  img.fillRoundRect(offset, 125, 200, 25, 1, TFT_CYAN);
+  img.fillRoundRect(offset, 150, 200, 25, 1, TFT_BLUE);
+  img.fillRoundRect(offset, 175, 200, 25, 1, TFT_LIGHTGREY);
+  img.fillRoundRect(offset, 200, 200, 25, 1, DARKGREY);
+  */  
+
+
   //ESP_LOGI("4","%u",millis()-timers); //---------------------------------------- 
   
   //timers=millis();
@@ -424,19 +442,23 @@ void Screen::flexDevicePrint(String jsonStr, bool pcCon){
         else if(doc[ind]["color"] == "DARKGREY")  color = DARKGREY;
         else if(doc[ind]["color"] == "CYAN")  color = TFT_CYAN;
         else if(doc[ind]["color"] == "BLUE")  color = TFT_BLUE;
+        else if(doc[ind]["color"] == "GREEN")  color = TFT_GREEN;
 
         img.setTextColor(color);
 
         if (!pcCon) img.setTextColor(TFT_LIGHTGREY);
 
+        String temp = String(doc[ind]["txt"].as<const char*>());
+        temp = temp.substring(0,14);
+
         if(doc[ind]["align"] == "left"){
-          img.drawString(doc[ind]["txt"].as<const char*>(),15,ty[i],4);
+          img.drawString(temp,15,ty[i],4);
         } 
         else if(doc[ind]["align"] == "right"){
-          img.drawRightString(doc[ind]["txt"].as<const char*>(), 230, ty[i], 4);
+          img.drawRightString(temp, 230, ty[i], 4);
         } 
         else if(doc[ind]["txt"]){
-          img.drawCentreString(doc[ind]["txt"].as<const char*>(), 120, ty[i], 4);
+          img.drawCentreString(temp, 120, ty[i], 4);
         }
       }  
       img.unloadFont();        

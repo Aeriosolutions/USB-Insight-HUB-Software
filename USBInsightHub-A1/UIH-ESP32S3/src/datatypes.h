@@ -161,6 +161,7 @@ struct System {
 struct FeaturesState {
   bool startUpActive;
   bool pcConnected;
+  bool clearScreenText;
   float vbus;
   String ssid;
   uint8_t wifiState;

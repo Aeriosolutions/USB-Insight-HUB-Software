@@ -270,9 +270,11 @@ void defaultScreenFastDataUpdate(){
       ScreenArr[i].mProp.fwdCLim      = gConfig->meter[i].fwdCLim;
       ScreenArr[i].mProp.backCLim     = gConfig->meter[i].backCLim;
       ScreenArr[i].tProp.numDev     = gState->usbInfo[i].numDev;
+      if(gState->features.clearScreenText) ScreenArr[i].tProp.numDev = 0;
       ScreenArr[i].tProp.Dev1_Name  = gState->usbInfo[i].Dev1_Name;
       ScreenArr[i].tProp.Dev2_Name  = gState->usbInfo[i].Dev2_Name;
-      ScreenArr[i].tProp.usbType    = gState->usbInfo[i].usbType;      
+      ScreenArr[i].tProp.usbType    = gState->usbInfo[i].usbType;
+      if(gState->features.clearScreenText) ScreenArr[i].tProp.usbType = 0;      
       ScreenArr[i].pconnected       = gState->features.pcConnected;
       iScreen->dProp[i].brightness  = gConfig->screen[i].brightness;
       iScreen->dProp[i].rotation    = gConfig->screen[i].rotation;
