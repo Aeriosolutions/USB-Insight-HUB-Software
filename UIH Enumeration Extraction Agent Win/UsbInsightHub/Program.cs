@@ -13,6 +13,9 @@ namespace USBInfoHub.DeviceFinder
     using System.IO;
     using System.IO.Ports;
     using System.Linq;
+    using System.Web.Script.Serialization;
+    using System.ComponentModel.Design.Serialization;
+
     //using Microsoft.Win32;
 
 
@@ -26,6 +29,7 @@ namespace USBInfoHub.DeviceFinder
         public static bool controllerisConnected = false;
         public static int rescheduleCount = 0;
         public static String controllerFrame = "HB";
+        public static String controllerFrameJSON = "";
         public static bool updateList = false;
 
         //public static String controllerVid = "303A"; //ESP32-S2
@@ -41,6 +45,8 @@ namespace USBInfoHub.DeviceFinder
         public static String Hub_3Pid = "0210";
         public static String Hub3_DeviceID = "NONE";
 
+        public static String Hub2_Location = null;
+        public static String Hub3_Location = null;
 
         private static Timer aTimer;
         private static Timer refreshTimer;
@@ -95,6 +101,21 @@ namespace USBInfoHub.DeviceFinder
 
             UsbDevice[] usbDevices = UsbDevice.GetDevices();
 
+            var builder = new UsbDeviceTreeBuilder();
+
+            // Build the tree
+            
+            var roots = builder.BuildTree();
+
+
+            Console.WriteLine("Full USB Device Tree:");
+            
+            foreach (var root in roots)
+            {
+                root.PrintTree(); // Recursively prints each device and its children
+                //Console.WriteLine($"[{root.Description}] has {root.Children.Count} children");
+            }
+
             foreach (var device in usbDevices)
             {
                 //Debug.Print(String.Format("{0}", device.Description));
@@ -105,6 +126,18 @@ namespace USBInfoHub.DeviceFinder
                     controllerPort = device.Port;
                     controllerHub = device.Hub;
                     Hub2_DeviceID = device.Properties[27].Value.ToString();
+                    
+                    foreach (var root in roots)
+                    {
+                        Hub2_Location = root.GetLocationFromVID_PID(Hub_2Vid, Hub_2Pid);
+                        if (Hub2_Location != null) break;
+                    }
+                    foreach (var root in roots)
+                    {
+                        Hub3_Location = root.GetLocationFromVID_PID(Hub_3Vid, Hub_3Pid);
+                        if (Hub3_Location != null) break;
+                    }
+
                     controllerisPresent = true;  
                     break;
                 }
@@ -187,7 +220,7 @@ namespace USBInfoHub.DeviceFinder
                         //Console.WriteLine("-----RAW----");
                         //DeviceIdsPattern.ForEach(Console.WriteLine);                        
                         DeviceIdsPattern = DeviceIdsPattern.Distinct().ToList(); //Remove duplicates from list
-                        //Console.WriteLine("-----DEDUD----");
+                        //Console.WriteLine("-----DEDUP----");
                         //DeviceIdsPattern.ForEach(Console.WriteLine);
 
                         foreach (ManagementObject obj in result)
@@ -266,12 +299,79 @@ namespace USBInfoHub.DeviceFinder
 
 
                 //-----------------------------------------------------------------------------------------------------------
+                //Find USB devices
 
+                var usbSearcher = new ManagementObjectSearcher(
+                    "SELECT * FROM Win32_LogicalDisk WHERE DriveType = 2"
+                );
+
+                foreach (ManagementObject logicalDisk in usbSearcher.Get())
+                {
+                    string driveLetter = logicalDisk["Name"]?.ToString();
+                    
+
+                    if (string.IsNullOrEmpty(driveLetter))
+                        continue;
+
+                    Console.WriteLine("Removable Drive Letter: " + driveLetter);                    
+                    
+
+                    try
+                    {
+                        // Step 1: Get Partition from LogicalDisk
+                        var partitionQuery = new ManagementObjectSearcher(
+                            "ASSOCIATORS OF {Win32_LogicalDisk.DeviceID='" + driveLetter +
+                            "'} WHERE AssocClass = Win32_LogicalDiskToPartition"
+                        );
+
+                        foreach (ManagementObject partition in partitionQuery.Get())
+                        {
+                            string partitionID = partition["DeviceID"]?.ToString();
+
+                            // Step 2: Get DiskDrive from Partition
+                            var driveQuery = new ManagementObjectSearcher(
+                                "ASSOCIATORS OF {Win32_DiskPartition.DeviceID='" + partitionID +
+                                "'} WHERE AssocClass = Win32_DiskDriveToDiskPartition"
+                            );
+
+                            foreach (ManagementObject diskDrive in driveQuery.Get())
+                            {
+                                string PNPDeviceID = diskDrive["PNPDeviceID"]?.ToString();
+                                string deviceID = diskDrive["DeviceID"]?.ToString();
+                                string location = "";
+                                int porti = 0;
+                                foreach (var r in roots)
+                                {
+                                    location = r.GetLocationFromID(PNPDeviceID);
+                                    if (location != null)
+                                    {
+                                        porti = int.Parse(location.Substring(location.Length-1)) - 1;
+                                        break;
+                                    }
+                                }
+
+                                Console.WriteLine("  PNPDeviceID: " + PNPDeviceID);
+                                Console.WriteLine("  Location: " + location + ", Index: " +porti);
+
+                                if (location.Contains(Hub2_Location) || location.Contains(Hub3_Location)) 
+                                    DevicesOnPorts[porti].comEnumerators.Add(driveLetter);
+                                
+
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Error tracing disk: " + ex.Message);
+                    }
+                }
 
 
                 //Find USB drives https://itecnote.com/tecnote/c-how-to-get-the-drive-letter-of-usb-device-using-wmi/
 
-                foreach (ManagementObject d in new ManagementObjectSearcher(@"SELECT * FROM Win32_DiskDrive WHERE InterfaceType LIKE 'USB%'").Get())
+                /*var usbDrives = new ManagementObjectSearcher(@"SELECT * FROM Win32_DiskDrive WHERE InterfaceType LIKE 'USB%'").Get();
+
+                foreach (ManagementObject d in usbDrives)
                 {              
                     string deviceID = (string)d.GetPropertyValue("DeviceID");
                     string PNPdeviceID = (string)d.GetPropertyValue("PNPDeviceID");
@@ -304,10 +404,12 @@ namespace USBInfoHub.DeviceFinder
                         }
                     }
 
-                }
+                }*/
+
 
                 foreach (var obj in DevicesOnPorts)
-                {                    
+                {
+
                     if (obj.comEnumerators.Count != obj.prevComEnumerators.Count)                        
                         updateList = true;
                 }
@@ -316,7 +418,6 @@ namespace USBInfoHub.DeviceFinder
                 {
                     foreach (var obj in DevicesOnPorts)
                     {
-                        Console.WriteLine("Devices on port {0}:", obj.port);
                         foreach (var element in obj.comEnumerators)
                         {
                             Console.WriteLine(element);                          
@@ -403,12 +504,34 @@ namespace USBInfoHub.DeviceFinder
                     { ch3enum_b = DevicesOnPorts[2].comEnumerators[1].ToString(); }
                     else { ch3enum_b = "-"; }
 
+                    //controllerFrameJSON = "{\"action\":\"set\",\"params\":{\"CH1\":{\"Dev1_name\":\"COM1\",\"numDev\":\"0\",\"usbType\":\"0\"},\"CH2\":{\"Dev1_name\":\"COM2\",\"numDev\":\"0\",\"usbType\":\"\"}}}";
+
+                    foreach (var obj in DevicesOnPorts)
+                    {
+                        if (obj.pnpDeviceID.Count != 0)
+                            for (int i = 0; i < obj.pnpDeviceID.Count; i++)
+                            {
+                                Console.WriteLine("Port {0} PNPDev Id{1}: {2}", obj.port, i, obj.pnpDeviceID[i]);
+                            }
+                    }
+
+
+                    controllerFrameJSON = String.Format("{{\"action\":\"set\",\"params\":{{" +
+                        "\"CH1\":{{\"Dev1_name\":\"{0}\",\"Dev2_name\":\"{1}\",\"numDev\":\"{2}\",\"usbType\":\"{3}\"}}," +
+                        "\"CH2\":{{\"Dev1_name\":\"{4}\",\"Dev2_name\":\"{5}\",\"numDev\":\"{6}\",\"usbType\":\"{7}\"}}," +
+                        "\"CH3\":{{\"Dev1_name\":\"{8}\",\"Dev2_name\":\"{9}\",\"numDev\":\"{10}\",\"usbType\":\"{11}\"}}" +
+                        "}}}}",
+                        ch1enum_a, ch1enum_b, ch1count.ToString(), ch1type,
+                        ch2enum_a, ch2enum_b, ch2count.ToString(), ch2type,
+                        ch3enum_a, ch3enum_b, ch3count.ToString(), ch3type
+                        );
+
                     controllerFrame = String.Format("PC,{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}",
                                         ch1count.ToString(), ch1enum_a, ch1enum_b, ch1type,
                                         ch2count.ToString(), ch2enum_a, ch2enum_b, ch2type,
                                         ch3count.ToString(), ch3enum_a, ch3enum_b, ch3type);
 
-                    Console.WriteLine(controllerFrame);
+                    Console.WriteLine(controllerFrameJSON);
                     updateList = false;
                 }
                 /*
@@ -419,7 +542,7 @@ namespace USBInfoHub.DeviceFinder
 
                 try
                 {                   
-                    _serialPort.WriteLine(controllerFrame);
+                    _serialPort.WriteLine(controllerFrameJSON);
                 }
                 catch (Exception ex)
                 {

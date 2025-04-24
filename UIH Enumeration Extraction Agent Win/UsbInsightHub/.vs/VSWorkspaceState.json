@@ -1,9 +1,8 @@
 {
   "ExpandedNodes": [
     "",
-    "\\Properties",
-    "\\Win32UsbControllerDevice"
+    "\\Properties"
   ],
-  "SelectedNode": "\\Program.cs",
+  "SelectedNode": "\\App.config",
   "PreviewInSolutionExplorer": false
 }
