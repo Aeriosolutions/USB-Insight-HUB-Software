@@ -1,3 +1,15 @@
+/**
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts 
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
+ 
 #include "baser.h"
 #include "stm8s.h"
 #include "stm8s_adc1.h"

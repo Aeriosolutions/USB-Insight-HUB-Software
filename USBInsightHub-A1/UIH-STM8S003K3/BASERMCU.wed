@@ -327,7 +327,7 @@ ResourceID=0
 
 [WorkState_v1_2.DockState.Bar-8]
 BarID=59647
-MRUWidth=412
+MRUWidth=233
 Docking=True
 MRUDockID=59419
 MRUDockLeftPos=-1
@@ -345,12 +345,12 @@ AutoHide=False
 AutoHidePinned=False
 LastAlignedDocking=0
 PctWidth=1000000
-MRUFloatCX=429
-MRUFloatCY=27
+MRUFloatCX=250
+MRUFloatCY=50
 MRUHorzDockCX=1920
 MRUHorzDockCY=29
-MRUVertDockCX=72
-MRUVertDockCY=527
+MRUVertDockCX=76
+MRUVertDockCY=634
 MRUDockingState=0
 DockingStyle=61440
 TypeID=14947
@@ -409,9 +409,9 @@ MRUWidth=566
 Docking=True
 MRUDockID=59419
 MRUDockLeftPos=342
-MRUDockTopPos=28
+MRUDockTopPos=31
 MRUDockRightPos=925
-MRUDockBottomPos=58
+MRUDockBottomPos=61
 MRUFloatStyle=8196
 MRUFloatXPos=-2
 MRUFloatYPos=0
@@ -730,7 +730,7 @@ MRUDockID=0
 MRUDockLeftPos=1
 MRUDockTopPos=-2
 MRUDockRightPos=282
-MRUDockBottomPos=718
+MRUDockBottomPos=634
 MRUFloatStyle=4
 MRUFloatXPos=-2
 MRUFloatYPos=0
@@ -747,7 +747,7 @@ MRUFloatCY=180
 MRUHorzDockCX=300
 MRUHorzDockCY=180
 MRUVertDockCX=281
-MRUVertDockCY=720
+MRUVertDockCY=636
 MRUDockingState=0
 DockingStyle=61440
 TypeID=0
@@ -764,7 +764,7 @@ MRUDockID=0
 MRUDockLeftPos=1
 MRUDockTopPos=5
 MRUDockRightPos=1920
-MRUDockBottomPos=180
+MRUDockBottomPos=264
 MRUFloatStyle=4
 MRUFloatXPos=-2
 MRUFloatYPos=0
@@ -779,7 +779,7 @@ PctWidth=1000000
 MRUFloatCX=300
 MRUFloatCY=180
 MRUHorzDockCX=1919
-MRUHorzDockCY=175
+MRUHorzDockCY=259
 MRUVertDockCX=300
 MRUVertDockCY=180
 MRUDockingState=0
@@ -849,7 +849,7 @@ PctWidth=500000
 MRUFloatCX=300
 MRUFloatCY=180
 MRUHorzDockCX=300
-MRUHorzDockCY=175
+MRUHorzDockCY=259
 MRUVertDockCX=300
 MRUVertDockCY=180
 MRUDockingState=0
@@ -1059,7 +1059,7 @@ PctWidth=666665
 MRUFloatCX=300
 MRUFloatCY=180
 MRUHorzDockCX=300
-MRUHorzDockCY=175
+MRUHorzDockCY=259
 MRUVertDockCX=300
 MRUVertDockCY=180
 MRUDockingState=0
@@ -1094,7 +1094,7 @@ PctWidth=750000
 MRUFloatCX=300
 MRUFloatCY=180
 MRUHorzDockCX=300
-MRUHorzDockCY=175
+MRUHorzDockCY=259
 MRUVertDockCX=300
 MRUVertDockCY=180
 MRUDockingState=0
@@ -1129,7 +1129,7 @@ PctWidth=800000
 MRUFloatCX=300
 MRUFloatCY=180
 MRUHorzDockCX=300
-MRUHorzDockCY=175
+MRUHorzDockCY=259
 MRUVertDockCX=300
 MRUVertDockCY=180
 MRUDockingState=0
@@ -1247,9 +1247,6 @@ Title=ST Visual Develop - BASERMCU.stw
 
 [WorkState_v1_2.Frames.ChildFrames]
 ptn_Child1=Document-0
-ptn_Child2=Document-1
-ptn_Child3=Document-2
-ptn_Child4=Document-3
 
 [WorkState_v1_2.Frames.ChildFrames.Document-0]
 ptn_Child1=ViewFrame-0
@@ -1258,39 +1255,6 @@ ptn_Child1=ViewFrame-0
 DocPathName=main.c
 DocumentString=
 DocTemplateIndex=0
-WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPJPPPPPPPLAAAAAAADCDAAAAALJCAAAAA
-IsActiveChildFrame=False
-IsFrameVisible=True
-
-[WorkState_v1_2.Frames.ChildFrames.Document-1]
-ptn_Child1=ViewFrame-0
-
-[WorkState_v1_2.Frames.ChildFrames.Document-1.ViewFrame-0]
-DocPathName=src\baser.c
-DocumentString=
-DocTemplateIndex=0
-WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPHADAAAAAPCAAAAAAHDGAAAAAGMCAAAAA
-IsActiveChildFrame=False
-IsFrameVisible=True
-
-[WorkState_v1_2.Frames.ChildFrames.Document-2]
-ptn_Child1=ViewFrame-0
-
-[WorkState_v1_2.Frames.ChildFrames.Document-2.ViewFrame-0]
-DocPathName=inc\baser.h
-DocumentString=
-DocTemplateIndex=0
-WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAAAAAAAAAJHBAAAAAPPPPPPPPPPPPPPPPBFDAAAAAJFAAAAAAGOFAAAAAAPCAAAAA
-IsActiveChildFrame=False
-IsFrameVisible=True
-
-[WorkState_v1_2.Frames.ChildFrames.Document-3]
-ptn_Child1=ViewFrame-0
-
-[WorkState_v1_2.Frames.ChildFrames.Document-3.ViewFrame-0]
-DocPathName=src\i2c_slave_interrupt.c
-DocumentString=
-DocTemplateIndex=0
-WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAICAAAAAPPPPPPPPPPPPPPPPIPBAAAAACBAAAAAABCGAAAAALICAAAAA
+WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPJPPPPPPPLAAAAAAADCDAAAAAHJCAAAAA
 IsActiveChildFrame=True
 IsFrameVisible=True

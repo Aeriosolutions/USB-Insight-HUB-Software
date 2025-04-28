@@ -79,6 +79,7 @@ bool PAC194x::begin(TwoWire *theWire){
   return false;
 }
 
+
 void PAC194x::write24(uint8_t reg_address,uint8_t lowByte, uint8_t midByte, uint8_t highByte){
   if(!initiated) return;
   int err = 0;
@@ -235,6 +236,26 @@ void PAC194x::enableAlerts(bool enable){
   }
   refresh_v();
 }
+
+/*
+bool PAC194x::readAndClearPORFlag(){
+  uint8_t reg;
+  if(!initiated) return 0;   
+  I2C->beginTransmission(PAC194x_ADDR);  
+  I2C->write(PAC194X_SMBUS_SETTINGS_ADDR); //Alert Status
+  int err = I2C->endTransmission(false);
+  err = I2C->requestFrom(PAC194x_ADDR,1);
+  reg = I2C->read();
+  //Check if POR flag is set
+  if (reg & 0x10 == 0x10){    
+    write8(PAC194X_SMBUS_SETTINGS_ADDR,reg & 0xEF); //clear POR flag
+    refresh_v();
+    return true;
+  }
+  return false;
+
+}
+*/
 
 uint8_t PAC194x::readInterruptFlags(){
 

@@ -106,6 +106,8 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
         
         delay(30); //required time after powerup to write to meter
         if(bMeter.begin(&I2CB2B)) ESP_LOGI(TAG, "Power Meter initialized OK");
+        else 
+          ESP_LOGE(TAG, "Power Meter initialization FAILED!");
         //clear any interrupt flag
         uint8_t flags = bMeter.readInterruptFlags();
         

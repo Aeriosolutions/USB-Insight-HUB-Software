@@ -1,9 +1,9 @@
 # USB Insight Hub – STM8S003K3
 ## 1. Development Environment
 The STM8S003K3 is programmed directly in C using [ST Visual Develop (4.3.12)]( https://www.st.com/en/development-tools/stvd-stm8.html) with STM8 Cosmic compiler (is necessary to [register]( https://www.cosmicsoftware.com/download_stm8_free.php) for free use). 
-The code is implemented barebone and is based on included ST examples. 
+The code is implemented barebone and is based on included STM8 examples. 
 ## 2. Programming
-To program is necessary to use a ST-Link-V2 connected to J2 header in the BASER board. It is necessary to provide external power.
+ST Visual Programmer (software) and ST-Link-V2 programmer are used to program the STM8S003K3. A cable adapter is necessary to connect the programmer to J2 header in the BASER board. 
 
 Check the [UIH Programing Guide](https://github.com/Aeriosolutions/USB-Insight-HUB-Software/tree/main/USBInsightHub-A1/)
 
@@ -34,6 +34,10 @@ Check the [UIH Programing Guide](https://github.com/Aeriosolutions/USB-Insight-H
 **<span style="color:blue">WHOAMI (10h)</span>**
 
 Read Only register with a fixed value of 35h
+
+**<span style="color:blue">VERSION (12h)</span>**
+
+Firmware version in hex (number)
 
 **<span style="color:blue">CHxREG (20h, 21h, 22h)</span>**
 

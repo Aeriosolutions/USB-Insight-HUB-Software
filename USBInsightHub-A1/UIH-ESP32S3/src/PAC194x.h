@@ -172,8 +172,11 @@ class PAC194x {
     void setCurrentLimit(float climit, bool cdir, int ch);
     void setFilterLength(uint8_t length);
     void enableAlerts(bool enable);
+    //bool readAndClearPORFlag();
     uint8_t readInterruptFlags();
-    uint16_t read16(uint8_t address);        
+    uint16_t read16(uint8_t address);
+    bool isInitiated() { return initiated; }   
+
 
   private:
     uint8_t filterWindowsize = 10;

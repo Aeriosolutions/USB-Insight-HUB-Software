@@ -1,22 +1,14 @@
 /**
-  ******************************************************************************
-  * file main.c
-  * brief This file contains the main function for I2C interrupt mode example.
-  * author STMicroelectronics - MCD Application Team
-  * version V1.0.0
-  * date 01/03/2010
-  ******************************************************************************
-  *
-  * THE PRESENT FIRMWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
-  * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE
-  * TIME. AS A RESULT, STMICROELECTRONICS SHALL NOT BE HELD LIABLE FOR ANY
-  * DIRECT, INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING
-  * FROM THE CONTENT OF SUCH FIRMWARE AND/OR THE USE MADE BY CUSTOMERS OF THE
-  * CODING INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
-  *
-  *                    COPYRIGHT 2009 STMicroelectronics
-  ******************************************************************************
-  */
+ *   USB Insight Hub
+ *
+ *   A USB supercharged interfacing tool for developers & tech enthusiasts 
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. Check full description on LICENSE file.
+ **/
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm8s.h"
