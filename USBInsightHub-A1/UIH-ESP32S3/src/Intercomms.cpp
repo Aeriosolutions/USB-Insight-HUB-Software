@@ -48,6 +48,8 @@ uint32_t adc_samples[ADC_NUMSAMPLES];
 int adc_idx = 0;
 uint32_t adc_sum = 0;
 
+//Counts the number of I2C read fails of PAC1943 
+uint8_t i2cErrCnt = 0;
 
 //Internal functions
 void taskIntercomms(void *pvParameters);
@@ -56,6 +58,8 @@ void interMcuReadAll(void);
 void interSetCurrentLimits(void);
 void interAvgMeterRead(void);
 float read5Vrail(void);
+void forcePacTimeout();
+
 
 void interPacAlertInterruptHandler(void);
 void inter_pac_alert_handler_task(void *pvParameters);
@@ -87,8 +91,9 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
 
     if(xSemaphoreTake(i2c_Semaphore,( TickType_t ) 10 ) == pdTRUE)
     {
-        I2CB2B.begin(B2B_SDA, B2B_SCL, 400000);
+        I2CB2B.begin(B2B_SDA, B2B_SCL, I2CSPEED);
         I2CB2B.setTimeOut(20);
+        
             
         delay(20);
         //if(bMCU.begin(&I2CB2B)) ESP_LOGI(TAG, "Base MCU initialized OK");
@@ -105,9 +110,16 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
           ESP_LOGE(TAG, "Base MCU initialization FAILED!");
         
         delay(30); //required time after powerup to write to meter
-        if(bMeter.begin(&I2CB2B)) ESP_LOGI(TAG, "Power Meter initialized OK");
-        else 
+        if(bMeter.begin(&I2CB2B)) {
+          ESP_LOGI(TAG, "Power Meter initialized OK");          
+          glState->system.meterInit = METER_INIT_OK;
+          glState->system.pacRevisionID = bMeter.getRevisionID();
+        }
+        else
+        {
           ESP_LOGE(TAG, "Power Meter initialization FAILED!");
+          glState->system.meterInit = METER_INIT_FAILED;
+        } 
         //clear any interrupt flag
         uint8_t flags = bMeter.readInterruptFlags();
         
@@ -170,16 +182,48 @@ void interMcuReadAll(void){
 void interAvgMeterRead(void){
   if(i2c_Semaphore != NULL){
     if(xSemaphoreTake(i2c_Semaphore,pdMS_TO_TICKS(10)) == pdTRUE){
-      bMeter.refresh_v();
-      delayMicroseconds(500); //required to update Meter registers after refresh command. 
-      bMeter.readAvgMeter();        
+
+      //resets I2C bus if read errors persist
+      if(i2cErrCnt > 10){
+        ESP_LOGE(TAG,"Try reset I2C bus after %i PAC1943 read failures",i2cErrCnt);
+        forcePacTimeout();
+        i2cErrCnt = 0;
+      }
+            
+      delayMicroseconds(1000);
+      bMeter.readAvgMeter();
+      bMeter.refresh(0);        
       xSemaphoreGive(i2c_Semaphore);
+
+      if (bMeter.getError()==0){
+        glState->system.meterInit = METER_INIT_OK;
+        i2cErrCnt = 0;
+      } 
+      else if (bMeter.getError()==1){
+        glState->system.meterInit = METER_INIT_READ_ERR;
+        i2cErrCnt++;        
+      } 
+      else if (bMeter.getError()==2) glState->system.meterInit = METER_INIT_SLOW_ERR;
     } 
     else{
       ESP_LOGE(TAG,"Timeout to get access to I2C read meter");
     }
   }  
 }
+
+void forcePacTimeout(){
+  I2CB2B.end();
+  pinMode(B2B_SCL, OUTPUT_OPEN_DRAIN);
+  pinMode(B2B_SDA, OUTPUT_OPEN_DRAIN);
+  digitalWrite(B2B_SDA, HIGH);
+  //delayMicroseconds(5);
+  digitalWrite(B2B_SCL, LOW);
+  vTaskDelay(pdMS_TO_TICKS(26));
+  
+  I2CB2B.begin(B2B_SDA, B2B_SCL, 400000);
+  I2CB2B.setTimeOut(20);  
+}
+
 
 void interSetCurrentLimits(void){
   

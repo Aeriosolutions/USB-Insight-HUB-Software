@@ -39,7 +39,11 @@
 //Configuration controls and status Pag 45
 #define CTRL_ADDR_L 0x10//0001 0000 -> high nible disabled channels (CH4 disabled); low nibble all 0s
 #define CTRL_ADDR_H 0x00// 0000->1024 samples adaptive accumulation |00-> ALERT2 as ALERT |00->ALERT as ALERT1
+//SMBUS setting
+#define SMBUS_SETTINGS 0x08 // Enable timeout and clear POR flag
 
+//default refresh delay
+#define DEF_REFRESH_DELAY 1500 //ms
 //Software default current limits
 #define DEFAULT_FWD_C_LIM 2000.0 //this value is for a configuration of -50/+50 mV FSR
 #define DEFAULT_BACK_C_LIM 20.0 //this value is for a configuration of -50/+50 mV FSR
@@ -167,7 +171,7 @@ class PAC194x {
     meter_averager chAverager[3];
     bool begin(TwoWire *theWire);    
     void refresh_v();
-    void refresh();
+    void refresh(uint32_t delay);
     void readAvgMeter();
     void setCurrentLimit(float climit, bool cdir, int ch);
     void setFilterLength(uint8_t length);
@@ -175,7 +179,10 @@ class PAC194x {
     //bool readAndClearPORFlag();
     uint8_t readInterruptFlags();
     uint16_t read16(uint8_t address);
-    bool isInitiated() { return initiated; }   
+    uint8_t read8(uint8_t address);
+    bool isInitiated() { return initiated; }
+    int getError() { return error; }
+    uint8_t getRevisionID() { return revisionID; }   
 
 
   private:
@@ -192,7 +199,9 @@ class PAC194x {
 
     TwoWire *I2C;
     bool initiated = false;
+    int error = 255;
     int filterIndex = 0;
+    uint8_t revisionID = 0;
 
 };
 

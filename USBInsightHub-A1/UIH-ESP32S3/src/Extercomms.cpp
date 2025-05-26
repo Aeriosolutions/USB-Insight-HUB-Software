@@ -33,7 +33,7 @@ bool USBSerialActivity = false;
 bool dataReceived = false; 
 
 
-char rawBuffer[76];
+char rawBuffer[80];
 size_t rawBufIndex = 0;
 char inputBuffer[MAX_BUFFER_SIZE];   //working array JSON-RPC
 size_t bufferIndex = 0;
@@ -93,8 +93,8 @@ void taskExterCheckActivity(void *pvParameters){
           gloState->features.clearScreenText = true;
         }
 
-        if(dataReceived){
-          processJsonRpcMessage(inputBuffer);  // Process JSON
+        if(dataReceived){          
+          processJsonRpcMessage(inputBuffer);  // Process JSON          
           dataReceived = false;
         }
 
@@ -123,7 +123,7 @@ void onSerialDataReceived(){
     // Check for end of message (`\n`)
     if (c == '\n') {
         inputBuffer[bufferIndex] = '\0';  // Null-terminate string
-        dataReceived = true;
+        dataReceived = true;        
         //ESP_LOGI(TAG,"%s",inputBuffer);
         bufferIndex = 0;  // Reset buffer for next message
     }
@@ -134,7 +134,7 @@ void onSerialDataReceived(){
 void processJsonRpcMessage(const char* jsonString) {
   JsonDocument doc;
   DeserializationError error = deserializeJson(doc, jsonString);
-
+  //ESP_LOGI(TAG,"%s",jsonString);
   if (error) {
     String err = "{\"status\": \"error\", \"data\": {\"code\": -32700, \"message\": \"Parse error "+String(error.c_str())+"\"}}";
     printErr(err);    
@@ -150,13 +150,13 @@ void processJsonRpcMessage(const char* jsonString) {
   String action = doc["action"].as<String>();
   JsonDocument responseDoc;
   JsonObject result = responseDoc.to<JsonObject>();  
-
+  
   if(action == "set"){
 
     JsonObject params = doc["params"].as<JsonObject>();
     bool pFail = false;
     
-
+  
     if(params["startUpmode"]){
       int inx = getEnumIndex(params["startUpmode"].as<const char*>(),t_startupMode,ARR_SIZE(t_startupMode));
       inx != -1 ? gloConfig->features.startUpmode = inx : result["startUpmode"] = "fail";
@@ -240,7 +240,7 @@ void processJsonRpcMessage(const char* jsonString) {
         int inx = getEnumIndex(params["CH"+String(i+1)]["shortAlert"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
         inx != -1 ? gloState->baseMCUIn[i].fault = inx : result["CH"+String(i+1)]["shortAlert"] = "fail";        
       }          
-
+      
       if(params["CH"+String(i+1)]["numDev"]){
         uint8_t inx = params["CH"+String(i+1)]["numDev"].as<unsigned int>();
         (inx >= 0 && inx <= 10) ? gloState->usbInfo[i].numDev = inx : result["CH"+String(i+1)]["numDev"] = "out of range";
@@ -257,11 +257,11 @@ void processJsonRpcMessage(const char* jsonString) {
       }
 
     }
-
-    result["valid"] = String(params.size()-result.size()) + " of " + String(params.size());
-
-    sendJsonResponse(0, result);
     
+    result["valid"] = String(params.size()-result.size()) + " of " + String(params.size());
+    
+    sendJsonResponse(0, result);
+   
   }  
 
   if(action == "get") {  
@@ -333,7 +333,12 @@ void processJsonRpcMessage(const char* jsonString) {
       }
       if(pName == "menuIsActive"    || all || state)
         result["menuIsActive"]      = gloState->system.menuIsActive;
-                 
+      if(pName == "meterInit"    || all || state){
+        result["meterInit"]      =  t_meter_init[gloState->system.meterInit];
+      }  
+      if(pName == "pacRev"    || all || state)
+        result["pacRev"]      = String(gloState->system.pacRevisionID);
+
       for(int i = 0; i<3; i++){
         if (pName == "CH"+String(i+1) || pName == "CH"+String(i+1)+"_all"){
           result["CH"+String(i+1)]["voltage"]     = String(gloState->meter[i].AvgVoltage,1);
@@ -362,6 +367,7 @@ void processJsonRpcMessage(const char* jsonString) {
 
     sendJsonResponse(0, result);
   }
+  
 }
 
 // Send JSON-RPC response

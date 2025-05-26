@@ -25,38 +25,48 @@ bool PAC194x::begin(TwoWire *theWire){
   theWire->beginTransmission(PAC194x_ADDR);
   theWire->write(PAC194X_PRODUCT_ID_ADDR); //Product ID
   err = theWire->endTransmission(false);
-  //delayMicroseconds(20);  
+  //delayMicroseconds(20);
   err = theWire->requestFrom(PAC194x_ADDR,1);
   if(theWire->available())
   {
     if(theWire->read()==PAC1943_PRODUCT_ID) {
       I2C = theWire;
       initiated=true;
+      error = 0;
+
+      revisionID = read8(PAC194X_REVISION_ID_ADDR); //Revision ID
+      uint8_t porByte = read8(PAC194X_SMBUS_SETTINGS_ADDR); //conserve POR state
+      
       //send configuration
+      //delayMicroseconds(1500);
       write16(PAC194X_CTRL_ADDR,CTRL_ADDR_L,CTRL_ADDR_H);
+      //refresh(DEF_REFRESH_DELAY);
       write16(PAC194X_NEG_PWR_FSR_ADDR,NEG_PWR_ADDR_L,NEG_PWR_ADDR_H);
       //Configure PAC194X_SLOW_ADDR here if necessary
       //Configure PAC194X_ACCUM_CONFIG_ADDR, PAC194X_ACC_FULLNESS_LIMITS_ADDR, if necessary
-      refresh();
-      delayMicroseconds(1000);; //wait refresh completion; //wait refresh completion
+      write8(PAC194X_SMBUS_SETTINGS_ADDR,SMBUS_SETTINGS); 
+      //refresh();
+      //delayMicroseconds(1000);; //wait refresh completion; //wait refresh completion
       //write8(PAC194X_REFRESH_CMD_ADDR,1);
-      enableAlerts(false);
+
+      //enableAlerts(false);
+      write24(PAC194X_ALERT_ENABLE_ADDR,0,0,DISABLEALERT);
+
       write8(PAC194X_OC_LIMIT_N_SAMPLES,OC_SAMPLES); //Set consecutive samples to trigger OC alert
       write8(PAC194X_UC_LIMIT_N_SAMPLES,UC_SAMPLES); //Set consecutive samples to trigger UC alert
       write24(PAC194X_SLOW_ALERT1_ADDR,0,0,ALERT1_INT_EN); //Alert1 interrupt sources
 
-
       for (int k=0; k<3; k++){
         setCurrentLimit(chMeterArr[k].fwdCLim,FORWARD,k); //reference value for test
-        refresh_v();
+        //refresh_v();
         setCurrentLimit(chMeterArr[k].backCLim,BACKWARD,k); //reference value for test
-        refresh_v();
+        //refresh_v();
       }
       
-      enableAlerts(true);
+      //enableAlerts(true);
+      write24(PAC194X_ALERT_ENABLE_ADDR,0,0,ENABLEALERT);
       //refresh();
-      delayMicroseconds(1000);; //wait refresh completion
-
+      //delayMicroseconds(1000);; //wait refresh completion
 
       //initialize averager
       for (int i=0; i<3; i++)
@@ -72,7 +82,6 @@ bool PAC194x::begin(TwoWire *theWire){
           chAverager[i].CurrentBuf[j]=0;
         }
       }
-
       return true;
     }
   }
@@ -110,22 +119,27 @@ void PAC194x::write8(uint8_t reg_address,uint8_t data){
   err = I2C->endTransmission();   
 }
 
+
 void PAC194x::refresh_v(){
-  //write8(PAC194X_REFRESH_V_CMD_ADDR,1);
+  
   if(!initiated) return;
   int err = 0;
   I2C->beginTransmission(PAC194x_ADDR);      
-  I2C->write(PAC194X_REFRESH_V_CMD_ADDR);     
-  err = I2C->endTransmission();   
+  I2C->write(PAC194X_REFRESH_V_CMD_ADDR);
+  //I2C->write(0x01);     
+  err = I2C->endTransmission();
+  delayMicroseconds(1200); //required to update Meter registers after refresh command.    
 }
 
-void PAC194x::refresh(){
-  //write8(PAC194X_REFRESH_V_CMD_ADDR,1);
+void PAC194x::refresh(uint32_t delay){
+  
   if(!initiated) return;
   int err = 0;
   I2C->beginTransmission(PAC194x_ADDR);      
-  I2C->write(PAC194X_REFRESH_CMD_ADDR);     
-  err = I2C->endTransmission();   
+  I2C->write(PAC194X_REFRESH_CMD_ADDR);
+  //I2C->write(0x01);     
+  err = I2C->endTransmission();
+  delayMicroseconds(delay); //required to update Meter registers after refresh command.   
 }
 
 void PAC194x::readAvgMeter(){
@@ -141,8 +155,9 @@ void PAC194x::readAvgMeter(){
   int sign=1;
   unsigned long i2cwd_timer = 0;
 
+  I2C->flush(); //start with the buffer empty
   I2C->beginTransmission(PAC194x_ADDR); 
-  I2C->write(PAC194X_VBUS1_AVG_ADDR); 
+  I2C->write(PAC194X_VBUS1_AVG_ADDR);
   err = I2C->endTransmission(false);
   i2cwd_timer = millis(); //*probably this protection is not longer necessary
   err = I2C->requestFrom(PAC194x_ADDR,12); //*
@@ -153,13 +168,16 @@ void PAC194x::readAvgMeter(){
     I2C->flush(); //*
     I2C->setClock(100000); //*
     I2C->setClock(400000); //*
+    error = 2;
     return; //*
   }
   if(err==0) {
     //Serial.println("PAC Fail to read bytes");
     ESP_LOGW(TAG, "PAC Fail to read bytes!");
+    error = 1;
     return;
   }
+  error = 0;
   for(i =0; i < 3; i++)
   {
     msb=I2C->read();
@@ -234,7 +252,8 @@ void PAC194x::enableAlerts(bool enable){
   else {
     write24(PAC194X_ALERT_ENABLE_ADDR,0,0,DISABLEALERT);
   }
-  refresh_v();
+  //refresh_v();
+  refresh(DEF_REFRESH_DELAY);
 }
 
 /*
@@ -289,6 +308,19 @@ uint16_t PAC194x::read16(uint8_t address){
   val = (uint16_t)(msb*256 + lsb);
   return val;
 }
+
+uint8_t PAC194x::read8(uint8_t address){
+  uint8_t val;
+  if(!initiated) return 0;
+  I2C->beginTransmission(PAC194x_ADDR);
+  I2C->write(address); //Alert Status
+  int err = I2C->endTransmission(false);
+  err = I2C->requestFrom(PAC194x_ADDR,1);
+  val = I2C->read();
+
+  return val;
+}
+
 
 void PAC194x::voltageMovingAverageFilter(int i){  
   /* This moving average filter implementation is more efficient, but needs to start from 0.

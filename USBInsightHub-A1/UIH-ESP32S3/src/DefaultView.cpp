@@ -259,7 +259,7 @@ void taskDefaultScreenLoop(void *pvParameters){
 }
 
 void defaultScreenFastDataUpdate(){
-
+    
     for (int i=0; i<3 ; i++){      
       ScreenArr[i].fault   = gState->baseMCUIn[i].fault;
       ScreenArr[i].data_en = gState->baseMCUOut[i].data_en;

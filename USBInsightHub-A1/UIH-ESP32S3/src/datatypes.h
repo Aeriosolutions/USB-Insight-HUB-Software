@@ -140,7 +140,14 @@ static const char* t_vx_stat[] = {"no_pullups","cc1_pu","cc2_pu","both"};
 #define USB_SUSPENDED  2
 #define USB_RESUME     3
 
+//meter initialization
+#define METER_NO_INIT  0
+#define METER_INIT_OK  1
+#define METER_INIT_FAILED 2
+#define METER_INIT_READ_ERR  3
+#define METER_INIT_SLOW_ERR  4
 
+static const char* t_meter_init[] = {"no_init","ok","failed","err_read","err_slow"};
 
 struct System {
   uint8_t currentView;
@@ -155,7 +162,9 @@ struct System {
   String wifiMAC;
   bool menuIsActive;
   bool showMenuInfoSplash;
-  uint8_t resetToDefault;  
+  uint8_t resetToDefault;
+  uint8_t meterInit;
+  uint8_t pacRevisionID;  
 };
 
 struct FeaturesState {

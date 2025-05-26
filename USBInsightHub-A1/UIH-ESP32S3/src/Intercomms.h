@@ -34,6 +34,7 @@ communitcaion between the Main MCU, the BaseMCU and the Power Meter
 
 #define ADC_NUMSAMPLES 10
 #define DIV5VRATIO 3.21 //22.1k|10.0k
+#define I2CSPEED 400000
 
 void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig);
 

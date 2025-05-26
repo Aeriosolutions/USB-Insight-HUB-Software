@@ -47,7 +47,7 @@ bool BaseMCU::readStart(int address, int start, int numBytes){
   if(initiated){
     int err=0;
     unsigned long i2cwd_timer = 0;
-
+    I2C->flush(); //start with the buffer empty
     I2C->beginTransmission(address);
     I2C->write(start);
     err = I2C->endTransmission(false); 
@@ -178,6 +178,7 @@ void BaseMCU::setUSB3Enable(bool set){
     I2C->write(MUXOECTR);    
     set ? data = 0x01 : data = 0x00;  
     I2C->write(data);  
-  }
     err = I2C->endTransmission();
+  }
+    
 }

@@ -9,6 +9,9 @@ Check the [UIH Programing Guide](https://github.com/Aeriosolutions/USB-Insight-H
 
 ## 3. I2C Protocol
 
+### Slave address: 
+0x51 (8 bit)
+
 ### Register Map
 |     Name         |     Type    |     Register Address    |     Default     |     Description                                        |
 |------------------|-------------|-------------------------|-----------------|--------------------------------------------------------|

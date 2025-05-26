@@ -106,6 +106,8 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     globalState->system.wifiMAC = mac;
     globalState->system.menuIsActive = false;
     globalState->system.resetToDefault = 0;
+    globalState->system.meterInit = METER_NO_INIT;
+    globalState->system.pacRevisionID = 0xFF; //means no revision ID available
 
     //---Features
     globalConfig->features.startUpmode != STARTUP_SEC ? globalState->features.startUpActive = false : globalState->features.startUpActive = true;
