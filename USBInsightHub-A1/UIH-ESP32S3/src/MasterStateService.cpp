@@ -167,7 +167,10 @@ void MasterStateService::taskMSS(){
     ESP_LOGI("Master State Service","Started on Core %u",xPortGetCoreID());
     unsigned long fallBackTimer = 0;    
     for(;;){
-               
+        
+        
+        gState->system.updateState = _skit->getUpdateState(); //check if an OTA update is in progress
+        
         read(masterStateObj,MasterState::read);
         //check if there is a change in the front end controls
         if(lastHash !=calculateJsonHash(masterStateObj)){
@@ -196,7 +199,8 @@ void MasterStateService::taskMSS(){
           _skit->factoryReset();
           vTaskDelay(pdMS_TO_TICKS(200));
           gState->features.wifiReset = 0;
-        }   
+        }
+                
 
         limitClientConnections();
 

@@ -5,7 +5,7 @@ export const Help = {
         POWER: "Hub is powered by the HOST or the AUX power supply",
         OVER_CURRENT: "Forward current limit. From the Hub to the load",
         BACK_CURRENT: "Reverse current limit. From the load to the Hub",
-        STARTUP_DELAY: "Delay time after power-on to turn on the channel power",
+        STARTUP_DELAY: "Delay time after power-on to turn on the channel power. Settings->Startup Mode->Timed must be selected",
     },
     SETTINGS: {
         STARTUP_MODE: "Select the logic to control the outputs at power up:\n"+

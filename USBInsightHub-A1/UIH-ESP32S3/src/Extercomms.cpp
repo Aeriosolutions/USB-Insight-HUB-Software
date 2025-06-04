@@ -449,7 +449,7 @@ static void usbEventCallback(void* arg, esp_event_base_t event_base, int32_t eve
       case ARDUINO_USB_CDC_RX_EVENT:
         //ESP_LOGV(TAG,"CDC RX [%u]:", data->rx.len);
         {
-            uint8_t buf[data->rx.len];
+            //uint8_t buf[data->rx.len]; //redundant- left for reference
 
             rawBufIndex = usbSerial.read(rawBuffer,data->rx.len);
             onSerialDataReceived();

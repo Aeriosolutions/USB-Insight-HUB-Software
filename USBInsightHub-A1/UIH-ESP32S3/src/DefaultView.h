@@ -24,6 +24,7 @@
 
 #define DEFAULT_VIEW_PERIOD      40 //in ms
 #define MENU_INFO_SPLASH_TIMEOUT 2000 //in ms
+#define VERSION_CHANGE_SPLASH_TIMEOUT 8000 //in ms
 
 
 

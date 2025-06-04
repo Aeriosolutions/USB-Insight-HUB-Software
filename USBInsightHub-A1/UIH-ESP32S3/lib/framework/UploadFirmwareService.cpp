@@ -38,7 +38,8 @@ void UploadFirmwareService::begin()
     uploadHandler->onRequest(std::bind(&UploadFirmwareService::uploadComplete, this, _1));  // gets called after upload has been handled
     uploadHandler->onClose(std::bind(&UploadFirmwareService::handleEarlyDisconnect, this)); // gets called if client disconnects
     _server->on(UPLOAD_FIRMWARE_PATH, HTTP_POST, uploadHandler);
-
+    uploadState = 0;
+    //ESP_LOGI("UL: ","%d", uploadState);
     ESP_LOGV("UploadFirmwareService", "Registered POST endpoint: %s", UPLOAD_FIRMWARE_PATH);
 }
 
@@ -129,12 +130,16 @@ esp_err_t UploadFirmwareService::handleUpload(PsychicRequest *request,
     // if we haven't delt with an error, continue with the firmware update
     if (!request->_tempObject)
     {
+        uploadState = 1;
+        //ESP_LOGI("UL: ","%d", uploadState);
         if (Update.write(data, len) != len)
         {
             handleError(request, 500);
         }
         if (final)
         {
+            uploadState = 2;
+            ESP_LOGI("UL: ","%d", uploadState);
             if (!Update.end(true))
             {
                 handleError(request, 500);
@@ -154,7 +159,7 @@ esp_err_t UploadFirmwareService::uploadComplete(PsychicRequest *request)
         {
             PsychicJsonResponse response = PsychicJsonResponse(request, false);
             JsonObject root = response.getRoot();
-            root["md5"] = md5;
+            root["md5"] = md5;            
             return response.send();
         }
         return ESP_OK;
@@ -162,7 +167,9 @@ esp_err_t UploadFirmwareService::uploadComplete(PsychicRequest *request)
 
     // if no error, send the success response
     if (!request->_tempObject)
-    {
+    {   
+        uploadState = 3;
+        ESP_LOGI("UL: ","%d", uploadState);
         request->reply(200);
         RestartService::restartNow();
         return ESP_OK;
@@ -189,6 +196,8 @@ esp_err_t UploadFirmwareService::handleError(PsychicRequest *request, int code)
 
     // send the error code to the client and record the error code in the temp object
     request->_tempObject = new int(code);
+    uploadState = code;
+    ESP_LOGI("UL: ","%d", uploadState);
     return request->reply(code);
 }
 

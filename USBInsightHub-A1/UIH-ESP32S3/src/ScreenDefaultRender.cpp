@@ -322,6 +322,36 @@ void Screen::screenDefaultRender(chScreenData Screen){
     img.unloadFont();
   }
 
+  //Version update splash
+  if(Screen.dProp.cs_pin == DISPLAY_CS_2 && Screen.showVersionChangeSplash){
+    img.loadFont(SMALLFONT);
+    img.fillRoundRect(5, 40, 235, 80, 5, TFT_BLUE);
+    img.fillRoundRect(9, 44, 229, 76, 5, TFT_WHITE);
+    img.setTextColor(TFT_BLACK);
+    img.drawString("Updated to ver.",10,50,4);
+    aux= String(APP_VERSION);
+    aux.concat(" !");
+    img.drawString(aux,10,80,4);
+    img.unloadFont();
+  }
+
+  //Update in progress splash
+  if(Screen.dProp.cs_pin == DISPLAY_CS_2 && Screen.updateState != 0){
+    img.loadFont(SMALLFONT);
+    img.fillRoundRect(5, 40, 235, 80, 5, TFT_BLUE);
+    img.fillRoundRect(9, 44, 229, 76, 5, TFT_WHITE);
+    img.setTextColor(TFT_BLACK);
+    if(Screen.updateState == 3)
+    {
+      img.drawString("   DONE!",10,62,4);
+    }
+    else{
+      img.drawString("Downloading",10,50,4);
+      img.drawString("Firmware ...",10,80,4);        
+    }
+    img.unloadFont();
+  }
+
   /*
   //Use for palette evaluation
   int offset = 0;

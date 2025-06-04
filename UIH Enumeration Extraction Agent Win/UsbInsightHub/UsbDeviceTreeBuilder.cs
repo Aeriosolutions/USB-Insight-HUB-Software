@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Management;
 using System.ComponentModel.Design.Serialization;
+using System.Linq;
+//using ContainerIdFetcher;
 
 namespace USBInfoHub.DeviceFinder
 {
@@ -15,10 +17,12 @@ namespace USBInfoHub.DeviceFinder
         public string LocationPath { get; set; }
         public string PortPath{ get; set; }
         public string Port { get; set; }
+        public string ContainerID { get; set; }
+        public string CompanionHub { get; set; }
         public string LastLocableInstanceId { get; set; }
 
         public UsbDeviceNode Parent { get; set; }
-        public List<UsbDeviceNode> Children { get; } = new List<UsbDeviceNode>();
+        public List<UsbDeviceNode> Children { get; set; } = new List<UsbDeviceNode>();
 
 
         public void PrintTree(string indent = "", bool isLast = true)
@@ -79,6 +83,62 @@ namespace USBInfoHub.DeviceFinder
 
     }
 
+    public static class TreeTrimer
+    {
+
+
+        public static List<UsbDeviceNode> ExtractTopLevelMatchingSubtrees(List<UsbDeviceNode> roots, Func<UsbDeviceNode, bool> match)
+        {
+            var matchedSubtrees = new List<UsbDeviceNode> ();
+
+            foreach (var root in roots)
+            {
+                CollectMatches(root, match, matchedSubtrees);
+            }
+
+            return matchedSubtrees;
+        }
+
+
+        // Recursive traversal with match collection
+        private static void CollectMatches(UsbDeviceNode current, Func<UsbDeviceNode, bool> match, List<UsbDeviceNode> collector)
+        {
+            if (current == null) return;
+
+            if (match(current))
+            {
+                collector.Add(CloneSubtree(current));
+                return; // Stop descending
+            }
+
+            foreach (var child in current.Children)
+            {
+                CollectMatches(child, match, collector);
+            }
+        }
+
+        // Deep copy
+        private static UsbDeviceNode CloneSubtree(UsbDeviceNode node)
+        {
+            return new UsbDeviceNode
+            {
+                //InstanceId = node.InstanceId,
+                Children = node.Children.Select(CloneSubtree).ToList(),
+
+                InstanceId = node.InstanceId,
+                Description = node.Description,
+                LocationPath = node.LocationPath,
+                PortPath = node.PortPath,
+                Port = node.Port,
+                ContainerID = node.ContainerID,
+                CompanionHub = node.CompanionHub,
+                LastLocableInstanceId = node.LastLocableInstanceId
+
+            };
+        }
+
+
+    }
 
 
     public class UsbDeviceTreeBuilder
@@ -161,7 +221,8 @@ namespace USBInfoHub.DeviceFinder
             var nodes = new Dictionary<string, UsbDeviceNode>();
             var roots = new List<UsbDeviceNode>();
 
-            var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_PnPEntity WHERE PNPDeviceID LIKE 'USB%'");
+            //var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_PnPEntity WHERE PNPDeviceID LIKE '%USB%'");
+            var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_PnPEntity");
 
             foreach (ManagementObject device in searcher.Get())
             {                
@@ -169,15 +230,38 @@ namespace USBInfoHub.DeviceFinder
                 string portHubInfo = ExtractPortHubInfo(instanceId);
                 string description = (string)device["Name"];
                 string locationPath = GetDeviceLocationPath(instanceId);
-                string portPath = ParseUsbPortPath(locationPath);
+                string portPath = ParseUsbPortPath(locationPath);                
                 string port = "";
+                string containerID = "";
+                string companionHub = "";
+                //Guid? contID = ContainerIdFetcher.GetContainerIdFromPnpDeviceId(instanceId);
+                //if (contID.HasValue) containerID = contID.ToString();
+
                 string lastLocableInstanceId = "";
                 if (!string.IsNullOrEmpty(portPath))
                 {
                     port = portPath.Substring(portPath.Length - 1);
                     lastLocableInstanceId = instanceId;
+
+                    /*try
+                    {
+                        string path = CompanionHubFetcher.GetDevicePathFromInstanceId(instanceId);
+                        if(path != null)
+                        {
+                            //string companionHubLink = CompanionHubFetcher.GetCompanionHubSymbolicLinkName(path.Replace(@"\\\\", @"\\"), uint.Parse(port));
+                            string companionHubLink = CompanionHubFetcher.GetCompanionHubSymbolicLinkName(path.Replace(@"\\\\", @"\\"), 2);
+                            //companionHub = companionHubLink;
+                            companionHub = companionHubLink;
+                        } 
+                            
+
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Error: " + ex.Message);
+                    }*/
                 }
-                
+
 
                 var node = new UsbDeviceNode
                 {
@@ -186,6 +270,8 @@ namespace USBInfoHub.DeviceFinder
                     LocationPath = locationPath,
                     PortPath = portPath,
                     Port = port,
+                    ContainerID = containerID,
+                    CompanionHub = companionHub,
                     LastLocableInstanceId = lastLocableInstanceId
                 };
 
@@ -218,7 +304,12 @@ namespace USBInfoHub.DeviceFinder
                 r.InheritParentProp();
             }
 
-            return roots;
+            //trim the tree for devices with top level usb parents
+
+            var test = TreeTrimer.ExtractTopLevelMatchingSubtrees(roots, node => node.Description.ToLower().Contains("usb"));
+            return test;
+
+
         }
 
 

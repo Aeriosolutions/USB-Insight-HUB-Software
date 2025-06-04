@@ -37,12 +37,13 @@ class UploadFirmwareService
 {
 public:
     UploadFirmwareService(PsychicHttpServer *server, SecurityManager *securityManager);
-
+    uint8_t getUploadState() const { return uploadState; }
     void begin();
 
 private:
     PsychicHttpServer *_server;
     SecurityManager *_securityManager;
+    uint8_t uploadState;
 
     esp_err_t handleUpload(PsychicRequest *request,
                            const String &filename,

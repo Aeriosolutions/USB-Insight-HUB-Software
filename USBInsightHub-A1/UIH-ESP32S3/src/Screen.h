@@ -84,6 +84,8 @@ struct chScreenData {
   uint8_t wifiState;
   uint8_t hubMode;
   bool showMenuInfoSplash;
+  bool showVersionChangeSplash;
+  uint8_t updateState;
   uint8_t startUpmode;
   bool pwr_source;
   uint8_t usbHostState;

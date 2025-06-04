@@ -36,6 +36,7 @@ void taskDefaultScreenLoop(void *pvParameters);
 bool defaultViewActive = false;
 SemaphoreHandle_t screen_Semaphore;
 unsigned long infoSplashTimer = 0;
+unsigned long versionChangeSplashTimer = 0;
 uint8_t prevRefreshRate = 0;
 
 void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Screen *screen){
@@ -193,6 +194,11 @@ void taskDefaultScreenLoop(void *pvParameters){
   
   TickType_t xLastWakeTime = xTaskGetTickCount();
   ESP_LOGI(TAG,"Loop Screen on Core %u",xPortGetCoreID());
+ 
+  if(strcmp(APP_VERSION,gState->system.prevESPVersion.c_str()) != 0){
+    gState->system.showVersionChangeSplash = true;
+    versionChangeSplashTimer = millis();
+  }
   
   if(xSemaphoreTake(screen_Semaphore,( TickType_t ) 10 ) == pdTRUE)
   {
@@ -241,6 +247,13 @@ void taskDefaultScreenLoop(void *pvParameters){
         }
       }
 
+      if(versionChangeSplashTimer != 0){
+        if(millis()-versionChangeSplashTimer > VERSION_CHANGE_SPLASH_TIMEOUT){          
+          gState->system.showVersionChangeSplash = false;
+          versionChangeSplashTimer = 0;
+        }
+      }
+
       if(!defaultViewActive){
         ESP_LOGI(TAG,"Delete Screen Loop");
         xSemaphoreGive(screen_Semaphore);
@@ -285,7 +298,9 @@ void defaultScreenFastDataUpdate(){
       ScreenArr[i].rssiBars         = getRssiBars(gState->features.wifiRSSI);
       ScreenArr[i].wifiState        = gState->features.wifiState;
       ScreenArr[i].hubMode          = gConfig->features.hubMode; 
-      ScreenArr[i].showMenuInfoSplash   = gState->system.showMenuInfoSplash;
+      ScreenArr[i].showMenuInfoSplash      = gState->system.showMenuInfoSplash;
+      ScreenArr[i].showVersionChangeSplash = gState->system.showVersionChangeSplash;
+      ScreenArr[i].updateState      = gState->system.updateState;
       ScreenArr[i].startUpmode      = gConfig->features.startUpmode;
       ScreenArr[i].pwr_source       = gState->baseMCUExtra.pwr_source; 
       ScreenArr[i].usbHostState     = gState->features.usbHostState;

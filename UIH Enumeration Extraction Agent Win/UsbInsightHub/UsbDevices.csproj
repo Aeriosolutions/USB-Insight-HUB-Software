@@ -65,6 +65,10 @@
 	<Compile Include="Endianness.cs" />
 	<Compile Include="MarshalEx.cs" />
 	<Compile Include="UsbDeviceTreeBuilder.cs" />
+	<Compile Include="ContainerIdFetcher.cs" />
+	<Compile Include="CompanionHubFetcher.cs" />
+	  
+	  
 	  
   </ItemGroup>
   <ItemGroup>

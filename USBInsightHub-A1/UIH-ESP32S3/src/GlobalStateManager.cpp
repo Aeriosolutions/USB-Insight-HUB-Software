@@ -42,8 +42,10 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     if(flashstorage.getInt("ConfigInit")!=MEM_INITIALIZED_NUM){
         //flashstorage.end();
         ESP_LOGI(TAG,"NVM is not initialized...load default values under template: %u", DATATYPES_VER);
-        setDefaultGlobalConfig(globalState,globalConfig);
+        setDefaultGlobalConfig(globalState,globalConfig);        
         flashstorage.putInt("TemplateVer",DATATYPES_VER);
+        flashstorage.putString("AppVersion",APP_VERSION);
+        globalState->system.prevESPVersion = APP_VERSION;
         flashstorage.putBytes("ConfigBlob",globalConfig,sizeof(*globalConfig));
         flashstorage.putBytes("MCUBlob",&(globalState->baseMCUOut),sizeof(globalState->baseMCUOut));
         flashstorage.putInt("ConfigInit",MEM_INITIALIZED_NUM);
@@ -52,6 +54,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     } 
     else {
         int tver = flashstorage.getInt("TemplateVer");
+        globalState->system.prevESPVersion = flashstorage.getString("AppVersion");
         if(tver!=DATATYPES_VER){           
            ESP_LOGW(TAG,"Template in NVM is version %u. This version supports version %u", tver,DATATYPES_VER);
            setDefaultGlobalConfig(globalState,globalConfig);
@@ -108,6 +111,8 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     globalState->system.resetToDefault = 0;
     globalState->system.meterInit = METER_NO_INIT;
     globalState->system.pacRevisionID = 0xFF; //means no revision ID available
+    globalState->system.showVersionChangeSplash = false;
+    globalState->system.updateState = 0; //default state is idle
 
     //---Features
     globalConfig->features.startUpmode != STARTUP_SEC ? globalState->features.startUpActive = false : globalState->features.startUpActive = true;
@@ -187,7 +192,7 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
     globalConfig->features.wifi_enabled = ENABLE;
     globalConfig->features.hubMode = USB2_3;
     globalConfig->features.filterType = FILTER_TYPE_MEDIAN;
-    globalConfig->features.refreshRate = S0_5;
+    globalConfig->features.refreshRate = S0_5;        
 
     for(int i=0; i<3; i++){
         globalConfig->startup[i].startup_timer = 1;
@@ -215,29 +220,43 @@ void taskConfigAutoSave(void *pvParameters){
   uint8_t dumb = 0;
   long index = 0;
   for(;;){
-    //check if is a change in config parameters
-    if( memcmp(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig)) != 0 ){
-        saveConfig();
-        //discriminate if the configuration change comes from the Menu or elsewhere
-        if(!globlState->system.configChangedFromMenu) globlState->system.congigChangedToMenu = true;
-        globlState->system.configChangedFromMenu = false;
+    //if an OTA is in progress, do not use NVM 
+    if(globlState->system.updateState != 1)
+    {
+        //check if is a change in config parameters
+        if( memcmp(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig)) != 0 ){
+            saveConfig();
+            //discriminate if the configuration change comes from the Menu or elsewhere
+            if(!globlState->system.configChangedFromMenu) globlState->system.congigChangedToMenu = true;
+            globlState->system.configChangedFromMenu = false;
 
-        if(globlConfig->features.wifi_enabled != prevGloblConfig.features.wifi_enabled){
-            vTaskDelay(pdMS_TO_TICKS(90));
-            ESP.restart();
+            if(globlConfig->features.wifi_enabled != prevGloblConfig.features.wifi_enabled){
+                vTaskDelay(pdMS_TO_TICKS(90));
+                ESP.restart();
+            }
+            memcpy(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig));
         }
-        memcpy(&prevGloblConfig, globlConfig, sizeof(prevGloblConfig));
-    }
-    if(globlState->system.saveMCUState){
-        saveMCUState();
-        globlState->system.saveMCUState = false;
-    }
+        if(globlState->system.saveMCUState){
+            saveMCUState();
+            globlState->system.saveMCUState = false;
+        }
 
-    //check if it is needed to reset to defaults
-    if(globlState->system.resetToDefault != 0){
-        ESP_LOGI(TAG,"Command: Reset to default values");
-        globlState->system.resetToDefault = 0;
-        setDefaultGlobalConfig(globlState,globlConfig);
+        //check if it is needed to reset to defaults
+        if(globlState->system.resetToDefault != 0){
+            ESP_LOGI(TAG,"Command: Reset to default values");
+            globlState->system.resetToDefault = 0;
+            setDefaultGlobalConfig(globlState,globlConfig);
+        }
+
+        //check if it is needed to update previous ESP version with new one
+        
+        if(strcmp(APP_VERSION,globlState->system.prevESPVersion.c_str()) != 0 && globlState->system.showVersionChangeSplash){
+            ESP_LOGI(TAG,"Updating previous ESP version to %s",APP_VERSION);
+            globlState->system.prevESPVersion = APP_VERSION;
+            flashstorage.begin(UIH_NAMESPACE,false);
+            flashstorage.putString("AppVersion",APP_VERSION);
+            flashstorage.end();
+        }
     }
     
     //Uncomment to increase flash size by 1575783 bytes to test big file OTA
@@ -259,6 +278,7 @@ void saveMCUState(void){
 }
 
 void saveConfig(void){
+    
     flashstorage.begin(UIH_NAMESPACE,false);
     flashstorage.putBytes("ConfigBlob",globlConfig,sizeof(*globlConfig));
     ESP_LOGI(TAG,"Save Config blob");

@@ -21,7 +21,7 @@
 #include "BaseMCU.h"
 #include "PAC194x.h"
 #include "Screen.h"
-
+                        
 #define DATATYPES_VER 4 //change this number every time globalconfig members are added
 
 #define APP_CORE 1
@@ -162,9 +162,12 @@ struct System {
   String wifiMAC;
   bool menuIsActive;
   bool showMenuInfoSplash;
+  bool showVersionChangeSplash;
   uint8_t resetToDefault;
   uint8_t meterInit;
-  uint8_t pacRevisionID;  
+  uint8_t pacRevisionID;
+  String prevESPVersion;
+  uint8_t updateState;  
 };
 
 struct FeaturesState {

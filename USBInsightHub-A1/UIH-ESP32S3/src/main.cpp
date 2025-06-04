@@ -26,6 +26,7 @@
 #include "DefaultView.h"
 #include "Powerstartup.h"
 
+
 #include <ArduinoJson.h>
 
 #define SERIAL_BAUD_RATE 115200
@@ -47,18 +48,20 @@ void setup()
 {
 
     // start serial and filesystem
-    //Serial.begin(SERIAL_BAUD_RATE);   
+    //Serial.begin(SERIAL_BAUD_RATE); 
+      
     globalStateInitializer(&globalState,&globalConfig);
     iniIntercomms(&globalState, &globalConfig);
     delay(10);
     iniPowerStartUp(&globalState,&globalConfig);     
     iniExtercomms(&globalState,&globalConfig);
     delay(40); //to give time to print
-    ESP_LOGI("Main","Running Firmware Version: %s\n", APP_VERSION);
+    ESP_LOGI("Main","Running Firmware Version: %s", APP_VERSION);
+    //ESP_LOGI("Main","Previous Firmware Version: %s\n", globalState.system.prevESPVersion.c_str());
 
-    iniButtons();
+    iniButtons();    
     iniDefaultView(&globalState,&globalConfig, &screen);
-       
+    //delay(10); //to give time to print
     
     // start ESP32-SvelteKit if WiFi is enabled
     if(globalConfig.features.wifi_enabled == ENABLE){

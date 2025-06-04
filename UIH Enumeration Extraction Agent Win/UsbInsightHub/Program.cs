@@ -122,7 +122,7 @@ namespace USBInfoHub.DeviceFinder
                 if (String.Compare(device.Pid, controllerPid) == 0 && String.Compare(device.Vid, controllerVid) == 0 && String.Compare(device.Port,"0004")==0)
                 {
                     Console.WriteLine(String.Format("ESP32 controller found on {0}:{1}", device.Hub, device.Port));
-                    //Console.WriteLine(String.Format("{0}", device.Vid));
+                   // Console.WriteLine(String.Format("{0}", device.Vid));
                     controllerPort = device.Port;
                     controllerHub = device.Hub;
                     Hub2_DeviceID = device.Properties[27].Value.ToString();
@@ -314,7 +314,7 @@ namespace USBInfoHub.DeviceFinder
                         continue;
 
                     Console.WriteLine("Removable Drive Letter: " + driveLetter);                    
-                    
+                    Console.WriteLine("Device ID: " + logicalDisk["DeviceID"]?.ToString()); 
 
                     try
                     {

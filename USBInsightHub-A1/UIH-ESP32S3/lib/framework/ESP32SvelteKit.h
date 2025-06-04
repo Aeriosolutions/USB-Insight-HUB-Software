@@ -201,6 +201,11 @@ public:
         _loopFunctions.push_back(function);
     }
 
+    uint8_t getUpdateState()
+    {
+        return _uploadFirmwareService.getUploadState();
+    }
+
 private:
     PsychicHttpServer *_server;
     unsigned int _numberEndpoints;
