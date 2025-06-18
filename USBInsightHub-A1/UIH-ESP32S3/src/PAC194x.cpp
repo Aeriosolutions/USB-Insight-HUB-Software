@@ -37,6 +37,9 @@ bool PAC194x::begin(TwoWire *theWire){
       revisionID = read8(PAC194X_REVISION_ID_ADDR); //Revision ID
       uint8_t porByte = read8(PAC194X_SMBUS_SETTINGS_ADDR); //conserve POR state
       
+      //test interrupt pin
+      testInterruptPin();
+
       //send configuration
       //delayMicroseconds(1500);
       write16(PAC194X_CTRL_ADDR,CTRL_ADDR_L,CTRL_ADDR_H);
@@ -395,4 +398,21 @@ void PAC194x::setFilterLength(uint8_t length){
   else 
     filterWindowsize = 10;
   
+}
+
+void PAC194x::testInterruptPin(){
+  
+  if(!digitalRead(PAC_ALERT)) return;
+  //set SLOW/ALERT1 as output GPIO  
+  write16(PAC194X_CTRL_ADDR,CTRL_ADDR_L,CTRL_ADDR_H_INT_TEST);
+  refresh(1000);  
+  //set SLOW/ALERT1 low
+  write8(PAC194X_SMBUS_SETTINGS_ADDR,SMBUS_SETTINGS); 
+  delayMicroseconds(1000);
+  if(digitalRead(PAC_ALERT)) return;
+  //set SLOW/ALERT1 high
+  write8(PAC194X_SMBUS_SETTINGS_ADDR,SMBUS_SETTINGS_INT_TEST_H);
+  delayMicroseconds(1000); 
+  if(!digitalRead(PAC_ALERT)) return;  
+  intTestResult = true;
 }

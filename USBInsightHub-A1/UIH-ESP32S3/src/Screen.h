@@ -89,6 +89,7 @@ struct chScreenData {
   uint8_t startUpmode;
   bool pwr_source;
   uint8_t usbHostState;
+  uint8_t internalErrFlags;
 };
 
 
@@ -98,6 +99,7 @@ class Screen{
     void start();
     void screenDefaultRender(chScreenData Screen);
     void screenSetBackLight(int pwm);
+    void screenSetBackLight(int pwm, uint8_t ch);
     void usbIconDraw(uint8_t type, bool active,bool com);
     void flexDevicePrint(String jsonStr, bool pcCon);
 

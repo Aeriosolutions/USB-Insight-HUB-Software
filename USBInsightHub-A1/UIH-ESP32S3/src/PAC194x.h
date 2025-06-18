@@ -18,6 +18,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include "datatypes.h" //to know the pin numbers
 
 #define SLOWDOWN_TIMEOUT 4
 
@@ -39,8 +40,10 @@
 //Configuration controls and status Pag 45
 #define CTRL_ADDR_L 0x10//0001 0000 -> high nible disabled channels (CH4 disabled); low nibble all 0s
 #define CTRL_ADDR_H 0x00// 0000->1024 samples adaptive accumulation |00-> ALERT2 as ALERT |00->ALERT as ALERT1
+#define CTRL_ADDR_H_INT_TEST 0x02// 0000->1024 samples adaptive accumulation |00-> ALERT2 as ALERT |10->ALERT as GPIO Output
 //SMBUS setting
 #define SMBUS_SETTINGS 0x08 // Enable timeout and clear POR flag
+#define SMBUS_SETTINGS_INT_TEST_H 0x48 // Enable timeout and clear POR flag, Enable ALERT as Output high, disable POR
 
 //default refresh delay
 #define DEF_REFRESH_DELAY 1500 //ms
@@ -181,6 +184,7 @@ class PAC194x {
     uint16_t read16(uint8_t address);
     uint8_t read8(uint8_t address);
     bool isInitiated() { return initiated; }
+    bool getIntTestResult() { return intTestResult; }
     int getError() { return error; }
     uint8_t getRevisionID() { return revisionID; }   
 
@@ -196,12 +200,14 @@ class PAC194x {
     void currentMedianFilter(int i);
     float medianFunction(float arr[], int n);
     float movingAverage(float arr[], int n);
+    void testInterruptPin();
 
     TwoWire *I2C;
     bool initiated = false;
     int error = 255;
     int filterIndex = 0;
     uint8_t revisionID = 0;
+    bool intTestResult = false;
 
 };
 

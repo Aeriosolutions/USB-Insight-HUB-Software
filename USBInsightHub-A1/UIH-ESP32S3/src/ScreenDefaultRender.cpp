@@ -74,6 +74,18 @@ void Screen::screenDefaultRender(chScreenData Screen){
     pcimg.pushToSprite(&img, 65, 0, TFT_WHITE);
   }
 
+  //Internal Error flag placer
+  if(Screen.internalErrFlags != 0 && Screen.dProp.cs_pin == DISPLAY_CS_1)
+  {
+    img.loadFont(SMALLFONT);
+    img.setTextColor(TFT_YELLOW);
+    aux = String(Screen.internalErrFlags, HEX);
+    aux.toUpperCase();
+    if(aux.length() < 2) aux = "0" + aux;    
+    aux = "e" + aux;
+    img.drawString(aux, 110, 4, 4);
+  }
+
   //Startup timer indicator
   if(Screen.dProp.cs_pin == DISPLAY_CS_2 && Screen.startUpmode != PERSISTANCE){
     switch (Screen.startUpmode){      
@@ -308,6 +320,8 @@ void Screen::screenDefaultRender(chScreenData Screen){
     img.drawCentreString(aux, 120, 65, 4); //**
     img.unloadFont();
   }
+
+
 
   //Menu access information splash
 

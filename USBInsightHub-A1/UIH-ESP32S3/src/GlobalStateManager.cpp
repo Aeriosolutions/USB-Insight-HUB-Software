@@ -113,6 +113,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     globalState->system.pacRevisionID = 0xFF; //means no revision ID available
     globalState->system.showVersionChangeSplash = false;
     globalState->system.updateState = 0; //default state is idle
+    globalState->system.internalErrFlags = 0; //no internal errors
 
     //---Features
     globalConfig->features.startUpmode != STARTUP_SEC ? globalState->features.startUpActive = false : globalState->features.startUpActive = true;

@@ -38,6 +38,9 @@ SemaphoreHandle_t screen_Semaphore;
 unsigned long infoSplashTimer = 0;
 unsigned long versionChangeSplashTimer = 0;
 uint8_t prevRefreshRate = 0;
+uint16_t brightnessTestValue = 0;
+bool brightnessTestActive = false;
+bool prevLedState = false; 
 
 void iniDefaultView(GlobalState* globalState, GlobalConfig* globalConfig,  Screen *screen){
 
@@ -131,8 +134,21 @@ void taskDefaultViewLoop(void *pvParameters){
         
         ESP_LOGI(TAG,"Setup button short press");
         uint16_t oclimit=2000;
-        gState->system.showMenuInfoSplash = true;
-        infoSplashTimer = millis();
+
+       
+        //for brightness test mode
+        if(USE_BRIGHTNESS_TEST_MODE > 0){
+          brightnessTestValue = 1000;
+          brightnessTestActive = true;
+          prevLedState = gState->system.ledState;
+          gState->system.ledState = true;
+        }
+        else 
+        {
+          gState->system.showMenuInfoSplash = true;
+          infoSplashTimer = millis();
+        }
+
         //fast current limit option
         if(USE_FAST_CURRENT_SETUP > 0) 
         {
@@ -206,6 +222,22 @@ void taskDefaultScreenLoop(void *pvParameters){
       
       xTaskNotifyGive(gState->system.taskIntercommHandle);
       ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(20));
+
+      //Brightness test mode
+      if(USE_BRIGHTNESS_TEST_MODE > 0 && brightnessTestActive)
+      {        
+        if(brightnessTestValue != 0)
+        {
+          brightnessTestValue = brightnessTestValue - 50;            
+          gConfig->screen[0].brightness = brightnessTestValue;            
+        } 
+        else 
+        {
+          brightnessTestActive = false;
+          gState->system.ledState = prevLedState;
+          gConfig->screen[0].brightness = 800;
+        }                
+      }
 
       //adjust brightness only if there is a change to avoid flikering
       if(prevBrightness != gConfig->screen[0].brightness && firstPass){        
@@ -304,6 +336,7 @@ void defaultScreenFastDataUpdate(){
       ScreenArr[i].startUpmode      = gConfig->features.startUpmode;
       ScreenArr[i].pwr_source       = gState->baseMCUExtra.pwr_source; 
       ScreenArr[i].usbHostState     = gState->features.usbHostState;
+      ScreenArr[i].internalErrFlags = gState->system.internalErrFlags;
 
       if( memcmp(&prevDevInfo[i],&(ScreenArr[i].tProp),sizeof(prevDevInfo[i])) != 0 ){
         ESP_LOGI(TAG, "CH %u: #d %u, D1: %s, D2: %s, t: %u",i,ScreenArr[i].tProp.numDev,

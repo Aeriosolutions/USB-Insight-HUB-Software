@@ -96,6 +96,12 @@ void Screen::screenSetBackLight(int pwm){
   analogWrite(DLIT_3, pwm);  
 }
 
+void Screen::screenSetBackLight(int pwm, uint8_t ch){
+  if(ch == 1) analogWrite(DLIT_1, pwm);
+  else if (ch == 2) analogWrite(DLIT_2, pwm);
+  else if (ch == 3) analogWrite(DLIT_3, pwm);      
+}
+
 uint16_t Screen::RGB332_to_RGB565(uint8_t rgb332) {
     uint8_t r = (rgb332 >> 5) & 0x07;  // Extract 3-bit Red
     uint8_t g = (rgb332 >> 2) & 0x07;  // Extract 3-bit Green

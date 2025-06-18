@@ -26,11 +26,16 @@
 
 #define APP_CORE 1
 
+#define COMPATIBLE_BMCU_VER 4
+
+
 #define DISPLAY_REFRESH_PERIOD    63 //note that for each screen the effective rate is 189ms
 #define SLOW_DATA_DOWNSAMPLES_0_5  8 //504ms //multiples of DISPLAY_REFRESH_PERIOD 
 #define SLOW_DATA_DOWNSAMPLES_1_0 16 //1008ms //multiples of DISPLAY_REFRESH_PERIOD 
 
 #define USE_FAST_CURRENT_SETUP 0 //if >0, a short press of SETUP button changes the current limit of all channels. 
+#define USE_BRIGHTNESS_TEST_MODE 1 // if>0, when pushing every CHx button, the display runs a brightness test.
+
 //------------ Start Pin definitions ------------
 
 //STEMMA
@@ -149,6 +154,17 @@ static const char* t_vx_stat[] = {"no_pullups","cc1_pu","cc2_pu","both"};
 
 static const char* t_meter_init[] = {"no_init","ok","failed","err_read","err_slow"};
 
+//internal error flags
+#define BMCU_INIT_ERR  0x01 //Base MCU I2C init error
+#define BMCU_VER_ERR  0x02 //Base MCU version mismatch
+#define BMCU_INT_PIN_ERR  0x04 //Base MCU interrupt pin error
+#define PAC_INIT_ERR  0x08 //PAC1943 I2C init error
+#define PAC_INT_PIN_ERR  0x10 //PAC1943 interrupt pin error
+#define VBUS_MONITOR_ERR  0x20 //VBUS monitor ADC voltage not detected
+
+#define VBUS_STABILIZAION_TIME  500 //WAIT TIME TO EVALUATE VBUS VOLTAGE
+#define VBUS_FAIL_THRES  4.0
+
 struct System {
   uint8_t currentView;
   TaskHandle_t taskIntercommHandle;
@@ -167,7 +183,8 @@ struct System {
   uint8_t meterInit;
   uint8_t pacRevisionID;
   String prevESPVersion;
-  uint8_t updateState;  
+  uint8_t updateState;
+  uint8_t internalErrFlags; //bitmask of error flags  
 };
 
 struct FeaturesState {

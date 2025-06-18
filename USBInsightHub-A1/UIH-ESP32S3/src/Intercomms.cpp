@@ -101,17 +101,26 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
         {
           bMCU.readVersion();
           ESP_LOGI(TAG, "Base MCU initialized OK version %u",bMCU.baseMCUVer);
+          if(bMCU.baseMCUVer != COMPATIBLE_BMCU_VER) {            
+            glState->system.internalErrFlags |= BMCU_VER_ERR;
+          }
           if(glConfig->features.hubMode==USB2_3 ||glConfig->features.hubMode==USB3)
             bMCU.setUSB3Enable(true);
           if(glConfig->features.hubMode==USB2)
             bMCU.setUSB3Enable(false);
         }
-        else 
+        else {
           ESP_LOGE(TAG, "Base MCU initialization FAILED!");
+          glState->system.internalErrFlags |= BMCU_INIT_ERR;
+        }
+          
         
         delay(30); //required time after powerup to write to meter
         if(bMeter.begin(&I2CB2B)) {
-          ESP_LOGI(TAG, "Power Meter initialized OK");          
+          ESP_LOGI(TAG, "Power Meter initialized OK. Interrupt pin: %s",bMeter.getIntTestResult() ? "OK": "FAIL");
+          if(!bMeter.getIntTestResult()){            
+            glState->system.internalErrFlags |= PAC_INT_PIN_ERR;
+          }
           glState->system.meterInit = METER_INIT_OK;
           glState->system.pacRevisionID = bMeter.getRevisionID();
         }
@@ -119,6 +128,7 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
         {
           ESP_LOGE(TAG, "Power Meter initialization FAILED!");
           glState->system.meterInit = METER_INIT_FAILED;
+          glState->system.internalErrFlags |= PAC_INIT_ERR;
         } 
         //clear any interrupt flag
         uint8_t flags = bMeter.readInterruptFlags();
@@ -132,7 +142,7 @@ void iniIntercomms(GlobalState *globalState, GlobalConfig *globalConfig){
     else {
         ESP_LOGE(TAG, "I2C Hardware is bussy, could not initialize I2C peripherals");        
     }
-
+    ESP_LOGI(TAG, "EF: %s", String(glState->system.internalErrFlags,HEX));
 }
 
 
@@ -257,7 +267,7 @@ void taskIntercomms(void *pvParameters){
   TickType_t xLastWakeTime = xTaskGetTickCount();
   ESP_LOGI(TAG,"Intercomms started on Core %u",xPortGetCoreID());
   unsigned long timer=0;
-  bool forceMCUwrite = false;
+  bool forceMCUwrite = false; 
 
   for(;;){
 
@@ -320,7 +330,7 @@ void taskIntercomms(void *pvParameters){
     }
     
     //read bMCU
-    interMcuReadAll();
+    interMcuReadAll();  
 
     //update globalState with bMCU readings only if is not first boot
     if(!bMCU.firstboot){
@@ -388,6 +398,15 @@ void taskIntercomms(void *pvParameters){
 
     //Read 5V rail voltage
     glState->features.vbus = read5Vrail();
+
+    if(timer > VBUS_STABILIZAION_TIME && glState->features.vbus < VBUS_FAIL_THRES )
+    {
+      glState->system.internalErrFlags |= VBUS_MONITOR_ERR;
+      ESP_LOGI(TAG, "VBUS is below %f",VBUS_FAIL_THRES);
+    }
+    else {
+      glState->system.internalErrFlags &= ~VBUS_MONITOR_ERR;
+    }
     
     if(glState->system.taskDefaultScreenLoopHandle != NULL)
       xTaskNotifyGive(glState->system.taskDefaultScreenLoopHandle);
