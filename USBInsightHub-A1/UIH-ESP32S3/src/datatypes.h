@@ -34,7 +34,7 @@
 #define SLOW_DATA_DOWNSAMPLES_1_0 16 //1008ms //multiples of DISPLAY_REFRESH_PERIOD 
 
 #define USE_FAST_CURRENT_SETUP 0 //if >0, a short press of SETUP button changes the current limit of all channels. 
-#define USE_BRIGHTNESS_TEST_MODE 1 // if>0, when pushing every CHx button, the display runs a brightness test.
+#define USE_BRIGHTNESS_TEST_MODE 0 // if>0, when pushing every CHx button, the display runs a brightness test.
 
 //------------ Start Pin definitions ------------
 
