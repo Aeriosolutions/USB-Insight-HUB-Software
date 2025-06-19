@@ -1,4 +1,4 @@
-﻿namespace USBInfoHub.DeviceFinder
+﻿namespace EnumerationExtractionAgent.WMICLasses
 {
     using System;
 

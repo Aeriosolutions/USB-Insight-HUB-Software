@@ -1,13 +1,26 @@
-﻿using System;
+﻿/**
+ *   USB Insight Hub Enumeration Extraction Agent
+ *
+ *   Works in tandem with USB Insight Hub hardware
+ *   
+ *   https://github.com/Aeriosolutions/USB-Insight-HUB-Software
+ *
+ *   Copyright (C) 2024 - 2025 Aeriosolutions
+ *   Copyright (C) 2024 - 2025 JoDaSa
+
+ * MIT License. 
+ **/
+
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Management;
-using System.ComponentModel.Design.Serialization;
 using System.Linq;
-//using ContainerIdFetcher;
+using static UEnumerationExtractionAgent.UsbDeviceNode;
 
-namespace USBInfoHub.DeviceFinder
+
+namespace UEnumerationExtractionAgent
 {
     public class UsbDeviceNode
     {
@@ -20,17 +33,24 @@ namespace USBInfoHub.DeviceFinder
         public string ContainerID { get; set; }
         public string CompanionHub { get; set; }
         public string LastLocableInstanceId { get; set; }
+        public int Level { get; set; } // This is the level from the root
 
         public UsbDeviceNode Parent { get; set; }
         public List<UsbDeviceNode> Children { get; set; } = new List<UsbDeviceNode>();
 
+       
+        public class ExternalDriveInfo
+        {
+            public string Letter;
+            public string DeviceID;
+        }
 
         public void PrintTree(string indent = "", bool isLast = true)
         {
             Console.Write(indent);
             Console.Write(isLast ? "└─" : "├─");
             //Console.WriteLine(Description + $" [{InstanceId}]");
-            Console.WriteLine($"{Description} [{InstanceId}][{PortPath}][{Port}]");
+            Console.WriteLine($"{Description} [{InstanceId}][{Level}][{PortPath}][{Port}]");
 
             for (int i = 0; i < Children.Count; i++)
             {
@@ -87,33 +107,32 @@ namespace USBInfoHub.DeviceFinder
     {
 
 
-        public static List<UsbDeviceNode> ExtractTopLevelMatchingSubtrees(List<UsbDeviceNode> roots, Func<UsbDeviceNode, bool> match)
+        public static List<UsbDeviceNode> ExtractTopLevelMatchingSubtrees(List<UsbDeviceNode> roots, Func<UsbDeviceNode, bool> match, bool descend=false)
         {
             var matchedSubtrees = new List<UsbDeviceNode> ();
 
             foreach (var root in roots)
             {
-                CollectMatches(root, match, matchedSubtrees);
+                CollectMatches(root, match, matchedSubtrees,descend);
             }
 
             return matchedSubtrees;
         }
 
-
         // Recursive traversal with match collection
-        private static void CollectMatches(UsbDeviceNode current, Func<UsbDeviceNode, bool> match, List<UsbDeviceNode> collector)
+        private static void CollectMatches(UsbDeviceNode current, Func<UsbDeviceNode, bool> match, List<UsbDeviceNode> collector, bool descend = false)
         {
             if (current == null) return;
 
             if (match(current))
             {
                 collector.Add(CloneSubtree(current));
-                return; // Stop descending
+                if(!descend) return; // Stop descending
             }
 
             foreach (var child in current.Children)
             {
-                CollectMatches(child, match, collector);
+                CollectMatches(child, match, collector,descend);
             }
         }
 
@@ -132,14 +151,13 @@ namespace USBInfoHub.DeviceFinder
                 Port = node.Port,
                 ContainerID = node.ContainerID,
                 CompanionHub = node.CompanionHub,
-                LastLocableInstanceId = node.LastLocableInstanceId
+                LastLocableInstanceId = node.LastLocableInstanceId,
+                Level = node.Level
 
             };
         }
 
-
     }
-
 
     public class UsbDeviceTreeBuilder
     {
@@ -212,10 +230,6 @@ namespace USBInfoHub.DeviceFinder
             return result == CR_SUCCESS ? parentId.ToString() : null;
         }
 
-        //[DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
-        //private static extern int CM_Get_Device_ID(uint devInst, StringBuilder buffer, int bufferLen, int flags);
-
-        //-------------------------
         public List<UsbDeviceNode> BuildTree()
         {
             var nodes = new Dictionary<string, UsbDeviceNode>();
@@ -240,28 +254,10 @@ namespace USBInfoHub.DeviceFinder
                 string lastLocableInstanceId = "";
                 if (!string.IsNullOrEmpty(portPath))
                 {
-                    port = portPath.Substring(portPath.Length - 1);
+                    var portparts = portPath.Split('-');
+                    port = portparts[portparts.Length-1];
                     lastLocableInstanceId = instanceId;
-
-                    /*try
-                    {
-                        string path = CompanionHubFetcher.GetDevicePathFromInstanceId(instanceId);
-                        if(path != null)
-                        {
-                            //string companionHubLink = CompanionHubFetcher.GetCompanionHubSymbolicLinkName(path.Replace(@"\\\\", @"\\"), uint.Parse(port));
-                            string companionHubLink = CompanionHubFetcher.GetCompanionHubSymbolicLinkName(path.Replace(@"\\\\", @"\\"), 2);
-                            //companionHub = companionHubLink;
-                            companionHub = companionHubLink;
-                        } 
-                            
-
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("Error: " + ex.Message);
-                    }*/
                 }
-
 
                 var node = new UsbDeviceNode
                 {
@@ -308,10 +304,17 @@ namespace USBInfoHub.DeviceFinder
 
             var test = TreeTrimer.ExtractTopLevelMatchingSubtrees(roots, node => node.Description.ToLower().Contains("usb"));
             return test;
-
-
         }
 
+        public static void AssignLevelsRecursive(UsbDeviceNode node, int currentLevel = 0)
+        {
+            node.Level = currentLevel;
+
+            foreach (var child in node.Children)
+            {
+                AssignLevelsRecursive(child, currentLevel + 1);
+            }
+        }
 
         public string GetHubAndPortPath(string pnpDeviceId)
         {
@@ -338,22 +341,6 @@ namespace USBInfoHub.DeviceFinder
                 current = current.Parent;
             }
             return string.Join(" -> ", path);
-        }
-
-        private static int GetDevInst(string instanceId)
-        {
-            // Stub method, can be extended to convert instanceId to devInst if needed
-            return 0;
-        }
-
-        private static string GetDeviceInstanceId(int devInst)
-        {
-            StringBuilder sb = new StringBuilder(260);
-            if (CM_Get_Device_ID((uint)devInst, sb, sb.Capacity, 0) == 0)
-            {
-                return sb.ToString();
-            }
-            return null;
         }
 
         private static string ExtractPortHubInfo(string instanceId)
@@ -406,45 +393,57 @@ namespace USBInfoHub.DeviceFinder
 
             return "";
         }
-
-        public string GetDriveLetterByPNPDeviceId(string pnpDeviceId)
+       
+        public List<ExternalDriveInfo> GetDriveLetterByPNPDeviceId()
         {
-            try
+            var usbSearcher = new ManagementObjectSearcher("SELECT * FROM Win32_LogicalDisk WHERE DriveType = 2");
+            var results = new List<ExternalDriveInfo>(); 
+
+            foreach (ManagementObject logicalDisk in usbSearcher.Get())
             {
-                // 1. Find all USB drives
-                var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_DiskDrive WHERE InterfaceType='USB'");
-                foreach (ManagementObject drive in searcher.Get())
+                string driveLetter = logicalDisk["Name"]?.ToString();
+
+                if (string.IsNullOrEmpty(driveLetter))
+                    continue;
+
+                //Console.WriteLine("Removable Drive Letter: " + driveLetter);
+
+                try
                 {
-                    string deviceId = drive["DeviceID"]?.ToString(); // e.g., \\.\PHYSICALDRIVE1
-                    string pnpId = drive["PNPDeviceID"]?.ToString(); // e.g., USBSTOR\...
+                    // Step 1: Get Partition from LogicalDisk
+                    var partitionQuery = new ManagementObjectSearcher(
+                        "ASSOCIATORS OF {Win32_LogicalDisk.DeviceID='" + driveLetter +
+                        "'} WHERE AssocClass = Win32_LogicalDiskToPartition"
+                    );
 
-                    if (!string.IsNullOrEmpty(pnpId) && pnpId.Equals(pnpDeviceId, StringComparison.OrdinalIgnoreCase))
+                    foreach (ManagementObject partition in partitionQuery.Get())
                     {
-                        // 2. Find the partitions on the disk
-                        var partitionSearcher = new ManagementObjectSearcher(
-                            $"ASSOCIATORS OF {{Win32_DiskDrive.DeviceID='{deviceId}'}} WHERE AssocClass = Win32_DiskDriveToDiskPartition");
+                        string partitionID = partition["DeviceID"]?.ToString();
 
-                        foreach (ManagementObject partition in partitionSearcher.Get())
+                        // Step 2: Get DiskDrive from Partition
+                        var driveQuery = new ManagementObjectSearcher(
+                            "ASSOCIATORS OF {Win32_DiskPartition.DeviceID='" + partitionID +
+                            "'} WHERE AssocClass = Win32_DiskDriveToDiskPartition"
+                        );
+
+                        foreach (ManagementObject diskDrive in driveQuery.Get())
                         {
-                            // 3. Find logical disks (drive letters)
-                            var logicalSearcher = new ManagementObjectSearcher(
-                                $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partition["DeviceID"]}'}} WHERE AssocClass = Win32_LogicalDiskToPartition");
-
-                            foreach (ManagementObject logical in logicalSearcher.Get())
-                            {
-                                return logical["Name"]?.ToString(); // e.g., E:
-                            }
+                            string PNPDeviceID = diskDrive["PNPDeviceID"]?.ToString();                            
+                            //Console.WriteLine($"[{driveLetter}][{PNPDeviceID}]");
+                            results.Add(new ExternalDriveInfo { Letter = driveLetter, DeviceID= PNPDeviceID});
                         }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error finding drive letter: " + ex.Message);
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error tracing disk: " + ex.Message);
+                }
+                
             }
 
-            return null;
+            return results;
         }
+
 
         private static string ParseUsbPortPath(string locationPath)
         {
