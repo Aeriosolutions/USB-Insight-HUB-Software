@@ -21,7 +21,7 @@ Although the intention was not to modify the ESP32 Sveltekit backend library, it
 
 ## 2. Programming
 ### Direct flashing by serial
-To update the firmware and have access to the debug serial prints, use header J4 in the Interface board. A small adapter is necessary to interface with an ESP32 compatible programmer, like the ESP-Prog (used in this project). It is recommended to use [ESP Flash tool](https://dl.espressif.com/public/flash_download_tool.zip) if the full .bin file is uploaded, or in development environment use the included Upload tool in Platformio.
+To update the firmware and have access to the debug serial prints, use header J4 in the Interface board. A small adapter is necessary to interface with an ESP32 compatible programmer, like the ESP-Prog (used in this project). It is recommended to use [ESP Flash tool](https://dl.espressif.com/public/flash_download_tool.zip) if the full .bin file is uploaded (Firmware_binaries/Flasher), or in development environment use the included Upload tool in Platformio.
 
 Check the [UIH Programing Guide](https://github.com/Aeriosolutions/USB-Insight-HUB-Software/tree/main/USBInsightHub-A1/)
 
