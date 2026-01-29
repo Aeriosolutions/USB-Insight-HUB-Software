@@ -318,6 +318,8 @@ void defaultScreenFastDataUpdate(){
       if(gState->features.clearScreenText) ScreenArr[i].tProp.numDev = 0;
       ScreenArr[i].tProp.Dev1_Name  = gState->usbInfo[i].Dev1_Name;
       ScreenArr[i].tProp.Dev2_Name  = gState->usbInfo[i].Dev2_Name;
+      ScreenArr[i].tProp.imgBuffer  = gState->usbInfo[i].imgBuffer;
+      ScreenArr[i].tProp.imgBPP     = gState->usbInfo[i].imgBPP;
       ScreenArr[i].tProp.usbType    = gState->usbInfo[i].usbType;
       if(gState->features.clearScreenText) ScreenArr[i].tProp.usbType = 0;      
       ScreenArr[i].pconnected       = gState->features.pcConnected;
