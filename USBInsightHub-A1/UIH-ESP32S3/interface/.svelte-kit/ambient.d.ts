@@ -31,6 +31,7 @@ declare module '$env/static/private' {
 	export const APPDATA: string;
 	export const APPLICATIONINSIGHTS_CONFIGURATION_CONTENT: string;
 	export const APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL: string;
+	export const APPLICATION_INSIGHTS_NO_STATSBEAT: string;
 	export const CHOCOLATEYINSTALL: string;
 	export const CHOCOLATEYLASTPATHUPDATE: string;
 	export const CHROME_CRASHPAD_PIPE_NAME: string;
@@ -43,10 +44,8 @@ declare module '$env/static/private' {
 	export const DOTNET_TIEREDPGO: string;
 	export const DRIVERDATA: string;
 	export const EDITOR: string;
-	export const EFC_13496_1592913036: string;
+	export const EFC_19876_1592913036: string;
 	export const ELECTRON_RUN_AS_NODE: string;
-	export const FPS_BROWSER_APP_PROFILE_STRING: string;
-	export const FPS_BROWSER_USER_PROFILE_STRING: string;
 	export const GIT_ASKPASS: string;
 	export const HOME: string;
 	export const HOMEDRIVE: string;
@@ -88,7 +87,6 @@ declare module '$env/static/private' {
 	export const NUMBER_OF_PROCESSORS: string;
 	export const ONEDRIVE: string;
 	export const ONEDRIVECONSUMER: string;
-	export const ORIGINAL_XDG_CURRENT_DESKTOP: string;
 	export const OS: string;
 	export const PATH: string;
 	export const PATHEXT: string;
@@ -131,8 +129,10 @@ declare module '$env/static/private' {
 	export const VSCODE_IPC_HOOK: string;
 	export const VSCODE_L10N_BUNDLE_LOCATION: string;
 	export const VSCODE_NLS_CONFIG: string;
+	export const VSCODE_NONCE: string;
 	export const VSCODE_PID: string;
 	export const WINDIR: string;
+	export const __COMPAT_LAYER: string;
 }
 
 /**
@@ -167,6 +167,7 @@ declare module '$env/dynamic/private' {
 		APPDATA: string;
 		APPLICATIONINSIGHTS_CONFIGURATION_CONTENT: string;
 		APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL: string;
+		APPLICATION_INSIGHTS_NO_STATSBEAT: string;
 		CHOCOLATEYINSTALL: string;
 		CHOCOLATEYLASTPATHUPDATE: string;
 		CHROME_CRASHPAD_PIPE_NAME: string;
@@ -179,10 +180,8 @@ declare module '$env/dynamic/private' {
 		DOTNET_TIEREDPGO: string;
 		DRIVERDATA: string;
 		EDITOR: string;
-		EFC_13496_1592913036: string;
+		EFC_19876_1592913036: string;
 		ELECTRON_RUN_AS_NODE: string;
-		FPS_BROWSER_APP_PROFILE_STRING: string;
-		FPS_BROWSER_USER_PROFILE_STRING: string;
 		GIT_ASKPASS: string;
 		HOME: string;
 		HOMEDRIVE: string;
@@ -224,7 +223,6 @@ declare module '$env/dynamic/private' {
 		NUMBER_OF_PROCESSORS: string;
 		ONEDRIVE: string;
 		ONEDRIVECONSUMER: string;
-		ORIGINAL_XDG_CURRENT_DESKTOP: string;
 		OS: string;
 		PATH: string;
 		PATHEXT: string;
@@ -267,8 +265,10 @@ declare module '$env/dynamic/private' {
 		VSCODE_IPC_HOOK: string;
 		VSCODE_L10N_BUNDLE_LOCATION: string;
 		VSCODE_NLS_CONFIG: string;
+		VSCODE_NONCE: string;
 		VSCODE_PID: string;
 		WINDIR: string;
+		__COMPAT_LAYER: string;
 		[key: `PUBLIC_${string}`]: undefined;
 		[key: `${string}`]: string | undefined;
 	}

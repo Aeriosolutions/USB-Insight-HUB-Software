@@ -163,7 +163,7 @@
 
 <div class="space-y-4 p-4" style="font-size: 20px;">
 	<!-- Startup Mode -->
-	<div class="bg-gray-200 p-4 rounded-lg shadow-md">
+	<div class="bg-base-200 p-4 rounded-lg shadow-md">
 	  <h2 class="font-bold inline-block">Startup Mode</h2>
 	  <span class="text-sm cursor-help inline-block" title={Help.SETTINGS.STARTUP_MODE}>ℹ️</span>
 	  <div class="flex gap-4 mt-2 ml-4">
@@ -180,7 +180,7 @@
 	</div>
   
 	<!-- Meter -->
-	<div class="bg-gray-200 p-4 rounded-lg shadow-md">
+	<div class="bg-base-200 p-4 rounded-lg shadow-md">
 	  <h2 class="font-bold">Meter</h2>
 	  <div class="mt-2 ml-6">
 		<label class="block font-semibold inline-block">Refresh rate:</label>
@@ -215,7 +215,7 @@
 	</div>
   
 	<!-- Screen -->
-	<div class="bg-gray-200 p-4 rounded-lg shadow-md">
+	<div class="bg-base-200 p-4 rounded-lg shadow-md">
 	  <h2 class="font-bold">Screen</h2>
 	  <div class="mt-2 ml-6">
 		<label class="block font-semibold">Rotation:</label>
@@ -243,7 +243,7 @@
 	</div>
   
 	<!-- Hub Mode -->
-	<div class="bg-gray-200 p-4 rounded-lg shadow-md">
+	<div class="bg-base-200 p-4 rounded-lg shadow-md">
 	  <h2 class="font-bold inline-block">Hub Mode</h2>
 	  <span class="text-sm cursor-help inline-block" title={Help.SETTINGS.HUB_MODE}>ℹ️</span>
 	  <div class="flex gap-4 mt-2 ml-6">
