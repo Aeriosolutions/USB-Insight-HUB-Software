@@ -237,6 +237,8 @@ void Screen::screenDefaultRender(chScreenData Screen){
   img.loadFont(modenine50); 
 
   //Screen.tProp.numDev=10;
+  bool colorText = true;
+  Screen.autoTxtClear==true ? colorText = Screen.pconnected: colorText = true; 
 
   if(Screen.tProp.numDev==0){
     img.setTextColor(TFT_LIGHTGREY);
@@ -244,23 +246,23 @@ void Screen::screenDefaultRender(chScreenData Screen){
     img.drawCentreString(device, 120, 65, 4); //**
   } 
   else if(Screen.tProp.numDev == 1){
-    Screen.pconnected == true ? img.setTextColor(TFT_YELLOW) : img.setTextColor(TFT_LIGHTGREY);
+    colorText == true ? img.setTextColor(TFT_YELLOW) : img.setTextColor(TFT_LIGHTGREY);
     //img.setTextColor(TFT_YELLOW);
     device = Screen.tProp.Dev1_Name;
     img.drawCentreString(device, 120, 65, 4); //**
   } 
   else if(Screen.tProp.numDev == 2){
-    Screen.pconnected == true ? img.setTextColor(TFT_YELLOW) : img.setTextColor(TFT_LIGHTGREY);
+    colorText == true ? img.setTextColor(TFT_YELLOW) : img.setTextColor(TFT_LIGHTGREY);
     //img.setTextColor(TFT_YELLOW);   
     img.drawCentreString(Screen.tProp.Dev1_Name,120,45,4);
-    Screen.pconnected == true ? img.setTextColor(TFT_WHITE) : img.setTextColor(TFT_LIGHTGREY);
+    colorText == true ? img.setTextColor(TFT_WHITE) : img.setTextColor(TFT_LIGHTGREY);
     //img.setTextColor(TFT_ORANGE);
     img.drawCentreString(Screen.tProp.Dev2_Name,120,85,4); //**
   }
   img.unloadFont();
 
 
-  if(Screen.tProp.numDev == 10) flexDevicePrint(Screen.tProp.Dev1_Name,Screen.pconnected);
+  if(Screen.tProp.numDev == 10) flexDevicePrint(Screen.tProp.Dev1_Name,colorText);
 
 
   //ESP_LOGI("3","%u",millis()-timers); //----------------------------------------

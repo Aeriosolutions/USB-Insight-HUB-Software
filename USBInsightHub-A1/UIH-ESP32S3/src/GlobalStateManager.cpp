@@ -119,6 +119,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     globalConfig->features.startUpmode != STARTUP_SEC ? globalState->features.startUpActive = false : globalState->features.startUpActive = true;
     globalState->features.pcConnected   = false;
     globalState->features.clearScreenText = false;
+    globalState->features.enableClearScreenText = true;
     globalState->features.vbus   = 5000; //mV
     globalConfig->features.wifi_enabled == ENABLE ? globalState->features.wifiState = WIFI_OFFLINE : globalState->features.wifiState = WIFI_OFF;
     globalState->features.wifiState     = WIFI_OFF;

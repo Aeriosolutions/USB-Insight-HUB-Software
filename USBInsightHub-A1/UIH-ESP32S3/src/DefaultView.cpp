@@ -339,6 +339,7 @@ void defaultScreenFastDataUpdate(){
       ScreenArr[i].pwr_source       = gState->baseMCUExtra.pwr_source; 
       ScreenArr[i].usbHostState     = gState->features.usbHostState;
       ScreenArr[i].internalErrFlags = gState->system.internalErrFlags;
+      ScreenArr[i].autoTxtClear     = gState->features.enableClearScreenText;
 
       if( memcmp(&prevDevInfo[i],&(ScreenArr[i].tProp),sizeof(prevDevInfo[i])) != 0 ){
         ESP_LOGI(TAG, "CH %u: #d %u, D1: %s, D2: %s, t: %u",i,ScreenArr[i].tProp.numDev,

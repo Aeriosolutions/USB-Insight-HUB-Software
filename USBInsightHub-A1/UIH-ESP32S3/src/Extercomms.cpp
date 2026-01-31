@@ -95,9 +95,14 @@ void taskExterCheckActivity(void *pvParameters){
           gloState->features.pcConnected = false;
         }
 
-        if(now-lastPCcom > PC_CONNECTION_TIMEOUT+DISPLAY_CLEAR_AFTER_TIMEOUT){
+        if(now-lastPCcom > PC_CONNECTION_TIMEOUT+DISPLAY_CLEAR_AFTER_TIMEOUT 
+           && gloState->features.enableClearScreenText){
           //clear display texts.
-          gloState->features.clearScreenText = true;
+          gloState->features.clearScreenText = true;    
+          for(int i=0; i<3; i++){
+            gloState->usbInfo[i].numDev = 0; //avoids reprint of previous texts
+            gloState->usbInfo[i].usbType = 0; //avoids reprint of previous texts
+          }
         }
 
         if(dataReceived){          
@@ -268,6 +273,11 @@ void processJsonRpcMessage(const char* jsonString) {
       inx != -1 ? gloState->system.ledState = inx : result["ledState"] = "fail";        
     }
 
+    if(params["autoTxtClear"]){
+      int inx = getEnumIndex(params["autoTxtClear"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
+      inx != -1 ? gloState->features.enableClearScreenText = inx : result["autoTxtClear"] = "fail";        
+    }
+
     for(int i = 0; i<3; i++){
 
       if(params["CH"+String(i+1)]["powerEn"]){
@@ -383,6 +393,8 @@ void processJsonRpcMessage(const char* jsonString) {
         result["cpu_ver"]       = APP_VERSION;
       if(pName == "mac"           || all || state)
         result["mac"]           = gloState->system.wifiMAC; 
+      if(pName == "autoTxtClear"    || all || state)
+        result["autoTxtClear"]      = gloState->features.enableClearScreenText;        
       
       //production specific getters
     

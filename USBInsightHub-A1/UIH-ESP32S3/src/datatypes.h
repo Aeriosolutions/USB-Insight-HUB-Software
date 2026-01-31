@@ -191,6 +191,7 @@ struct FeaturesState {
   bool startUpActive;
   bool pcConnected;
   bool clearScreenText;
+  bool enableClearScreenText; 
   float vbus;
   String ssid;
   uint8_t wifiState;

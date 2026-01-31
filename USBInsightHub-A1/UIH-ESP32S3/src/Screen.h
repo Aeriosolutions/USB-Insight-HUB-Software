@@ -92,6 +92,7 @@ struct chScreenData {
   bool pwr_source;
   uint8_t usbHostState;
   uint8_t internalErrFlags;
+  bool autoTxtClear;
 };
 
 
