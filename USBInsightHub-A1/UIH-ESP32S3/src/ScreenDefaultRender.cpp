@@ -54,6 +54,7 @@ void Screen::screenDefaultRender(chScreenData Screen){
     //img.fillRect(60, 0, 45, 20, TFT_RED) ;
     img.drawString("OFF", 2, 2, 4);
     img.fillRoundRect(0, 33, 240, 104, 10, color);
+    color_border = color;
   }
   else{
     //Screen.fault == true ? color=TFT_RED:color=TFT_GREEN;
@@ -227,7 +228,7 @@ void Screen::screenDefaultRender(chScreenData Screen){
   if (Screen.tProp.numDev == 11) {
     imagePrint(Screen.tProp.imgBuffer, Screen.tProp.imgBPP, color_border);
   } else {
-    img.fillSmoothRoundRect(0, 33, 240, 104, 18, color_border, TFT_BLACK);
+    img.fillSmoothRoundRect(0, 33, 240, 104, 10, color_border, TFT_BLACK);
     img.fillSmoothRoundRect(7, 40, 226, 90, 10, DARKGREY, color_border);
   }
 
