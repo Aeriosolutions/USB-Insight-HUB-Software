@@ -82,6 +82,10 @@
 #define H_DEFxNA     46 //restore default no action
 #define H_DEFRES     47 //restore default action
 
+#define H_USBRBT     48 //USB reboot help
+#define H_USBRBTNO   49 //USB reboot disabled
+#define H_USBRBTYES  50 //USB reboot enabled
+
 struct Menu {
     int menuType;
     String name;               //Menu name

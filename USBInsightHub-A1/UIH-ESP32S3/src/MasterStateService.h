@@ -73,6 +73,7 @@ public:
     uint8_t features_conf_hubMode;
     uint8_t features_conf_filterType;
     uint8_t features_conf_refreshRate;
+    uint8_t features_conf_reboot_enabled;
     uint8_t features_usbHostState;
     bool features_startUpActive;
     bool features_pcConnected;
@@ -99,6 +100,7 @@ public:
         root["features_conf_hubMode"]       = settings.features_conf_hubMode;
         root["features_conf_filterType"]    = settings.features_conf_filterType;
         root["features_conf_refreshRate"]   = settings.features_conf_refreshRate;
+        root["features_conf_reboot_enabled"] = settings.features_conf_reboot_enabled;
         root["features_startUpActive"]      = settings.features_startUpActive;
         root["features_pcConnected"]        = settings.features_pcConnected;
         root["features_vbusVoltage"]        = settings.features_vbusVoltage;
@@ -146,6 +148,7 @@ public:
         settings.features_conf_hubMode      = root["features_conf_hubMode"].as<uint8_t>();
         settings.features_conf_filterType   = root["features_conf_filterType"].as<uint8_t>();
         settings.features_conf_refreshRate  = root["features_conf_refreshRate"].as<uint8_t>();
+        settings.features_conf_reboot_enabled = root["features_conf_reboot_enabled"].as<uint8_t>();
         settings.features_startUpActive     = root["features_startUpActive"] | false;
         settings.features_pcConnected       = root["features_pcConnected"] | false;
         settings.features_vbusVoltage       = root["features_vbusVoltage"].as<float>();
