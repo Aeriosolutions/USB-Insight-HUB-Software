@@ -190,14 +190,14 @@ void processJsonRpcMessage(const char* jsonString) {
         result["rotation"] = "fail";
     }   
     if(params["brightness"]){
-      uint8_t inx = params["brightness"].as<unsigned int>();
-      if(inx >= 10 && inx <= 100) {
+      uint16_t inx = params["brightness"].as<unsigned int>();
+      if(inx >= 50 && inx <= 1000) {
         gloConfig->screen[0].brightness = inx;
         gloConfig->screen[1].brightness = inx;
         gloConfig->screen[2].brightness = inx;
       }
       else
-        result["brightness"] = "fail";
+        result["brightness"] = "out of range (50-1000)";
     } 
     
     if(params["ledState"]){
