@@ -339,6 +339,7 @@ void processJsonRpcMessage(const char* jsonString) {
       }
     }
 
+
     if(params["ledState"]){
       int inx = getEnumIndex(params["ledState"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
       inx != -1 ? gloState->system.ledState = inx : result["ledState"] = "fail";        

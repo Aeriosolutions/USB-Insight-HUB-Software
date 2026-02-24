@@ -400,6 +400,7 @@ class Hub:
         self._connect()
         self._verify_responsive()
 
+
     def close(self):
         if self.ser and self.ser.is_open:
             self.ser.close()
