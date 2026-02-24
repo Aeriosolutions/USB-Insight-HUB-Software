@@ -189,15 +189,16 @@ void processJsonRpcMessage(const char* jsonString) {
       else
         result["rotation"] = "fail";
     }   
-    if(params["brightness"]){
+    if(params.containsKey("brightness")){
       uint16_t inx = params["brightness"].as<unsigned int>();
-      if(inx >= 50 && inx <= 1000) {
-        gloConfig->screen[0].brightness = inx;
-        gloConfig->screen[1].brightness = inx;
-        gloConfig->screen[2].brightness = inx;
+      if(inx <= 100) {
+        uint16_t pwm = ((uint32_t)inx * 1023 + 50) / 100;
+        gloConfig->screen[0].brightness = pwm;
+        gloConfig->screen[1].brightness = pwm;
+        gloConfig->screen[2].brightness = pwm;
       }
       else
-        result["brightness"] = "out of range (50-1000)";
+        result["brightness"] = "out of range (0-100% expected)";
     } 
     
     if(params["ledState"]){
@@ -291,8 +292,8 @@ void processJsonRpcMessage(const char* jsonString) {
         result["refreshRate"]   = t_refreshRate[gloConfig->features.refreshRate];
       if(pName == "rotation"      || all || conf)     
         result["rotation"]      = t_rotation[gloConfig->screen[0].rotation];
-      if(pName == "brightness"    || all || conf)   
-        result["brightness"]    = gloConfig->screen[0].brightness;
+      if(pName == "brightness"    || all || conf)
+        result["brightness"]    = ((uint32_t)gloConfig->screen[0].brightness * 100 + 511) / 1023;
       
       if(pName == "startUpActive" || all || state)
         result["startUpActive"] = gloState->features.startUpActive;

@@ -1,7 +1,8 @@
-"""Integration tests for the brightness uint16_t fix.
+"""Integration tests for brightness percentage API.
 
-Verifies that brightness values in the 50-1000 range roundtrip correctly
-(previously truncated via uint8_t) and that out-of-range values are rejected.
+The serial API accepts brightness as a percentage (0-100) and converts to
+a 10-bit PWM value (0-1023) internally.  The get handler converts back to
+percentage for the response.
 """
 
 import time
@@ -10,7 +11,7 @@ import pytest
 
 
 class TestBrightnessRoundtrip:
-    """Verify the uint16_t brightness fix: set/get across 50-1000."""
+    """Verify brightness percentage set/get roundtrip."""
 
     @pytest.fixture(autouse=True)
     def _save_restore_brightness(self, hub):
@@ -20,25 +21,25 @@ class TestBrightnessRoundtrip:
         if self._orig is not None:
             hub.set({"brightness": self._orig})
 
-    @pytest.mark.parametrize("val", [50, 100, 200, 500, 800, 1000])
-    def test_roundtrip(self, hub, val):
-        """Set brightness to val, read it back, verify it matches."""
-        hub.set({"brightness": val})
+    @pytest.mark.parametrize("pct", [1, 10, 25, 50, 75, 100])
+    def test_roundtrip(self, hub, pct):
+        """Set brightness to pct%, read it back, verify it matches."""
+        hub.set({"brightness": pct})
         time.sleep(0.1)
         data = hub.get("brightness")
         assert data is not None, "get brightness returned None"
-        assert data["brightness"] == val
+        assert data["brightness"] == pct
 
-    def test_default_800_roundtrips(self, hub):
-        """800 is the factory default — previously truncated to 32 via uint8_t."""
-        hub.set({"brightness": 800})
+    def test_zero_turns_off(self, hub):
+        """brightness=0 sets PWM to 0 (display off)."""
+        hub.set({"brightness": 0})
         time.sleep(0.1)
         data = hub.get("brightness")
-        assert data["brightness"] == 800
+        assert data["brightness"] == 0
 
 
 class TestBrightnessOutOfRange:
-    """Brightness rejects values outside 50-1000."""
+    """Brightness rejects values outside 0-100."""
 
     @pytest.fixture(autouse=True)
     def _save_restore_brightness(self, hub):
@@ -48,31 +49,21 @@ class TestBrightnessOutOfRange:
         if self._orig is not None:
             hub.set({"brightness": self._orig})
 
-    @pytest.mark.parametrize("val", [10, 49, 1001, 2000])
+    @pytest.mark.parametrize("val", [101, 200, 1000])
     def test_rejects_invalid(self, hub, val):
-        """Setting brightness outside 50-1000 returns an 'out of range' error."""
+        """Setting brightness outside 0-100 returns a 'fail' error."""
         resp = hub.send({"action": "set", "params": {"brightness": val}})
         data = resp.get("data", {}) if resp else {}
-        assert "brightness" in data
-        assert "out of range" in str(data["brightness"])
-
-    def test_zero_is_ignored(self, hub):
-        """ArduinoJson treats 0 as falsy, so brightness=0 is silently skipped."""
-        before = hub.get("brightness")
-        before_val = before.get("brightness") if before else None
-        hub.send({"action": "set", "params": {"brightness": 0}})
-        time.sleep(0.1)
-        after = hub.get("brightness")
-        assert after.get("brightness") == before_val
+        assert "out of range" in str(data.get("brightness"))
 
     def test_value_unchanged_after_invalid(self, hub):
         """Invalid brightness values do not alter the stored brightness."""
+        hub.set({"brightness": 50})
+        time.sleep(0.1)
         before = hub.get("brightness")
-        before_val = before.get("brightness") if before else None
 
-        hub.send({"action": "set", "params": {"brightness": 9999}})
+        hub.send({"action": "set", "params": {"brightness": 999}})
         time.sleep(0.1)
 
         after = hub.get("brightness")
-        after_val = after.get("brightness") if after else None
-        assert after_val == before_val
+        assert after["brightness"] == before["brightness"]
