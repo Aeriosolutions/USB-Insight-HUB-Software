@@ -273,6 +273,7 @@ void processJsonRpcMessage(const char* jsonString) {
         result["brightness"] = "out of range (5-100% expected)";
     }
 
+
     if(params.containsKey("reboot_enabled")){
       uint8_t val = params["reboot_enabled"].as<unsigned int>();
       if(val <= 1) {
@@ -383,6 +384,7 @@ void processJsonRpcMessage(const char* jsonString) {
         result["brightness"]    = brightnessPwmToPct(gloConfig->screen[0].brightness);
       if(pName == "reboot_enabled" || all || conf)
         result["reboot_enabled"] = gloConfig->features.reboot_enabled;
+
 
       if(pName == "startUpActive" || all || state)
         result["startUpActive"] = gloState->features.startUpActive;

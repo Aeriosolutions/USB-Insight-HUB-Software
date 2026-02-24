@@ -30,7 +30,11 @@ NVS_SIZE = 0x5000
 
 
 def find_hub():
-    """Find the Insight Hub's serial port by USB VID/PID or product string."""
+    """Find the Insight Hub's serial port by USB VID/PID or product string.
+
+    Excludes devices in ROM bootloader mode (same VID/PID but different
+    product string).
+    """
     for p in comports():
         if p.product == BOOTLOADER_PRODUCT:
             continue
@@ -212,7 +216,9 @@ class Hub:
     def touch_1200(self):
         """Open port at 1200 baud to trigger bootloader entry.
 
-        Requires reboot_enabled=1 to be set first.
+        Requires reboot_enabled=1 to be set first.  Only changes baud rate
+        to 1200 to trigger the _onLineCoding path.  Does NOT toggle DTR/RTS
+        to avoid triggering the separate line-state bootloader sequence.
         """
         log.info("1200-baud touch on %s", self.port)
         self.close()

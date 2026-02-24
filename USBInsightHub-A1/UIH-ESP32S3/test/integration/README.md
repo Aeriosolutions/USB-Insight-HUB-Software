@@ -112,16 +112,24 @@ describing what it verifies. Use `pytest --co -v` to see the full hierarchy.
 | **Forward limit** | 4 | CH1 fwdLimit set/get across 100-2000 range |
 | **Power control** | 2 | CH1 power off/on via serial API |
 | **Edge cases** | 2 | Invalid action handling; firstStart auto-clear flag |
+| **Uptime** | 4 | Uptime present, in state/all responses, monotonically increasing |
+| **Reboot config** | 5 | reboot_enabled in config, default disabled, set/get roundtrip, invalid rejection |
+| **Restart command** | 2 | Graceful and immediate restart verified via uptime reset |
+| **Reboot toggle** | 2 | 1200-baud touch ignored when disabled; enters bootloader when enabled |
 | **NVS persistence** | 13 | Config survives reboot; per-field persistence; defaults validation |
 | **NVS upgrade** | 1 | v1.0.0 blob → key-value migration via OTA (includes known brightness bug) |
 
-**Total: 32 tests**
+**Total: 45 tests**
 
 ## Safety
 
-All tests that modify state (power, fwdLimit, filterType) save the original
-value before testing and restore it in a fixture teardown, even if the test
-fails.
+All tests that modify state (power, fwdLimit, filterType, reboot_enabled) save
+the original value before testing and restore it in a fixture teardown, even if
+the test fails.
+
+The reboot toggle test (`test_enabled_enters_bootloader`) puts the hub into ROM
+bootloader and recovers it via `usb-device boot`. If recovery fails, power-cycle
+the hub.
 
 ## Test Structure
 
@@ -129,6 +137,7 @@ fails.
 conftest.py               — Pytest fixtures, hub connection, CLI options
 hub.py                    — Hub class and device discovery (reusable outside pytest)
 test_serial_api.py        — Serial API test cases
+test_reboot.py            — Restart, uptime, and reboot toggle tests
 test_nvs_persistence.py   — NVS config persistence across reboots
 test_nvs_upgrade.py       — NVS migration from v1.0.0 to current firmware
 requirements.txt          — Python dependencies

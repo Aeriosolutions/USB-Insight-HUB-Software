@@ -5,12 +5,13 @@ from pathlib import Path
 import pytest
 import serial
 
-from hub import Hub, HubConnectionError, find_hub
+from hub import Hub, HubConnectionError, find_bootloader, find_hub
 
 LOGS_DIR = Path(__file__).parent / "logs"
 
 
 PROJECT_DIR = Path(__file__).parent.parent.parent  # UIH-ESP32S3/
+
 
 
 def pytest_addoption(parser):
@@ -64,9 +65,40 @@ def pytest_terminal_summary(terminalreporter, config):
         terminalreporter.write_sep("-", f"serial log: {logfile}")
 
 
+def _recover_from_bootloader():
+    """If the hub is in ROM bootloader, try to recover via USB power cycle."""
+    import shutil
+    import time
+
+    bl_port = find_bootloader()
+    if not bl_port:
+        return
+
+    log = logging.getLogger("hub")
+    log.warning("Hub detected in ROM bootloader on %s — recovering", bl_port)
+
+    # Create a temporary Hub just for bootloader recovery
+    from hub import Hub
+    tmp = Hub.__new__(Hub)
+    tmp.port = bl_port
+    tmp.ser = None
+    try:
+        tmp.boot_from_bootloader()
+    except Exception as e:
+        pytest.exit(
+            f"Hub is in ROM bootloader and recovery failed: {e}\n"
+            f"Power-cycle the hub manually (unplug/replug USB).",
+            returncode=1,
+        )
+
+
 def pytest_collection_modifyitems(session, config, items):
     """Connect to the hub before any tests run. Abort early on failure."""
     port = config.getoption("--port") or find_hub()
+    if not port:
+        # No hub found — check if it's stuck in bootloader
+        _recover_from_bootloader()
+        port = find_hub()
     if not port:
         pytest.exit("No Insight Hub found. Pass --port or connect a hub.", returncode=1)
     try:
