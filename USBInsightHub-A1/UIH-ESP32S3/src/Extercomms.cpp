@@ -15,7 +15,10 @@
 
 #include "Extercomms.h"
 #include "tusb.h"
+#include "DefaultView.h"
+#include "Screen.h"
 #include <RestartService.h>
+#include <esp_crc.h>
 
 //USB Serial and Harware Serial (Debug)
 #if ARDUINO_USB_CDC_ON_BOOT
@@ -33,10 +36,12 @@ static const char* TAG = "Extercoms";
 
 GlobalState *gloState;
 GlobalConfig *gloConfig;
+static Screen *gloScreen = nullptr;
 
 bool USBSerialActivity = false;
-bool dataReceived = false; 
+bool dataReceived = false;
 
+volatile bool imageMode[3] = {false, false, false};
 
 char rawBuffer[80];
 size_t rawBufIndex = 0;
@@ -46,6 +51,65 @@ int8_t imgPortIndex = -1;
 uint8_t imgBufBpp = 0;
 size_t imgBufLen = 0;
 unsigned long long lastSerialTime = 0;
+
+// Binary transport state machine
+enum ParseState {
+  PARSE_TEXT,
+  PARSE_BIN_HEADER,
+  PARSE_BIN_PAYLOAD,
+  PARSE_BIN_CHECKSUM
+};
+
+static ParseState parseState = PARSE_TEXT;
+static uint8_t binHeader[10];   // version(1) + cmd(2) + flags(2) + length(4) = 9 bytes, + 1 spare
+static size_t binHeaderIndex = 0;
+static uint32_t binPayloadLen = 0;
+static uint32_t binPayloadReceived = 0;
+static uint16_t binCmd = 0;
+static uint16_t binFlags = 0;
+static uint32_t binRunningCRC = 0;
+static uint8_t binChecksumBuf[4];
+static size_t binChecksumIndex = 0;
+
+// Image sub-header state
+static const size_t IMAGE_SUBHEADER_SIZE = 6;  // port(1) + bpp(1) + width(2) + height(2)
+static uint8_t imgSubHeader[6];
+static size_t imgSubHeaderIndex = 0;
+static bool imgStreamActive = false;
+static uint8_t imgPort = 0;
+static uint8_t imgBpp = 0;
+static uint16_t imgWidth = 0;
+static uint16_t imgHeight = 0;
+static uint32_t imgPixelsExpected = 0;
+static uint32_t imgBytesReceived = 0;
+static bool imgFailed = false;  // set if image validation failed; suppresses dispatch
+
+// Small pixel buffer for streaming to SPI
+static uint16_t pixStreamBuf[64];
+static uint8_t pixStreamRaw[128]; // for accumulating partial pixel bytes at 16bpp
+static size_t pixStreamBufCount = 0;
+static size_t pixStreamRawCount = 0;
+
+// CRC-32 using ESP32 ROM hardware acceleration (esp_crc32_le)
+// No lookup table needed — uses the chip's built-in CRC unit.
+
+// Echo command state
+static uint8_t* echoBuffer = nullptr;
+static size_t echoBufferSize = 0;
+static size_t echoBufferIndex = 0;
+
+// Forward declarations
+static void binReset();
+static void binDispatch();
+static void binProcessPayloadByte(uint8_t byte);
+static void binImageBegin();
+static void binImagePayloadByte(uint8_t byte);
+static void binImageFlushPixels();
+static void binImageEnd(bool success);
+static void binEchoBegin();
+static void binEchoPayloadByte(uint8_t byte);
+static void binEchoEnd();
+static void binSendResponse(uint16_t cmd, const char* message, bool ok = true);
 
 //Internal functions
 void parseDataPC();
@@ -133,6 +197,10 @@ void iniExtercomms(GlobalState* globalState, GlobalConfig* globalConfig){
 
 }
 
+void iniExtercommsBinaryTransport(Screen* screen){
+  gloScreen = screen;
+}
+
 //serial loop - check if there has been serial activity to update the pc-connection status icon 
 void taskExterCheckActivity(void *pvParameters){
     TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -173,86 +241,383 @@ void taskExterCheckActivity(void *pvParameters){
 
 }
 
-static inline void serialReset() {
-  imgPortIndex = -1;
-  bufferIndex = 0;
-  imgBufBpp = 0;
-  imgBufLen = 0;
+static void binReset() {
+  parseState = PARSE_TEXT;
+  binHeaderIndex = 0;
+  binPayloadLen = 0;
+  binPayloadReceived = 0;
+  binCmd = 0;
+  binFlags = 0;
+  binRunningCRC = 0;
+  binChecksumIndex = 0;
+  imgSubHeaderIndex = 0;
+  imgStreamActive = false;
+  imgFailed = false;
+  imgBytesReceived = 0;
+  pixStreamBufCount = 0;
+  pixStreamRawCount = 0;
+  if (echoBuffer) { free(echoBuffer); echoBuffer = nullptr; }
+  echoBufferSize = 0;
+  echoBufferIndex = 0;
+}
+
+static void binSendResponse(uint16_t cmd, const char* message, bool ok) {
+  char buf[128];
+  snprintf(buf, sizeof(buf),
+    "{\"status\":\"%s\",\"data\":{\"cmd\":%u,\"message\":\"%s\"}}",
+    ok ? "ok" : "error", cmd, message);
+  usbSerial.println(buf);
+  usbSerial.flush();
+}
+
+// Called when full binary frame is received and checksum verified
+static void binDispatch() {
+  switch (binCmd) {
+    case BIN_CMD_IMAGE:
+      if (!imgFailed) {
+        binImageEnd(true);
+      }
+      // If imgFailed, error was already sent during validation
+      break;
+    case BIN_CMD_ECHO:
+      binEchoEnd();
+      break;
+    default:
+      binSendResponse(binCmd, "unknown command", false);
+      break;
+  }
+}
+
+// Process image sub-header bytes, then stream pixel data
+static void binImagePayloadByte(uint8_t byte) {
+  if (imgFailed) return;  // validation failed — consume silently
+
+  if (imgSubHeaderIndex < IMAGE_SUBHEADER_SIZE) {
+    imgSubHeader[imgSubHeaderIndex++] = byte;
+    if (imgSubHeaderIndex == IMAGE_SUBHEADER_SIZE) {
+      binImageBegin();
+    }
+    return;
+  }
+
+  if (imgFailed) return;  // binImageBegin() may have set this
+
+  // Pixel data — stream to display
+  imgBytesReceived++;
+
+  if (imgBpp == 16) {
+    // Accumulate pairs of bytes into RGB565 pixels
+    pixStreamRaw[pixStreamRawCount++] = byte;
+    if (pixStreamRawCount >= 2) {
+      // Little-endian RGB565
+      pixStreamBuf[pixStreamBufCount++] = pixStreamRaw[0] | (pixStreamRaw[1] << 8);
+      pixStreamRawCount = 0;
+      if (pixStreamBufCount >= 64) {
+        binImageFlushPixels();
+      }
+    }
+  } else if (imgBpp == 8) {
+    // RGB332 — convert via palette and buffer
+    if (gloScreen) {
+      pixStreamBuf[pixStreamBufCount++] = gloScreen->palette[byte];
+    }
+    if (pixStreamBufCount >= 64) {
+      binImageFlushPixels();
+    }
+  }
+}
+
+static void binImageBegin() {
+  imgPort   = imgSubHeader[0];
+  imgBpp    = imgSubHeader[1];
+  imgWidth  = imgSubHeader[2] | (imgSubHeader[3] << 8);
+  imgHeight = imgSubHeader[4] | (imgSubHeader[5] << 8);
+
+  uint32_t bytesPerPixel = (imgBpp + 7) / 8;
+  imgPixelsExpected = (uint32_t)imgWidth * imgHeight;
+  uint32_t expectedDataBytes = imgPixelsExpected * bytesPerPixel;
+  uint32_t expectedPayload = IMAGE_SUBHEADER_SIZE + expectedDataBytes;
+
+  // Validate — on failure, set imgFailed so remaining bytes are consumed silently
+  if (imgPort < 1 || imgPort > 3) {
+    ESP_LOGW(TAG, "Image: invalid port %u", imgPort);
+    binSendResponse(BIN_CMD_IMAGE, "invalid port", false);
+    imgFailed = true;
+    return;
+  }
+  if (imgBpp != 8 && imgBpp != 16) {
+    ESP_LOGW(TAG, "Image: unsupported bpp %u", imgBpp);
+    binSendResponse(BIN_CMD_IMAGE, "unsupported bpp", false);
+    imgFailed = true;
+    return;
+  }
+  if (imgWidth == 0 || imgHeight == 0 || imgWidth > 240 || imgHeight > 240) {
+    ESP_LOGW(TAG, "Image: invalid dimensions %ux%u", imgWidth, imgHeight);
+    binSendResponse(BIN_CMD_IMAGE, "invalid dimensions", false);
+    imgFailed = true;
+    return;
+  }
+  if (expectedPayload != binPayloadLen) {
+    ESP_LOGW(TAG, "Image: payload length mismatch (expected %u, got %u)", expectedPayload, binPayloadLen);
+    binSendResponse(BIN_CMD_IMAGE, "payload length mismatch", false);
+    imgFailed = true;
+    return;
+  }
+
+  if (!gloScreen) {
+    ESP_LOGE(TAG, "Image: screen not initialized");
+    binSendResponse(BIN_CMD_IMAGE, "screen not initialized", false);
+    imgFailed = true;
+    return;
+  }
+
+  // Acquire screen semaphore — block up to 200ms
+  if (xSemaphoreTake(screen_Semaphore, pdMS_TO_TICKS(200)) != pdTRUE) {
+    ESP_LOGW(TAG, "Image: screen busy");
+    binSendResponse(BIN_CMD_IMAGE, "screen busy", false);
+    imgFailed = true;
+    return;
+  }
+
+  // Mark this channel as image mode so render loop skips it
+  imageMode[imgPort - 1] = true;
+
+  // Determine display position — center the image in the info area
+  int32_t x = 7;   // info area X offset
+  int32_t y = 40;   // info area Y offset
+
+  // Get CS pin for target display
+  uint8_t cs_pin;
+  switch (imgPort) {
+    case 1: cs_pin = DISPLAY_CS_1; break;
+    case 2: cs_pin = DISPLAY_CS_2; break;
+    case 3: cs_pin = DISPLAY_CS_3; break;
+    default: cs_pin = DISPLAY_CS_1; break;
+  }
+
+  gloScreen->streamBegin(cs_pin, x, y, imgWidth, imgHeight);
+  imgStreamActive = true;
+  imgBytesReceived = 0;
+  pixStreamBufCount = 0;
+  pixStreamRawCount = 0;
+
+  ESP_LOGI(TAG, "Image: port=%u bpp=%u %ux%u", imgPort, imgBpp, imgWidth, imgHeight);
+}
+
+static void binImageFlushPixels() {
+  if (pixStreamBufCount > 0 && gloScreen && imgStreamActive) {
+    gloScreen->streamPixels(pixStreamBuf, pixStreamBufCount);
+    pixStreamBufCount = 0;
+  }
+}
+
+static void binImageEnd(bool success) {
+  if (imgStreamActive) {
+    // Flush any remaining pixels
+    binImageFlushPixels();
+    gloScreen->streamEnd();
+    xSemaphoreGive(screen_Semaphore);
+    imgStreamActive = false;
+  }
+
+  if (success) {
+    binSendResponse(BIN_CMD_IMAGE, "image complete");
+  }
+  // Error responses are sent by the caller before calling binImageEnd(false)
+}
+
+// --- Echo command (cmd=0x0002) ---
+// Echoes payload back as a binary frame with the same cmd.
+// Useful for round-trip latency testing and protocol verification.
+
+static void binEchoBegin() {
+  if (binPayloadLen > 4096) {
+    binSendResponse(BIN_CMD_ECHO, "echo payload too large", false);
+    echoBuffer = nullptr;
+    return;
+  }
+  echoBuffer = (uint8_t*)malloc(binPayloadLen);
+  if (!echoBuffer) {
+    binSendResponse(BIN_CMD_ECHO, "out of memory", false);
+    return;
+  }
+  echoBufferSize = binPayloadLen;
+  echoBufferIndex = 0;
+}
+
+static void binEchoPayloadByte(uint8_t byte) {
+  if (echoBufferIndex == 0 && !echoBuffer) {
+    binEchoBegin();
+    if (!echoBuffer) return;  // allocation failed
+  }
+  if (echoBufferIndex < echoBufferSize) {
+    echoBuffer[echoBufferIndex++] = byte;
+  }
+}
+
+static void binEchoEnd() {
+  // Handle zero-length echo (binEchoPayloadByte was never called)
+  if (!echoBuffer && binPayloadLen == 0) {
+    echoBufferIndex = 0;
+  } else if (!echoBuffer) {
+    return;  // allocation failed earlier
+  }
+
+  // Build response frame: \0 + header + payload + crc32
+  uint8_t header[9];
+  header[0] = BIN_PROTOCOL_VERSION;
+  header[1] = BIN_CMD_ECHO & 0xFF;
+  header[2] = (BIN_CMD_ECHO >> 8) & 0xFF;
+  header[3] = 0;  // flags low
+  header[4] = 0;  // flags high
+  header[5] = echoBufferIndex & 0xFF;
+  header[6] = (echoBufferIndex >> 8) & 0xFF;
+  header[7] = (echoBufferIndex >> 16) & 0xFF;
+  header[8] = (echoBufferIndex >> 24) & 0xFF;
+
+  uint32_t crc = esp_crc32_le(0, header, 9);
+  if (echoBufferIndex > 0 && echoBuffer) {
+    crc = esp_crc32_le(crc, echoBuffer, echoBufferIndex);
+  }
+
+  uint8_t escape = 0x00;
+  usbSerial.write(&escape, 1);
+  usbSerial.write(header, 9);
+  if (echoBufferIndex > 0 && echoBuffer) {
+    usbSerial.write(echoBuffer, echoBufferIndex);
+  }
+  uint8_t crcBytes[4] = {
+    (uint8_t)(crc & 0xFF),
+    (uint8_t)((crc >> 8) & 0xFF),
+    (uint8_t)((crc >> 16) & 0xFF),
+    (uint8_t)((crc >> 24) & 0xFF)
+  };
+  usbSerial.write(crcBytes, 4);
+  usbSerial.flush();
+
+  free(echoBuffer);
+  echoBuffer = nullptr;
+  echoBufferSize = 0;
+  echoBufferIndex = 0;
+}
+
+// Route payload bytes to the appropriate command handler
+static void binProcessPayloadByte(uint8_t byte) {
+  switch (binCmd) {
+    case BIN_CMD_IMAGE:
+      binImagePayloadByte(byte);
+      break;
+    case BIN_CMD_ECHO:
+      binEchoPayloadByte(byte);
+      break;
+    default:
+      // Unknown command — just consume bytes, error sent at dispatch
+      break;
+  }
 }
 
 //void onSerialDataReceived(const uint8_t* data, size_t length){
 void onSerialDataReceived(){
   if (millis() - lastSerialTime > SERIAL_BUFFER_TIMEOUT_MS) {
-    serialReset();
+    binReset();
   }
   lastSerialTime = millis();
 
   // Process each byte
   for (size_t i = 0; i < rawBufIndex; i++) {
-    char c = (char)rawBuffer[i];
+    uint8_t c = (uint8_t)rawBuffer[i];
 
-    if (imgPortIndex >= 0) {
-      char* imgBufferRaw = (char*)gloState->usbInfo[imgPortIndex].imgBuffer;
-
-      if (imgBufBpp == 0) {
-        // First byte indicates bits per pixel
-        if (c == 0) {
-          gloState->usbInfo[imgPortIndex].imgBPP = 0;
-          free(gloState->usbInfo[imgPortIndex].imgBuffer);
-          gloState->usbInfo[imgPortIndex].imgBuffer = nullptr;
-          serialReset();
-          usbSerial.println("{\"status\": \"ok\", \"data\": {\"message\": \"image complete\"}}");
-          continue;
-        }
-
-        imgBufBpp = c;
-        const unsigned long long imageBits = IMAGE_SIZE_PIXELS * imgBufBpp;
-        imgBufLen = (imageBits / 8) + (imageBits % 8 ? 1 : 0);
-
-        const uint8_t oldBPP = gloState->usbInfo[imgPortIndex].imgBPP;
-        gloState->usbInfo[imgPortIndex].imgBPP = 0;
-        if (imgBufferRaw == nullptr || oldBPP != imgBufBpp) {
-          free(imgBufferRaw); // Free previous buffer if any
-          imgBufferRaw = (char*)malloc(imgBufLen);
-          gloState->usbInfo[imgPortIndex].imgBuffer = (uint16_t*)imgBufferRaw;
-        }
-        continue;
+    switch (parseState) {
+    case PARSE_TEXT:
+      if (c == 0x00) {
+        // Binary escape — switch to binary header mode
+        parseState = PARSE_BIN_HEADER;
+        binHeaderIndex = 0;
+        binRunningCRC = 0;
+        break;
       }
 
-      imgBufferRaw[bufferIndex++] = c;
-
-      if (bufferIndex >= imgBufLen) {
-        gloState->usbInfo[imgPortIndex].imgBPP = imgBufBpp;
-        serialReset();
-        usbSerial.println("{\"status\": \"ok\", \"data\": {\"message\": \"image complete\"}}");
+      // Normal text/JSON path
+      if (bufferIndex >= MAX_BUFFER_SIZE - 1) {
+          bufferIndex = 0;
+          Serial.println("{\"jsonrpc\": \"2.0\", \"error\": {\"code\": -32700, \"message\": \"Buffer overflow\"}}");
+          return;
       }
-      continue;
-    }
+      inputBuffer[bufferIndex++] = (char)c;
+      if (c == '\n') {
+          inputBuffer[bufferIndex] = '\0';
+          dataReceived = true;
+          bufferIndex = 0;
+      }
+      break;
 
-    if (c >= 1 && c <= 3) {
-      serialReset();
-      imgPortIndex = c - 1;
-      continue;
-    }
+    case PARSE_BIN_HEADER:
+      binHeader[binHeaderIndex++] = c;
+      binRunningCRC = esp_crc32_le(binRunningCRC, &c, 1);
 
-    // Prevent buffer overflow
-    if (bufferIndex >= MAX_BUFFER_SIZE - 1) {
-        serialReset();
-        Serial.println("{\"jsonrpc\": \"2.0\", \"error\": {\"code\": -32700, \"message\": \"Buffer overflow\"}}");
-        return;
-    }
+      if (binHeaderIndex == 9) {
+        // Parse header fields (all little-endian)
+        uint8_t version = binHeader[0];
+        binCmd   = binHeader[1] | (binHeader[2] << 8);
+        binFlags = binHeader[3] | (binHeader[4] << 8);
+        binPayloadLen = binHeader[5] | (binHeader[6] << 8) |
+                       (binHeader[7] << 16) | (binHeader[8] << 24);
 
-    // Store character in buffer
-    inputBuffer[bufferIndex++] = c;
+        if (version != BIN_PROTOCOL_VERSION) {
+          ESP_LOGW(TAG, "Binary: unsupported version %u", version);
+          binSendResponse(binCmd, "unsupported version", false);
+          binReset();
+          break;
+        }
+        if (binPayloadLen > BIN_MAX_PAYLOAD) {
+          ESP_LOGW(TAG, "Binary: payload too large %u", binPayloadLen);
+          binSendResponse(binCmd, "payload too large", false);
+          binReset();
+          break;
+        }
 
-    // Check for end of message (`\n`)
-    if (c == '\n') {
-        inputBuffer[bufferIndex] = '\0';  // Null-terminate string
-        dataReceived = true;        
-        //ESP_LOGI(TAG,"%s",inputBuffer);
-        serialReset();
+        binPayloadReceived = 0;
+        imgSubHeaderIndex = 0;
+
+        if (binPayloadLen == 0) {
+          // No payload — go straight to checksum
+          parseState = PARSE_BIN_CHECKSUM;
+          binChecksumIndex = 0;
+        } else {
+          parseState = PARSE_BIN_PAYLOAD;
+        }
+      }
+      break;
+
+    case PARSE_BIN_PAYLOAD:
+      binRunningCRC = esp_crc32_le(binRunningCRC, &c, 1);
+      binProcessPayloadByte(c);
+      binPayloadReceived++;
+
+      if (binPayloadReceived >= binPayloadLen) {
+        parseState = PARSE_BIN_CHECKSUM;
+        binChecksumIndex = 0;
+      }
+      break;
+
+    case PARSE_BIN_CHECKSUM:
+      binChecksumBuf[binChecksumIndex++] = c;
+      if (binChecksumIndex == BIN_CHECKSUM_SIZE) {
+        uint32_t expected = binChecksumBuf[0] | (binChecksumBuf[1] << 8) |
+                           (binChecksumBuf[2] << 16) | (binChecksumBuf[3] << 24);
+        if (expected != binRunningCRC) {
+          ESP_LOGW(TAG, "Binary: checksum mismatch (expected 0x%08X, got 0x%08X)",
+                   expected, binRunningCRC);
+          binImageEnd(false);
+          binSendResponse(binCmd, "checksum mismatch", false);
+        } else {
+          binDispatch();
+        }
+        binReset();
+      }
+      break;
     }
-  }  
+  }
 }
 
 // Function to process JSON-RPC message

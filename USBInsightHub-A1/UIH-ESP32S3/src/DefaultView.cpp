@@ -14,6 +14,7 @@
  //Logic for the default view (Devices metadata, voltage/current meter, etc.)
 
 #include "DefaultView.h"
+#include "Extercomms.h"
 
 GlobalState *gState;
 GlobalConfig *gConfig;
@@ -216,89 +217,94 @@ void taskDefaultScreenLoop(void *pvParameters){
     versionChangeSplashTimer = millis();
   }
   
-  if(xSemaphoreTake(screen_Semaphore,( TickType_t ) 10 ) == pdTRUE)
-  {
-    for(;;){
-      
-      xTaskNotifyGive(gState->system.taskIntercommHandle);
-      ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(20));
+  for(;;){
 
-      //Brightness test mode
-      if(USE_BRIGHTNESS_TEST_MODE > 0 && brightnessTestActive)
-      {        
-        if(brightnessTestValue != 0)
-        {
-          brightnessTestValue = brightnessTestValue - 50;            
-          gConfig->screen[0].brightness = brightnessTestValue;            
-        } 
-        else 
-        {
-          brightnessTestActive = false;
-          gState->system.ledState = prevLedState;
-          gConfig->screen[0].brightness = 800;
-        }                
-      }
+    // Release/re-acquire semaphore each iteration so binary transport
+    // can interleave direct-to-display streaming
+    if(xSemaphoreTake(screen_Semaphore, pdMS_TO_TICKS(DISPLAY_REFRESH_PERIOD)) != pdTRUE) {
+      // Screen busy (e.g. image streaming) — skip this cycle
+      vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(DISPLAY_REFRESH_PERIOD));
+      continue;
+    }
 
-      //adjust brightness only if there is a change to avoid flikering
-      if(prevBrightness != gConfig->screen[0].brightness && firstPass){        
-        iScreen->screenSetBackLight(gConfig->screen[0].brightness);
-        prevBrightness = gConfig->screen[0].brightness;
-      }
-      //keep backlight off for the first update for the three screens
-      if(!firstPass) iScreen->screenSetBackLight(0);
+    xTaskNotifyGive(gState->system.taskIntercommHandle);
+    ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(20));
 
-      defaultScreenFastDataUpdate();
-      if(prevRefreshRate != gConfig->features.refreshRate){
-        if(gConfig->features.refreshRate == S0_5) slowPeriod = SLOW_DATA_DOWNSAMPLES_0_5;
-        if(gConfig->features.refreshRate == S1_0) slowPeriod = SLOW_DATA_DOWNSAMPLES_1_0;
-        slowCnt=0;
-        prevRefreshRate = gConfig->features.refreshRate;
+    //Brightness test mode
+    if(USE_BRIGHTNESS_TEST_MODE > 0 && brightnessTestActive)
+    {
+      if(brightnessTestValue != 0)
+      {
+        brightnessTestValue = brightnessTestValue - 50;
+        gConfig->screen[0].brightness = brightnessTestValue;
       }
-      slowCnt++;
-      if(slowCnt == slowPeriod){
-        slowCnt=0;
-        defaultScreenSlowDataUpdate();      
+      else
+      {
+        brightnessTestActive = false;
+        gState->system.ledState = prevLedState;
+        gConfig->screen[0].brightness = 800;
       }
+    }
 
-      //update screen only if something changed or on the first update cycle      
+    //adjust brightness only if there is a change to avoid flikering
+    if(prevBrightness != gConfig->screen[0].brightness && firstPass){
+      iScreen->screenSetBackLight(gConfig->screen[0].brightness);
+      prevBrightness = gConfig->screen[0].brightness;
+    }
+    //keep backlight off for the first update for the three screens
+    if(!firstPass) iScreen->screenSetBackLight(0);
+
+    defaultScreenFastDataUpdate();
+    if(prevRefreshRate != gConfig->features.refreshRate){
+      if(gConfig->features.refreshRate == S0_5) slowPeriod = SLOW_DATA_DOWNSAMPLES_0_5;
+      if(gConfig->features.refreshRate == S1_0) slowPeriod = SLOW_DATA_DOWNSAMPLES_1_0;
+      slowCnt=0;
+      prevRefreshRate = gConfig->features.refreshRate;
+    }
+    slowCnt++;
+    if(slowCnt == slowPeriod){
+      slowCnt=0;
+      defaultScreenSlowDataUpdate();
+    }
+
+    // Skip rendering for channels in image mode (host owns the display)
+    if(!imageMode[iScnt]) {
+      //update screen only if something changed or on the first update cycle
       if(memcmp(&prevScreenArr[iScnt],&(ScreenArr[iScnt]),sizeof(prevScreenArr[iScnt])) != 0 || !firstPass){
         timers=millis();
         iScreen->screenDefaultRender(ScreenArr[iScnt]);
         timere=millis();
         prevScreenArr[iScnt] = ScreenArr[iScnt];
-        //ESP_LOGI(TAG,"%u",timere-timers);            
+        //ESP_LOGI(TAG,"%u",timere-timers);
       }
-
-      iScnt++;
-      if(iScnt==3) {iScnt=0;  firstPass = true;  }
-
-      if(infoSplashTimer != 0){
-        if(millis()-infoSplashTimer > MENU_INFO_SPLASH_TIMEOUT){
-          gState->system.showMenuInfoSplash = false;
-          infoSplashTimer = 0;
-        }
-      }
-
-      if(versionChangeSplashTimer != 0){
-        if(millis()-versionChangeSplashTimer > VERSION_CHANGE_SPLASH_TIMEOUT){          
-          gState->system.showVersionChangeSplash = false;
-          versionChangeSplashTimer = 0;
-        }
-      }
-
-      if(!defaultViewActive){
-        ESP_LOGI(TAG,"Delete Screen Loop");
-        xSemaphoreGive(screen_Semaphore);
-        gState->system.taskDefaultScreenLoopHandle = NULL;
-        vTaskDelete(NULL);
-      }      
-
-      vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(DISPLAY_REFRESH_PERIOD));
     }
-  }
-  else {
-    ESP_LOGE(TAG,"Screen resource bussy, can't create Screen Loop Task");
-    vTaskDelete(NULL);
+
+    iScnt++;
+    if(iScnt==3) {iScnt=0;  firstPass = true;  }
+
+    if(infoSplashTimer != 0){
+      if(millis()-infoSplashTimer > MENU_INFO_SPLASH_TIMEOUT){
+        gState->system.showMenuInfoSplash = false;
+        infoSplashTimer = 0;
+      }
+    }
+
+    if(versionChangeSplashTimer != 0){
+      if(millis()-versionChangeSplashTimer > VERSION_CHANGE_SPLASH_TIMEOUT){
+        gState->system.showVersionChangeSplash = false;
+        versionChangeSplashTimer = 0;
+      }
+    }
+
+    if(!defaultViewActive){
+      ESP_LOGI(TAG,"Delete Screen Loop");
+      xSemaphoreGive(screen_Semaphore);
+      gState->system.taskDefaultScreenLoopHandle = NULL;
+      vTaskDelete(NULL);
+    }
+
+    xSemaphoreGive(screen_Semaphore);
+    vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(DISPLAY_REFRESH_PERIOD));
   }
 
 }

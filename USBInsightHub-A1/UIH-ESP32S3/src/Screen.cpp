@@ -120,3 +120,33 @@ void Screen::setCSPins(uint8_t state){
   digitalWrite(DISPLAY_CS_2, state);
   digitalWrite(DISPLAY_CS_3, state);
 }
+
+void Screen::streamBegin(uint8_t cs_pin, int32_t x, int32_t y, int32_t w, int32_t h){
+  setCSPins(HIGH);               // deselect all
+  digitalWrite(cs_pin, LOW);     // select target display
+  tft.startWrite();
+  tft.setAddrWindow(x, y, w, h);
+}
+
+void Screen::streamPixels(const uint16_t* data, uint32_t pixelCount){
+  tft.pushPixels((uint16_t*)data, pixelCount);
+}
+
+void Screen::streamPixelsRGB332(const uint8_t* data, uint32_t pixelCount){
+  // Convert RGB332 → RGB565 in small batches using the palette
+  uint16_t buf[32];
+  while (pixelCount > 0) {
+    uint32_t batch = (pixelCount > 32) ? 32 : pixelCount;
+    for (uint32_t i = 0; i < batch; i++) {
+      buf[i] = palette[data[i]];
+    }
+    tft.pushPixels(buf, batch);
+    data += batch;
+    pixelCount -= batch;
+  }
+}
+
+void Screen::streamEnd(){
+  tft.endWrite();
+  setCSPins(HIGH);               // deselect all
+}
