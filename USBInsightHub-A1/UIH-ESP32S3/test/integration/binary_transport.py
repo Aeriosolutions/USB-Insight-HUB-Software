@@ -13,6 +13,7 @@ import struct
 BIN_PROTOCOL_VERSION = 0x01
 BIN_CMD_IMAGE = 0x0001
 BIN_CMD_ECHO = 0x0002
+BIN_CMD_METER_STREAM = 0x0003
 
 # CRC-32 lookup table (polynomial 0xEDB88320, same as ESP32 ROM)
 _CRC32_TABLE = []
@@ -93,6 +94,46 @@ def build_image_frame(
 def build_echo_frame(payload: bytes, flags: int = 0) -> bytes:
     """Build a binary frame for the echo command (cmd=0x0002)."""
     return build_frame(BIN_CMD_ECHO, payload, flags)
+
+
+def build_meter_subscribe_frame(
+    channel_mask: int, interval_ms: int, flags: int = 0
+) -> bytes:
+    """Build a meter stream subscribe frame (cmd=0x0003).
+
+    *channel_mask*: bits 0-2 for CH1-CH3 (e.g. 0x07 = all three).
+    Set mask=0 to stop streaming.
+    *interval_ms*: sample interval in milliseconds (min 20, max 10000).
+    """
+    payload = struct.pack("<BH", channel_mask, interval_ms)
+    return build_frame(BIN_CMD_METER_STREAM, payload, flags)
+
+
+def parse_meter_sample(payload: bytes) -> dict:
+    """Parse a meter stream sample payload.
+
+    Returns dict with 'timestamp_ms' and 'channels' list of
+    {'channel': int, 'voltage_mV': float, 'current_mA': float}.
+    """
+    if len(payload) < 5:
+        raise ValueError("meter sample too short")
+    timestamp_ms = struct.unpack_from("<I", payload, 0)[0]
+    num_ch = payload[4]
+    channels = []
+    offset = 5
+    for _ in range(num_ch):
+        if offset + 9 > len(payload):
+            raise ValueError("meter sample truncated")
+        ch = payload[offset]
+        voltage = struct.unpack_from("<f", payload, offset + 1)[0]
+        current = struct.unpack_from("<f", payload, offset + 5)[0]
+        channels.append({
+            "channel": ch,
+            "voltage_mV": voltage,
+            "current_mA": current,
+        })
+        offset += 9
+    return {"timestamp_ms": timestamp_ms, "channels": channels}
 
 
 def rgb565(r: int, g: int, b: int) -> int:

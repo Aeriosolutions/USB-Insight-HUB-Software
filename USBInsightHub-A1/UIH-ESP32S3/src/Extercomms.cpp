@@ -98,6 +98,16 @@ static uint8_t* echoBuffer = nullptr;
 static size_t echoBufferSize = 0;
 static size_t echoBufferIndex = 0;
 
+// Meter stream state
+static volatile bool meterStreamActive = false;
+static volatile uint8_t meterStreamChannelMask = 0;  // bits 0-2 = CH1-3
+static volatile uint16_t meterStreamIntervalMs = 100;
+static unsigned long meterStreamLastSend = 0;
+
+// Meter subscribe payload: channel_mask(1) + interval_ms(2,LE)
+static uint8_t meterSubPayload[3];
+static size_t meterSubPayloadIndex = 0;
+
 // Forward declarations
 static void binReset();
 static void binDispatch();
@@ -109,6 +119,10 @@ static void binImageEnd(bool success);
 static void binEchoBegin();
 static void binEchoPayloadByte(uint8_t byte);
 static void binEchoEnd();
+static void binMeterStreamPayloadByte(uint8_t byte);
+static void binMeterStreamDispatch();
+static void binMeterStreamSendSample();
+static void binSendBinaryFrame(uint16_t cmd, const uint8_t* payload, size_t len);
 static void binSendResponse(uint16_t cmd, const char* message, bool ok = true);
 
 //Internal functions
@@ -230,9 +244,15 @@ void taskExterCheckActivity(void *pvParameters){
           }
         }
 
-        if(dataReceived){          
-          processJsonRpcMessage(inputBuffer);  // Process JSON          
+        if(dataReceived){
+          processJsonRpcMessage(inputBuffer);  // Process JSON
           dataReceived = false;
+        }
+
+        // Meter streaming — send samples at the configured interval
+        if(meterStreamActive && (now - meterStreamLastSend >= meterStreamIntervalMs)){
+          meterStreamLastSend = now;
+          binMeterStreamSendSample();
         }
 
         vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(SERIAL_CHECK_PERIOD));
@@ -259,6 +279,7 @@ static void binReset() {
   if (echoBuffer) { free(echoBuffer); echoBuffer = nullptr; }
   echoBufferSize = 0;
   echoBufferIndex = 0;
+  meterSubPayloadIndex = 0;
 }
 
 static void binSendResponse(uint16_t cmd, const char* message, bool ok) {
@@ -281,6 +302,9 @@ static void binDispatch() {
       break;
     case BIN_CMD_ECHO:
       binEchoEnd();
+      break;
+    case BIN_CMD_METER_STREAM:
+      binMeterStreamDispatch();
       break;
     default:
       binSendResponse(binCmd, "unknown command", false);
@@ -463,28 +487,87 @@ static void binEchoEnd() {
     return;  // allocation failed earlier
   }
 
-  // Build response frame: \0 + header + payload + crc32
+  binSendBinaryFrame(BIN_CMD_ECHO, echoBuffer, echoBufferIndex);
+
+  free(echoBuffer);
+  echoBuffer = nullptr;
+  echoBufferSize = 0;
+  echoBufferIndex = 0;
+}
+
+// --- Meter stream command (cmd=0x0003) ---
+// Subscribe payload: channel_mask(1) + interval_ms(2,LE)
+// channel_mask bits 0-2 = CH1-CH3.  mask=0 stops streaming.
+// Firmware sends unsolicited binary frames with meter samples.
+//
+// Sample frame payload: timestamp_ms(4,LE) + num_channels(1)
+//   + [channel(1) + voltage_mV(4,float,LE) + current_mA(4,float,LE)] * num_channels
+
+static void binMeterStreamPayloadByte(uint8_t byte) {
+  if (meterSubPayloadIndex < sizeof(meterSubPayload)) {
+    meterSubPayload[meterSubPayloadIndex++] = byte;
+  }
+}
+
+static void binMeterStreamDispatch() {
+  if (meterSubPayloadIndex < 3) {
+    binSendResponse(BIN_CMD_METER_STREAM, "payload too short", false);
+    return;
+  }
+
+  uint8_t mask = meterSubPayload[0];
+  uint16_t interval = meterSubPayload[1] | (meterSubPayload[2] << 8);
+
+  if (mask == 0) {
+    // Stop streaming
+    meterStreamActive = false;
+    meterStreamChannelMask = 0;
+    ESP_LOGI(TAG, "Meter stream: stopped");
+    binSendResponse(BIN_CMD_METER_STREAM, "stopped");
+    return;
+  }
+
+  if (mask > 0x07) {
+    binSendResponse(BIN_CMD_METER_STREAM, "invalid channel mask", false);
+    return;
+  }
+  if (interval < 20) interval = 20;    // cap at 50Hz
+  if (interval > 10000) interval = 10000;
+
+  meterStreamChannelMask = mask;
+  meterStreamIntervalMs = interval;
+  meterStreamLastSend = millis();
+  meterStreamActive = true;
+
+  ESP_LOGI(TAG, "Meter stream: mask=0x%02X interval=%ums", mask, interval);
+
+  char msg[48];
+  snprintf(msg, sizeof(msg), "streaming mask=0x%02X interval=%ums", mask, interval);
+  binSendResponse(BIN_CMD_METER_STREAM, msg);
+}
+
+static void binSendBinaryFrame(uint16_t cmd, const uint8_t* payload, size_t len) {
   uint8_t header[9];
   header[0] = BIN_PROTOCOL_VERSION;
-  header[1] = BIN_CMD_ECHO & 0xFF;
-  header[2] = (BIN_CMD_ECHO >> 8) & 0xFF;
+  header[1] = cmd & 0xFF;
+  header[2] = (cmd >> 8) & 0xFF;
   header[3] = 0;  // flags low
   header[4] = 0;  // flags high
-  header[5] = echoBufferIndex & 0xFF;
-  header[6] = (echoBufferIndex >> 8) & 0xFF;
-  header[7] = (echoBufferIndex >> 16) & 0xFF;
-  header[8] = (echoBufferIndex >> 24) & 0xFF;
+  header[5] = len & 0xFF;
+  header[6] = (len >> 8) & 0xFF;
+  header[7] = (len >> 16) & 0xFF;
+  header[8] = (len >> 24) & 0xFF;
 
   uint32_t crc = esp_crc32_le(0, header, 9);
-  if (echoBufferIndex > 0 && echoBuffer) {
-    crc = esp_crc32_le(crc, echoBuffer, echoBufferIndex);
+  if (len > 0) {
+    crc = esp_crc32_le(crc, payload, len);
   }
 
   uint8_t escape = 0x00;
   usbSerial.write(&escape, 1);
   usbSerial.write(header, 9);
-  if (echoBufferIndex > 0 && echoBuffer) {
-    usbSerial.write(echoBuffer, echoBufferIndex);
+  if (len > 0) {
+    usbSerial.write(payload, len);
   }
   uint8_t crcBytes[4] = {
     (uint8_t)(crc & 0xFF),
@@ -494,11 +577,40 @@ static void binEchoEnd() {
   };
   usbSerial.write(crcBytes, 4);
   usbSerial.flush();
+}
 
-  free(echoBuffer);
-  echoBuffer = nullptr;
-  echoBufferSize = 0;
-  echoBufferIndex = 0;
+static void binMeterStreamSendSample() {
+  if (!meterStreamActive || !gloState) return;
+
+  // Count active channels
+  uint8_t numCh = 0;
+  for (int i = 0; i < 3; i++) {
+    if (meterStreamChannelMask & (1 << i)) numCh++;
+  }
+
+  // Build payload: timestamp(4) + num_channels(1) + [ch(1) + voltage(4) + current(4)] * n
+  const size_t sampleSize = 1 + 4 + 4;  // channel + voltage_f32 + current_f32
+  const size_t payloadLen = 4 + 1 + numCh * sampleSize;
+  uint8_t buf[4 + 1 + 3 * 9];  // max 32 bytes for 3 channels
+
+  uint32_t ts = millis();
+  buf[0] = ts & 0xFF;
+  buf[1] = (ts >> 8) & 0xFF;
+  buf[2] = (ts >> 16) & 0xFF;
+  buf[3] = (ts >> 24) & 0xFF;
+  buf[4] = numCh;
+
+  size_t offset = 5;
+  for (int i = 0; i < 3; i++) {
+    if (!(meterStreamChannelMask & (1 << i))) continue;
+    buf[offset++] = i + 1;  // 1-indexed channel number
+    float v = gloState->meter[i].AvgVoltage;
+    float c = gloState->meter[i].AvgCurrent;
+    memcpy(buf + offset, &v, 4); offset += 4;
+    memcpy(buf + offset, &c, 4); offset += 4;
+  }
+
+  binSendBinaryFrame(BIN_CMD_METER_STREAM, buf, payloadLen);
 }
 
 // Route payload bytes to the appropriate command handler
@@ -509,6 +621,9 @@ static void binProcessPayloadByte(uint8_t byte) {
       break;
     case BIN_CMD_ECHO:
       binEchoPayloadByte(byte);
+      break;
+    case BIN_CMD_METER_STREAM:
+      binMeterStreamPayloadByte(byte);
       break;
     default:
       // Unknown command — just consume bytes, error sent at dispatch

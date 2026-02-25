@@ -38,6 +38,7 @@
 // Binary command types
 #define BIN_CMD_IMAGE         0x0001
 #define BIN_CMD_ECHO          0x0002
+#define BIN_CMD_METER_STREAM  0x0003
 
 void iniExtercomms(GlobalState* globalState,GlobalConfig* globalConfig);
 
