@@ -224,13 +224,13 @@
 
 </script>
 
-<div class="bg-gray-100 min-h-screen p-4" style="font-size: 20px;">
+<div class="bg-base-100 min-h-screen p-4" style="font-size: 20px;">
 	<!-- Header -->
-	<div class="flex justify-around items-center bg-gray-300 p-4 rounded-lg shadow-md mb-4">
+	<div class="flex justify-around items-center bg-base-200 p-4 rounded-lg shadow-md mb-4">
 	  <div class="flex items-center gap-2">
 		<span>Host Link</span>
 		<span class="text-sm cursor-help" title={Help.CONTROL.HOSTLINK}>ℹ️:</span>
-		<span class="text-green-500 font-bold">
+		<span class="text-success font-bold">
 			{#if masterState[`features_usbHostState`] != 0} ✔
 			{:else} -		
 			{/if}
@@ -277,15 +277,19 @@
 			border: none;
 			border-top: 4px solid #ccc; /* Adjust the color and thickness as needed */
 			margin: 20px 0; /* Adjust the spacing as needed */
-  		}		
+  		}
+		
+		input[type="number"] {
+			padding: 0.25rem 0.5rem; /* Reduce padding to fix Firefox left margin issue */
+		}		
 	</style>
 
 	  {#each channels as ch}
-		<div class="bg-white rounded-lg shadow p-4">
+		<div class="bg-base-200 rounded-lg shadow p-4">
 		  <!-- Header -->
 		  <div class="flex justify-between mb-2">
 			<span class="font-bold" style="font-size: 25px;">Channel {ch.id}</span>
-			<span class="text-gray-500">
+			<span class="text-base-content/60">
 				{#if masterState[`c${ch.id}_USBInfo_usbType`] == 0} -
 				{:else if masterState[`c${ch.id}_USBInfo_usbType`] == 2} USB 2.0
 				{:else if masterState[`c${ch.id}_USBInfo_usbType`] == 3} USB 3.0
@@ -295,8 +299,8 @@
   
 		  <!-- Enumerator -->
 		  <div class="mb-4">
-			<label class="text-gray-600 text-sm block" style="font-size: 20px;">Enumerators:</label>			
-			<div class="bg-gray-100 p-2 rounded whitespace-pre-wrap" style="font-size: 20px;">{enumText[`c${ch.id}_txt`]}</div>
+			<label class="text-base-content/70 text-sm block" style="font-size: 20px;">Enumerators:</label>			
+			<div class="bg-base-100 p-2 rounded whitespace-pre-wrap" style="font-size: 20px;">{enumText[`c${ch.id}_txt`]}</div>
 			<!--<div class="bg-gray-100 p-2 rounded" style="font-size: 20px;">{masterState[`c${ch.id}_USBInfo_Dev2_Name`]}</div>-->			
 		  </div>
   
@@ -374,45 +378,45 @@
 		  </div>
 		  <hr class="separator">
 		  <!-- Limits -->
-		  <div class="text-sm text-gray-600 mb-2" style="font-size: 20px;">
+		  <div class="text-sm text-base-content mb-2" style="font-size: 20px;">
 			<span class="tab-space">Over Current Limit :</span>
 		
 			<input 
 				type="number" 
-				class="border rounded p-1" 
+				class="input input-bordered bg-base-100 text-base-content" 
 				bind:value={tempParams[`c${ch.id}_fwdCLim`]}
 				min="100"
 				max="2000"
 				step="1"
-				style="width: 80px;"
+				style="width: 80px; font-size: 20px;"
 				on:change={(e) => validateInput(e, `c${ch.id}_fwdCLim`, 100, 2000)} 
 			/> mA
 			{#if ch.id == 1}  <span class="text-sm cursor-help" title={Help.CONTROL.OVER_CURRENT}>ℹ️</span> {/if}
 		  </div>
-		  <div class="text-sm text-gray-600 mb-2" style="font-size: 20px;">
+		  <div class="text-sm text-base-content mb-2" style="font-size: 20px;">
 			<span class="tab-space">Back Current Limit :</span>			 
 			<input 
 				type="number" 
-				class="border rounded p-1" 
+				class="input input-bordered bg-base-100 text-base-content" 
 				bind:value={tempParams[`c${ch.id}_backCLim`]} 
 				min="20"
 				max="100"
 				step="1"
-				style="width: 80px;"
+				style="width: 80px; font-size: 20px;"
 				on:change={(e) => validateInput(e, `c${ch.id}_backCLim`, 20, 100)}
 			/> mA
 			{#if ch.id == 1}  <span class="text-sm cursor-help" title={Help.CONTROL.BACK_CURRENT}>ℹ️</span> {/if}
 		  </div>
-		  <div class="text-sm text-gray-600 mb-4" style="font-size: 20px;">
+		  <div class="text-sm text-base-content mb-4" style="font-size: 20px;">
 			<span class="tab-space">Startup Time Delay:</span>			 
 			<input 
 				type="number" 
-				class="border rounded p-1" 				 								
+				class="input input-bordered bg-base-100 text-base-content" 				 								
 				bind:value={tempParams[`c${ch.id}_startupTime`]}
 				min="1"
 				max="10"				
 				step="0.1"
-				style="width: 80px;"
+				style="width: 80px; font-size: 20px;"
 				on:change={(e) => validateInput(e, `c${ch.id}_startupTime`, 0.1, 10)}
 			/> s
 			{#if ch.id == 1}  <span class="text-sm cursor-help" title={Help.CONTROL.STARTUP_DELAY}>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ℹ️</span> {/if}

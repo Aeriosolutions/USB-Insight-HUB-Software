@@ -27,6 +27,11 @@
 	
 
 	onMount(async () => {
+		// Detect browser's dark mode preference and apply theme accordingly
+		const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+		const theme = prefersDark ? 'business' : 'corporate';
+		document.documentElement.setAttribute('data-theme', theme);
+		
 		if ($user.bearer_token !== '') {
 			await validateUser($user);
 		}

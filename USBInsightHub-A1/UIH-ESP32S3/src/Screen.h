@@ -67,6 +67,8 @@ struct txtProp{
   String Dev1_Name;
   String Dev2_Name;
   int usbType;
+  uint8_t imgBPP;
+  uint16_t* imgBuffer;
 };
 
 struct chScreenData { 
@@ -90,6 +92,7 @@ struct chScreenData {
   bool pwr_source;
   uint8_t usbHostState;
   uint8_t internalErrFlags;
+  bool autoTxtClear;
 };
 
 
@@ -102,6 +105,7 @@ class Screen{
     void screenSetBackLight(int pwm, uint8_t ch);
     void usbIconDraw(uint8_t type, bool active,bool com);
     void flexDevicePrint(String jsonStr, bool pcCon);
+    void imagePrint(uint16_t* imgBuffer, uint8_t bpp, uint32_t color_border);
 
     displayProp dProp[3];
     TFT_eSPI tft       = TFT_eSPI();       // Invoke custom library

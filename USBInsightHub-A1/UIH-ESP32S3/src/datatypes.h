@@ -191,6 +191,7 @@ struct FeaturesState {
   bool startUpActive;
   bool pcConnected;
   bool clearScreenText;
+  bool enableClearScreenText; 
   float vbus;
   String ssid;
   uint8_t wifiState;
@@ -242,6 +243,8 @@ struct USBInfoState {
   String Dev1_Name;
   String Dev2_Name;
   int usbType;
+  uint8_t imgBPP;
+  uint16_t* imgBuffer;
 };
 
 struct BaseMCUStateIn {
