@@ -21,7 +21,7 @@ class TestBrightnessRoundtrip:
         if self._orig is not None:
             hub.set({"brightness": self._orig})
 
-    @pytest.mark.parametrize("pct", [1, 10, 25, 50, 75, 100])
+    @pytest.mark.parametrize("pct", [5, 10, 25, 50, 75, 100])
     def test_roundtrip(self, hub, pct):
         """Set brightness to pct%, read it back, verify it matches."""
         hub.set({"brightness": pct})
@@ -30,13 +30,7 @@ class TestBrightnessRoundtrip:
         assert data is not None, "get brightness returned None"
         assert data["brightness"] == pct
 
-    def test_zero_turns_off(self, hub):
-        """brightness=0 sets PWM to 0 (display off)."""
-        hub.set({"brightness": 0})
-        time.sleep(0.1)
-        data = hub.get("brightness")
-        assert data["brightness"] == 0
-
+    #removed 0% brighness test
 
 class TestBrightnessOutOfRange:
     """Brightness rejects values outside 0-100."""
@@ -49,7 +43,7 @@ class TestBrightnessOutOfRange:
         if self._orig is not None:
             hub.set({"brightness": self._orig})
 
-    @pytest.mark.parametrize("val", [101, 200, 1000])
+    @pytest.mark.parametrize("val", [1,101, 200, 1000])
     def test_rejects_invalid(self, hub, val):
         """Setting brightness outside 0-100 returns a 'fail' error."""
         resp = hub.send({"action": "set", "params": {"brightness": val}})

@@ -36,7 +36,6 @@ declare module '$env/static/private' {
 	export const CHOCOLATEYLASTPATHUPDATE: string;
 	export const CHROME_CRASHPAD_PIPE_NAME: string;
 	export const COLOR: string;
-	export const COLORTERM: string;
 	export const COMMONPROGRAMFILES: string;
 	export const COMMONPROGRAMW6432: string;
 	export const COMPUTERNAME: string;
@@ -44,18 +43,14 @@ declare module '$env/static/private' {
 	export const DOTNET_TIEREDPGO: string;
 	export const DRIVERDATA: string;
 	export const EDITOR: string;
-	export const EFC_23504_1592913036: string;
+	export const EFC_10276_1592913036: string;
 	export const ELECTRON_RUN_AS_NODE: string;
-	export const FPS_BROWSER_APP_PROFILE_STRING: string;
-	export const FPS_BROWSER_USER_PROFILE_STRING: string;
-	export const GIT_ASKPASS: string;
 	export const HOME: string;
 	export const HOMEDRIVE: string;
 	export const HOMEPATH: string;
 	export const IDF_PATH: string;
 	export const INIT_CWD: string;
 	export const JAVA_HOME: string;
-	export const LANG: string;
 	export const LOCALAPPDATA: string;
 	export const LOGONSERVER: string;
 	export const NODE: string;
@@ -110,8 +105,6 @@ declare module '$env/static/private' {
 	export const SYSTEMDRIVE: string;
 	export const SYSTEMROOT: string;
 	export const TEMP: string;
-	export const TERM_PROGRAM: string;
-	export const TERM_PROGRAM_VERSION: string;
 	export const TMP: string;
 	export const USERDOMAIN: string;
 	export const USERDOMAIN_ROAMINGPROFILE: string;
@@ -123,18 +116,12 @@ declare module '$env/static/private' {
 	export const VSCODE_CWD: string;
 	export const VSCODE_DOTNET_INSTALL_TOOL_ORIGINAL_HOME: string;
 	export const VSCODE_ESM_ENTRYPOINT: string;
-	export const VSCODE_GIT_ASKPASS_EXTRA_ARGS: string;
-	export const VSCODE_GIT_ASKPASS_MAIN: string;
-	export const VSCODE_GIT_ASKPASS_NODE: string;
-	export const VSCODE_GIT_IPC_HANDLE: string;
 	export const VSCODE_HANDLES_UNCAUGHT_ERRORS: string;
 	export const VSCODE_IPC_HOOK: string;
 	export const VSCODE_L10N_BUNDLE_LOCATION: string;
 	export const VSCODE_NLS_CONFIG: string;
-	export const VSCODE_NONCE: string;
 	export const VSCODE_PID: string;
 	export const WINDIR: string;
-	export const __COMPAT_LAYER: string;
 }
 
 /**
@@ -174,7 +161,6 @@ declare module '$env/dynamic/private' {
 		CHOCOLATEYLASTPATHUPDATE: string;
 		CHROME_CRASHPAD_PIPE_NAME: string;
 		COLOR: string;
-		COLORTERM: string;
 		COMMONPROGRAMFILES: string;
 		COMMONPROGRAMW6432: string;
 		COMPUTERNAME: string;
@@ -182,18 +168,14 @@ declare module '$env/dynamic/private' {
 		DOTNET_TIEREDPGO: string;
 		DRIVERDATA: string;
 		EDITOR: string;
-		EFC_23504_1592913036: string;
+		EFC_10276_1592913036: string;
 		ELECTRON_RUN_AS_NODE: string;
-		FPS_BROWSER_APP_PROFILE_STRING: string;
-		FPS_BROWSER_USER_PROFILE_STRING: string;
-		GIT_ASKPASS: string;
 		HOME: string;
 		HOMEDRIVE: string;
 		HOMEPATH: string;
 		IDF_PATH: string;
 		INIT_CWD: string;
 		JAVA_HOME: string;
-		LANG: string;
 		LOCALAPPDATA: string;
 		LOGONSERVER: string;
 		NODE: string;
@@ -248,8 +230,6 @@ declare module '$env/dynamic/private' {
 		SYSTEMDRIVE: string;
 		SYSTEMROOT: string;
 		TEMP: string;
-		TERM_PROGRAM: string;
-		TERM_PROGRAM_VERSION: string;
 		TMP: string;
 		USERDOMAIN: string;
 		USERDOMAIN_ROAMINGPROFILE: string;
@@ -261,18 +241,12 @@ declare module '$env/dynamic/private' {
 		VSCODE_CWD: string;
 		VSCODE_DOTNET_INSTALL_TOOL_ORIGINAL_HOME: string;
 		VSCODE_ESM_ENTRYPOINT: string;
-		VSCODE_GIT_ASKPASS_EXTRA_ARGS: string;
-		VSCODE_GIT_ASKPASS_MAIN: string;
-		VSCODE_GIT_ASKPASS_NODE: string;
-		VSCODE_GIT_IPC_HANDLE: string;
 		VSCODE_HANDLES_UNCAUGHT_ERRORS: string;
 		VSCODE_IPC_HOOK: string;
 		VSCODE_L10N_BUNDLE_LOCATION: string;
 		VSCODE_NLS_CONFIG: string;
-		VSCODE_NONCE: string;
 		VSCODE_PID: string;
 		WINDIR: string;
-		__COMPAT_LAYER: string;
 		[key: `PUBLIC_${string}`]: undefined;
 		[key: `${string}`]: string | undefined;
 	}

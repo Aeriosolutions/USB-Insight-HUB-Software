@@ -259,14 +259,16 @@ void processJsonRpcMessage(const char* jsonString) {
     }   
     if(params.containsKey("brightness")){
       uint16_t inx = params["brightness"].as<unsigned int>();
-      if(inx <= 100) {
+      //5% is minimum brighness. A complete dark display(0%) may lead to confusion and make
+      //difficult to restore using the UIH menu 
+      if(inx >= 5 && inx <= 100) {
         uint16_t pwm = ((uint32_t)inx * 1023 + 50) / 100;
         gloConfig->screen[0].brightness = pwm;
         gloConfig->screen[1].brightness = pwm;
         gloConfig->screen[2].brightness = pwm;
       }
       else
-        result["brightness"] = "out of range (0-100% expected)";
+        result["brightness"] = "out of range (5-100% expected)";
     } 
     
     if(params["ledState"]){
