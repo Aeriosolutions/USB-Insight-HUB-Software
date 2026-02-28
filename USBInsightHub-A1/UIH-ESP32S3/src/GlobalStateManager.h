@@ -18,6 +18,7 @@
 
 #include <Arduino.h>
 #include "datatypes.h"
+#include "legacyNVMstruct.h"
 #include <Wire.h>
 #include <WiFi.h>
 #include "BaseMCU.h"

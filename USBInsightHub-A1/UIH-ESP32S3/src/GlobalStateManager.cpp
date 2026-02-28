@@ -26,6 +26,9 @@ GlobalConfig prevGloblConfig;
 
 void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig);
 
+void writeGlobalConfigasKeyValuePairs(GlobalConfig *globalConfig);
+void readGlobalConfigasKeyValuePairs(GlobalConfig *globalConfig);
+void migrateLegacyTemplate(GlobalConfig *globalConfig);
 
 void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig){
 
@@ -41,43 +44,43 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
     flashstorage.begin(UIH_NAMESPACE,false);
     if(flashstorage.getInt("ConfigInit")!=MEM_INITIALIZED_NUM){
         //flashstorage.end();
-        ESP_LOGI(TAG,"NVM is not initialized...load default values under template: %u", DATATYPES_VER);
+        ESP_LOGI(TAG,"NVM is not initialized...create default values under template: %u", DATATYPES_VER);
         setDefaultGlobalConfig(globalState,globalConfig);        
         flashstorage.putInt("TemplateVer",DATATYPES_VER);
         flashstorage.putString("AppVersion",APP_VERSION);
         globalState->system.prevESPVersion = APP_VERSION;
-        flashstorage.putBytes("ConfigBlob",globalConfig,sizeof(*globalConfig));
+        flashstorage.end();
+        
+        writeGlobalConfigasKeyValuePairs(globalConfig);
+        flashstorage.begin(UIH_NAMESPACE,false);
         flashstorage.putBytes("MCUBlob",&(globalState->baseMCUOut),sizeof(globalState->baseMCUOut));
         flashstorage.putInt("ConfigInit",MEM_INITIALIZED_NUM);
         flashstorage.end();
-        ESP_LOGI(TAG,"Saved new template to NVM");        
+        ESP_LOGI(TAG,"Saved new template to NVM as key-value pairs");        
     } 
     else {
         int tver = flashstorage.getInt("TemplateVer");
         globalState->system.prevESPVersion = flashstorage.getString("AppVersion");
-        if(tver!=DATATYPES_VER){           
-           ESP_LOGW(TAG,"Template in NVM is version %u. This version supports version %u", tver,DATATYPES_VER);
-           setDefaultGlobalConfig(globalState,globalConfig);
-           flashstorage.putInt("TemplateVer",DATATYPES_VER);
-           //clear previous template keys
-           flashstorage.remove("ConfigBlob");
-           flashstorage.remove("MCUBlob");
-           //create keys again with new lengths (if is the case) and default values
-           flashstorage.putBytes("ConfigBlob",globalConfig,sizeof(*globalConfig));
-           flashstorage.putBytes("MCUBlob",&(globalState->baseMCUOut),sizeof(globalState->baseMCUOut));
-           flashstorage.end();            
-           ESP_LOGI(TAG,"Default templete ver %d created",DATATYPES_VER); 
+        setDefaultGlobalConfig(globalState,globalConfig);
+        if(tver<=LEGACY_DATATYPES_VER){
+            ESP_LOGW(TAG,"Template in NVM is legacy version %u. This version supports key-value version %u", tver,DATATYPES_VER);
+           
+            flashstorage.putInt("TemplateVer",DATATYPES_VER);
+            flashstorage.end();
+            migrateLegacyTemplate(globalConfig);
+            writeGlobalConfigasKeyValuePairs(globalConfig);
+
         }
+
         else {
             //Load configuration from NVM
             
-            if(flashstorage.getBytes("ConfigBlob",globalConfig,sizeof(*globalConfig))==sizeof(*globalConfig)){
-                ESP_LOGI(TAG,"Config loaded correctly");
-            } else {
-                ESP_LOGW(TAG,"Failed to load Config... upload defaults");
-                setDefaultGlobalConfig(globalState,globalConfig);
-            }
+            ESP_LOGI(TAG,"Template in NVM is key-value version: %u.", tver);
+            readGlobalConfigasKeyValuePairs(globalConfig);
+            ESP_LOGI(TAG,"Config loaded correctly");
 
+        }
+        flashstorage.begin(UIH_NAMESPACE,false);
             if(flashstorage.getBytes("MCUBlob",&(globalState->baseMCUOut),sizeof(globalState->baseMCUOut))==sizeof(globalState->baseMCUOut)){
                 ESP_LOGI(TAG,"MCU blob loaded correctly");
             } else {
@@ -88,8 +91,7 @@ void globalStateInitializer(GlobalState *globalState, GlobalConfig *globalConfig
                     globalState->baseMCUOut[i].pwr_en = true;  
                 }              
             }
-            flashstorage.end();
-        }
+        flashstorage.end();        
     }
  
 
@@ -216,6 +218,106 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
     globalConfig->startup[2].startup_timer = 30;
 }
 
+void writeGlobalConfigasKeyValuePairs(GlobalConfig *globalConfig)
+{
+    //This function is intended to be used in case we want to migrate from the blob storage to a key-value storage in NVM. 
+    //It writes each config parameter as a separate key in NVM, so it can be easily accessed and modified without the need of reading/writing the whole blob.
+    flashstorage.begin(UIH_NAMESPACE,false);
+    flashstorage.putUChar("f_startView", globalConfig->features.startView);
+    flashstorage.putUChar("f_startUpmode", globalConfig->features.startUpmode);
+    flashstorage.putUChar("f_wifi_enabled", globalConfig->features.wifi_enabled);
+    flashstorage.putUChar("f_hubMode", globalConfig->features.hubMode);
+    flashstorage.putUChar("f_filterType", globalConfig->features.filterType);
+    flashstorage.putUChar("f_refreshRate", globalConfig->features.refreshRate);
+    
+    char key[16];  // <= 15 + null
+
+    for(int i = 0; i < 3; i++) {
+
+        snprintf(key, sizeof(key), "c%d_startup", i);
+        flashstorage.putUInt(key, globalConfig->startup[i].startup_timer);
+
+        snprintf(key, sizeof(key), "c%d_rotation", i);
+        flashstorage.putUChar(key, globalConfig->screen[i].rotation);
+
+        snprintf(key, sizeof(key), "c%d_brightness", i);
+        flashstorage.putUShort(key, globalConfig->screen[i].brightness);
+
+        snprintf(key, sizeof(key), "c%d_backCLim", i);
+        flashstorage.putUShort(key, globalConfig->meter[i].backCLim);
+
+        snprintf(key, sizeof(key), "c%d_fwdCLim", i);
+        flashstorage.putUShort(key, globalConfig->meter[i].fwdCLim);
+    }
+    flashstorage.end();
+
+}
+
+void readGlobalConfigasKeyValuePairs(GlobalConfig *globalConfig)
+{
+    //This function is intended to be used in case we want to migrate from the blob storage to a key-value storage in NVM. 
+    //It reads each config parameter as a separate key in NVM, so it can be easily accessed and modified without the need of reading/writing the whole blob.
+    //globalConfig must be already initialized with default values before calling this function, so in case some key is missing in NVM, it will keep the default value.
+    flashstorage.begin(UIH_NAMESPACE,false);
+    globalConfig->features.startView = flashstorage.getUChar("f_startView", globalConfig->features.startView);
+    globalConfig->features.startUpmode = flashstorage.getUChar("f_startUpmode", globalConfig->features.startUpmode);
+    globalConfig->features.wifi_enabled = flashstorage.getUChar("f_wifi_enabled", globalConfig->features.wifi_enabled);
+    globalConfig->features.hubMode = flashstorage.getUChar("f_hubMode", globalConfig->features.hubMode);
+    globalConfig->features.filterType = flashstorage.getUChar("f_filterType", globalConfig->features.filterType);
+    globalConfig->features.refreshRate = flashstorage.getUChar("f_refreshRate", globalConfig->features.refreshRate);
+    
+    char key[16];  // <= 15 + null
+
+    for(int i = 0; i < 3; i++) {
+
+        snprintf(key, sizeof(key), "c%d_startup", i);
+        globalConfig->startup[i].startup_timer = flashstorage.getUInt(key, globalConfig->startup[i].startup_timer);
+
+        snprintf(key, sizeof(key), "c%d_rotation", i);
+        globalConfig->screen[i].rotation = flashstorage.getUChar(key, globalConfig->screen[i].rotation);
+
+        snprintf(key, sizeof(key), "c%d_brightness", i);
+        globalConfig->screen[i].brightness = flashstorage.getUShort(key, globalConfig->screen[i].brightness);
+
+        snprintf(key, sizeof(key), "c%d_backCLim", i);
+        globalConfig->meter[i].backCLim = flashstorage.getUShort(key, globalConfig->meter[i].backCLim);
+
+        snprintf(key, sizeof(key), "c%d_fwdCLim", i);
+        globalConfig->meter[i].fwdCLim = flashstorage.getUShort(key, globalConfig->meter[i].fwdCLim);
+    }
+
+    flashstorage.end();
+}
+
+void migrateLegacyTemplate(GlobalConfig *globalConfig){
+    
+    lGlobalConfig lglobalConfig ={};
+
+    flashstorage.begin(UIH_NAMESPACE,false);
+    if(flashstorage.getBytes("ConfigBlob",&lglobalConfig,sizeof(lglobalConfig))==sizeof(lglobalConfig)){
+        ESP_LOGI(TAG,"Legacy config loaded correctly");
+        //Map legacy config to new config structure
+        globalConfig->features.startView = lglobalConfig.features.startView;
+        globalConfig->features.startUpmode = lglobalConfig.features.startUpmode;
+        globalConfig->features.wifi_enabled = lglobalConfig.features.wifi_enabled;
+        globalConfig->features.hubMode = lglobalConfig.features.hubMode;
+        globalConfig->features.filterType = lglobalConfig.features.filterType;
+        globalConfig->features.refreshRate = lglobalConfig.features.refreshRate;
+        for(int i = 0; i < 3; i++) {
+            globalConfig->startup[i].startup_timer = lglobalConfig.startup[i].startup_timer;
+            globalConfig->screen[i].rotation = lglobalConfig.screen[i].rotation;
+            globalConfig->screen[i].brightness = lglobalConfig.screen[i].brightness;
+            globalConfig->meter[i].backCLim = lglobalConfig.meter[i].backCLim;
+            globalConfig->meter[i].fwdCLim = lglobalConfig.meter[i].fwdCLim;
+        }
+        flashstorage.remove("ConfigBlob");
+
+    } else {
+        ESP_LOGW(TAG,"Failed to load legacy Config... upload defaults");
+    }
+     flashstorage.end();
+}
+
 
 void taskConfigAutoSave(void *pvParameters){
   TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -282,8 +384,9 @@ void saveMCUState(void){
 void saveConfig(void){
     
     flashstorage.begin(UIH_NAMESPACE,false);
-    flashstorage.putBytes("ConfigBlob",globlConfig,sizeof(*globlConfig));
-    ESP_LOGI(TAG,"Save Config blob");
+    writeGlobalConfigasKeyValuePairs(globlConfig);
+    //flashstorage.putBytes("ConfigBlob",globlConfig,sizeof(*globlConfig));
+    ESP_LOGI(TAG,"Save Configuration");
     flashstorage.end();
 }
 

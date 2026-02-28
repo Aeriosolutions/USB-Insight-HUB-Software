@@ -22,7 +22,7 @@
 #include "PAC194x.h"
 #include "Screen.h"
                         
-#define DATATYPES_VER 4 //change this number every time globalconfig members are added
+#define DATATYPES_VER 5 //change this number every time globalconfig members are added
 
 #define APP_CORE 1
 
