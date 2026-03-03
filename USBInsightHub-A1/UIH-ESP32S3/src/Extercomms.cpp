@@ -14,6 +14,7 @@
 //Handlers for the communication with external devices through USB Serial
 
 #include "Extercomms.h"
+#include <RestartService.h>
 
 //USB Serial and Harware Serial (Debug)
 #if ARDUINO_USB_CDC_ON_BOOT
@@ -68,6 +69,7 @@ void iniExtercomms(GlobalState* globalState, GlobalConfig* globalConfig){
     usbSerial.onEvent(usbEventCallback);
 
     usbSerial.begin(115200);
+    usbSerial.enableReboot(globalConfig->features.reboot_enabled == ENABLE);
     USB.manufacturerName("Aerio");
     USB.productName("InsightHUB Controller");
     USB.begin();
@@ -269,8 +271,18 @@ void processJsonRpcMessage(const char* jsonString) {
       }
       else
         result["brightness"] = "out of range (5-100% expected)";
-    } 
-    
+    }
+
+    if(params.containsKey("reboot_enabled")){
+      uint8_t val = params["reboot_enabled"].as<unsigned int>();
+      if(val <= 1) {
+        gloConfig->features.reboot_enabled = val;
+        usbSerial.enableReboot(val == ENABLE);
+      } else {
+        result["reboot_enabled"] = "fail";
+      }
+    }
+
     if(params["ledState"]){
       int inx = getEnumIndex(params["ledState"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
       inx != -1 ? gloState->system.ledState = inx : result["ledState"] = "fail";        
@@ -369,7 +381,9 @@ void processJsonRpcMessage(const char* jsonString) {
         result["rotation"]      = t_rotation[gloConfig->screen[0].rotation];
       if(pName == "brightness"    || all || conf)
         result["brightness"]    = ((uint32_t)gloConfig->screen[0].brightness * 100 + 511) / 1023;
-      
+      if(pName == "reboot_enabled" || all || conf)
+        result["reboot_enabled"] = gloConfig->features.reboot_enabled;
+
       if(pName == "startUpActive" || all || state)
         result["startUpActive"] = gloState->features.startUpActive;
       if(pName == "pcConnected"   || all || state)  
@@ -416,6 +430,8 @@ void processJsonRpcMessage(const char* jsonString) {
       }  
       if(pName == "pacRev"    || all || state)
         result["pacRev"]      = String(gloState->system.pacRevisionID);
+      if(pName == "uptime"    || all || state)
+        result["uptime"]      = millis();
 
       for(int i = 0; i<3; i++){
         if (pName == "CH"+String(i+1) || pName == "CH"+String(i+1)+"_all"){
@@ -445,7 +461,19 @@ void processJsonRpcMessage(const char* jsonString) {
 
     sendJsonResponse(0, result);
   }
-  
+  else if(action == "restart"){
+    JsonObject params = doc["params"].as<JsonObject>();
+    bool immediate = params["immediate"] | false;
+    sendJsonResponse(0, result);
+    usbSerial.flush();
+    if(immediate){
+      delay(100);
+      ESP.restart();
+    } else {
+      RestartService::restartNow();
+    }
+  }
+
 }
 
 // Send JSON-RPC response

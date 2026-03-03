@@ -196,7 +196,8 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
     globalConfig->features.wifi_enabled = ENABLE;
     globalConfig->features.hubMode = USB2_3;
     globalConfig->features.filterType = FILTER_TYPE_MEDIAN;
-    globalConfig->features.refreshRate = S0_5;        
+    globalConfig->features.refreshRate = S0_5;
+    globalConfig->features.reboot_enabled = DISABLE;
 
     for(int i=0; i<3; i++){
         globalConfig->startup[i].startup_timer = 1;
@@ -229,7 +230,8 @@ void writeGlobalConfigasKeyValuePairs(GlobalConfig *globalConfig)
     flashstorage.putUChar("f_hubMode", globalConfig->features.hubMode);
     flashstorage.putUChar("f_filterType", globalConfig->features.filterType);
     flashstorage.putUChar("f_refreshRate", globalConfig->features.refreshRate);
-    
+    flashstorage.putUChar("f_reboot_en", globalConfig->features.reboot_enabled);
+
     char key[16];  // <= 15 + null
 
     for(int i = 0; i < 3; i++) {
@@ -265,7 +267,8 @@ void readGlobalConfigasKeyValuePairs(GlobalConfig *globalConfig)
     globalConfig->features.hubMode = flashstorage.getUChar("f_hubMode", globalConfig->features.hubMode);
     globalConfig->features.filterType = flashstorage.getUChar("f_filterType", globalConfig->features.filterType);
     globalConfig->features.refreshRate = flashstorage.getUChar("f_refreshRate", globalConfig->features.refreshRate);
-    
+    globalConfig->features.reboot_enabled = flashstorage.getUChar("f_reboot_en", globalConfig->features.reboot_enabled);
+
     char key[16];  // <= 15 + null
 
     for(int i = 0; i < 3; i++) {

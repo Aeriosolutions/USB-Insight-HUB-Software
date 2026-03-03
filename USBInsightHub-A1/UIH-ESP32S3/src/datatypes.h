@@ -209,8 +209,9 @@ struct FeaturesConfig {
   uint8_t startUpmode;  
   uint8_t wifi_enabled;
   uint8_t hubMode;
-  uint8_t filterType;    
+  uint8_t filterType;
   uint8_t refreshRate;
+  uint8_t reboot_enabled;
 };
 
 struct StartupState { 
