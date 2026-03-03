@@ -49,14 +49,22 @@ REBOOT_WAIT_S = 15
 
 
 def get_auth_token(host, username=DEFAULT_ADMIN_USER, password=DEFAULT_ADMIN_PASS):
-    """Authenticate with the hub's REST API and return a JWT bearer token."""
+    """Authenticate with the hub's REST API and return a JWT bearer token.
+
+    Returns None if security is disabled (FT_SECURITY=0).
+    """
     url = f"http://{host}/rest/signIn"
-    resp = requests.post(url, json={"username": username, "password": password}, timeout=10)
-    resp.raise_for_status()
-    return resp.json()["access_token"]
+    try:
+        resp = requests.post(url, json={"username": username, "password": password}, timeout=10)
+        if resp.status_code == 200 and "access_token" in resp.text:
+            return resp.json()["access_token"]
+    except Exception:
+        pass
+    log.info("Security disabled or signIn unavailable — proceeding without auth")
+    return None
 
 
-def ota_upload(host, firmware_path, token):
+def ota_upload(host, firmware_path, token=None):
     """Upload firmware via OTA and wait for the hub to reboot."""
     url = f"http://{host}/rest/uploadFirmware"
     fw_path = Path(firmware_path)
@@ -65,11 +73,15 @@ def ota_upload(host, firmware_path, token):
     size = fw_path.stat().st_size
     log.info("OTA upload: %s (%d bytes) → %s", fw_path.name, size, host)
 
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
     with open(fw_path, "rb") as f:
         resp = requests.post(
             url,
             files={"file": (fw_path.name, f, "application/octet-stream")},
-            headers={"Authorization": f"Bearer {token}"},
+            headers=headers,
             timeout=OTA_TIMEOUT_S,
         )
 

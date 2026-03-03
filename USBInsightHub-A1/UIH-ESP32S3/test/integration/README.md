@@ -24,14 +24,39 @@ The hub is auto-detected by USB VID/PID. Pass `--port` to override.
 
 ```bash
 # Auto-detect hub, verbose output
-pytest -v
+.venv/bin/pytest -v
 
 # Explicit serial port
-pytest -v --port /dev/cu.usbmodemXXX
+.venv/bin/pytest -v --port /dev/cu.usbmodemXXX
+
+# Skip slow tests (reboot, bootloader operations)
+.venv/bin/pytest -v --quick
 
 # Run only channel query tests
-pytest -v -k channel
+.venv/bin/pytest -v -k channel
 ```
+
+### NVS Persistence Tests
+
+Tests that settings survive a reboot. Requires the current firmware with
+`restart` support.
+
+```bash
+.venv/bin/pytest test_nvs_persistence.py -v -s
+```
+
+### NVS Upgrade Migration Test
+
+Tests the v1.0.0 → current firmware migration path via OTA. Requires WiFi
+connectivity to the hub.
+
+```bash
+.venv/bin/pytest test_nvs_upgrade.py -v -s --host insighthub.local
+```
+
+The `--old-firmware` and `--new-firmware` options default to
+`build/firmware/USBInsightHub-A0_esp32-s3-uih_1-0-0.bin` and
+`.pio/build/esp32-s3-uih/firmware.bin` respectively.
 
 ## Troubleshooting
 
@@ -81,8 +106,10 @@ describing what it verifies. Use `pytest --co -v` to see the full hierarchy.
 | **Forward limit** | 4 | CH1 fwdLimit set/get across 100-2000 range |
 | **Power control** | 2 | CH1 power off/on via serial API |
 | **Edge cases** | 2 | Invalid action handling; firstStart auto-clear flag |
+| **NVS persistence** | 13 | Config survives reboot; per-field persistence; defaults validation |
+| **NVS upgrade** | 1 | v1.0.0 blob → key-value migration via OTA (includes known brightness bug) |
 
-**Total: 18 tests**
+**Total: 32 tests**
 
 ## Safety
 
@@ -93,7 +120,11 @@ fails.
 ## Test Structure
 
 ```
-conftest.py          — Hub connection class, auto-detection, pytest fixtures
-test_serial_api.py   — Serial API test cases
-requirements.txt     — Python dependencies
+conftest.py               — Pytest fixtures, hub connection, CLI options
+hub.py                    — Hub class and device discovery (reusable outside pytest)
+test_serial_api.py        — Serial API test cases
+test_nvs_persistence.py   — NVS config persistence across reboots
+test_nvs_upgrade.py       — NVS migration from v1.0.0 to current firmware
+requirements.txt          — Python dependencies
+snapshots/                — Config snapshots from upgrade test runs
 ```
