@@ -309,7 +309,15 @@ void migrateLegacyTemplate(GlobalConfig *globalConfig){
         for(int i = 0; i < 3; i++) {
             globalConfig->startup[i].startup_timer = lglobalConfig.startup[i].startup_timer;
             globalConfig->screen[i].rotation = lglobalConfig.screen[i].rotation;
-            globalConfig->screen[i].brightness = lglobalConfig.screen[i].brightness;
+            // v1.0.0 stored brightness inconsistently: serial API wrote 10-100
+            // (percentage), but the on-board menu wrote 50-1000 (raw PWM) and the
+            // default was 800 (PWM).  Detect which format we have by range.
+            uint16_t legacyBrightness = lglobalConfig.screen[i].brightness;
+            if (legacyBrightness <= 100) {
+                globalConfig->screen[i].brightness = brightnessPctToPwm(legacyBrightness);
+            } else {
+                globalConfig->screen[i].brightness = legacyBrightness;
+            }
             globalConfig->meter[i].backCLim = lglobalConfig.meter[i].backCLim;
             globalConfig->meter[i].fwdCLim = lglobalConfig.meter[i].fwdCLim;
         }

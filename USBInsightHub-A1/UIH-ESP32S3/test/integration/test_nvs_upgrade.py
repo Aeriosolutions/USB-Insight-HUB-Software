@@ -261,11 +261,11 @@ class TestNvsUpgradeMigration:
         snap_upgraded = snapshot_full_config(hub)
         save_snapshot("post-upgrade", snap_upgraded)
 
-        # Dump NVS binary (requires reboot_enabled on current firmware).
-        # This enables reverting to this exact NVS state if needed.
-        hub.set({"reboot_enabled": 1})
-        time.sleep(0.5)
-        save_nvs_snapshot(hub, "post-upgrade-nvs")
+        # NVS binary dump is available via hub.dump_nvs() but requires
+        # bootloader entry (1200-baud touch) which is unreliable and can
+        # leave the hub unresponsive. Run manually when needed:
+        #   hub.set({"reboot_enabled": 1})
+        #   hub.dump_nvs("snapshots/post-upgrade-nvs.bin")
 
         # ── Step 7: Verify old settings survived ────────────────
         log.info("=== Step 7: Verifying settings survived migration ===")

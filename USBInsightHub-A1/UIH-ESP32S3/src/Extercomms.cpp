@@ -264,7 +264,7 @@ void processJsonRpcMessage(const char* jsonString) {
       //5% is minimum brighness. A complete dark display(0%) may lead to confusion and make
       //difficult to restore using the UIH menu 
       if(inx >= 5 && inx <= 100) {
-        uint16_t pwm = ((uint32_t)inx * 1023 + 50) / 100;
+        uint16_t pwm = brightnessPctToPwm(inx);
         gloConfig->screen[0].brightness = pwm;
         gloConfig->screen[1].brightness = pwm;
         gloConfig->screen[2].brightness = pwm;
@@ -380,7 +380,7 @@ void processJsonRpcMessage(const char* jsonString) {
       if(pName == "rotation"      || all || conf)     
         result["rotation"]      = t_rotation[gloConfig->screen[0].rotation];
       if(pName == "brightness"    || all || conf)
-        result["brightness"]    = ((uint32_t)gloConfig->screen[0].brightness * 100 + 511) / 1023;
+        result["brightness"]    = brightnessPwmToPct(gloConfig->screen[0].brightness);
       if(pName == "reboot_enabled" || all || conf)
         result["reboot_enabled"] = gloConfig->features.reboot_enabled;
 
