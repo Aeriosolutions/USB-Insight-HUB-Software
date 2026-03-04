@@ -13,9 +13,15 @@ serial command interface.
 
 ```bash
 cd USBInsightHub-A1/UIH-ESP32S3/test/integration
-python3 -m venv .venv #or py -m venv .venv on Windows
-source .venv/bin/activate   # or .venv\Scripts\activate on Windows
-pip install -r requirements.txt
+./setup.sh
+```
+
+This creates the Python venv and installs dependencies.
+
+Manual setup (or Windows):
+```bash
+python3 -m venv .venv  # or py -m venv .venv on Windows
+.venv/bin/pip install -r requirements.txt  # or .venv\Scripts\pip on Windows
 ```
 
 ## Running Tests
