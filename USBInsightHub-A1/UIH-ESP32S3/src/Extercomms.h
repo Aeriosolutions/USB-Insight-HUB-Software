@@ -30,6 +30,7 @@
 #define ARR_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
 // Binary transport protocol
+#define BIN_ESCAPE            0x01  // SOH — binary frame escape byte
 #define BIN_PROTOCOL_VERSION  0x01
 #define BIN_HEADER_SIZE       10    // version(1) + cmd(2) + flags(2) + length(4) + checksum placeholder
 #define BIN_CHECKSUM_SIZE     4
@@ -39,6 +40,21 @@
 #define BIN_CMD_IMAGE         0x0001
 #define BIN_CMD_ECHO          0x0002
 #define BIN_CMD_METER_STREAM  0x0003
+#define BIN_CMD_SCREEN_LOCK   0x0004
+#define BIN_CMD_SCREEN_READY  0x0005
+
+// Pluggable binary command handler
+struct BinCommandHandler {
+    uint16_t cmd;
+    bool (*begin)(uint16_t cmd, uint16_t flags, uint32_t payloadLen);
+    void (*payloadByte)(uint8_t byte);
+    void (*dispatch)();
+    void (*reset)();   // optional, may be nullptr
+};
+
+#define BIN_MAX_HANDLERS 8
+
+void binRegisterCommand(const BinCommandHandler* handler);
 
 void iniExtercomms(GlobalState* globalState,GlobalConfig* globalConfig);
 
@@ -48,5 +64,13 @@ void iniExtercommsBinaryTransport(Screen* screen);
 
 // Image mode flags — when set, render loop skips that channel
 extern volatile bool imageMode[3];
+
+// Screen lock timeout
+#define SCREEN_LOCK_TIMEOUT_MS  10000
+
+// Screen ready notification — render loop signals when a locked channel's slot arrives
+extern volatile uint8_t screenReadyPending;
+extern SemaphoreHandle_t screenReadySemaphore;
+extern TaskHandle_t exterTaskHandle;
 
 #endif

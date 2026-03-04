@@ -277,6 +277,9 @@ void taskDefaultScreenLoop(void *pvParameters){
         prevScreenArr[iScnt] = ScreenArr[iScnt];
         //ESP_LOGI(TAG,"%u",timere-timers);
       }
+    } else if (screenReadyPending & (1 << iScnt)) {
+      // Host is waiting for this channel's render slot — signal ready
+      if (screenReadySemaphore) xSemaphoreGive(screenReadySemaphore);
     }
 
     iScnt++;

@@ -19,6 +19,8 @@
 #include "Screen.h"
 #include <RestartService.h>
 #include <esp_crc.h>
+#include "freertos/stream_buffer.h"
+#include "tusb.h"
 
 //USB Serial and Harware Serial (Debug)
 #if ARDUINO_USB_CDC_ON_BOOT
@@ -42,8 +44,11 @@ bool USBSerialActivity = false;
 bool dataReceived = false;
 
 volatile bool imageMode[3] = {false, false, false};
+volatile unsigned long screenLockTime[3] = {0, 0, 0};
+volatile uint8_t screenReadyPending = 0;
+SemaphoreHandle_t screenReadySemaphore = NULL;
 
-char rawBuffer[80];
+char rawBuffer[4096];
 size_t rawBufIndex = 0;
 char inputBuffer[MAX_BUFFER_SIZE];   //working array JSON-RPC
 size_t bufferIndex = 0;
@@ -61,6 +66,8 @@ enum ParseState {
 };
 
 static ParseState parseState = PARSE_TEXT;
+static unsigned long binLastByteTime = 0;  // millis() of last byte in binary state
+#define BIN_TIMEOUT_MS 2000               // reset binary parser after 2s of silence
 static uint8_t binHeader[10];   // version(1) + cmd(2) + flags(2) + length(4) = 9 bytes, + 1 spare
 static size_t binHeaderIndex = 0;
 static uint32_t binPayloadLen = 0;
@@ -75,20 +82,31 @@ static size_t binChecksumIndex = 0;
 static const size_t IMAGE_SUBHEADER_SIZE = 6;  // port(1) + bpp(1) + width(2) + height(2)
 static uint8_t imgSubHeader[6];
 static size_t imgSubHeaderIndex = 0;
-static bool imgStreamActive = false;
 static uint8_t imgPort = 0;
 static uint8_t imgBpp = 0;
 static uint16_t imgWidth = 0;
 static uint16_t imgHeight = 0;
 static uint32_t imgPixelsExpected = 0;
-static uint32_t imgBytesReceived = 0;
 static bool imgFailed = false;  // set if image validation failed; suppresses dispatch
 
-// Small pixel buffer for streaming to SPI
-static uint16_t pixStreamBuf[64];
-static uint8_t pixStreamRaw[128]; // for accumulating partial pixel bytes at 16bpp
-static size_t pixStreamBufCount = 0;
-static size_t pixStreamRawCount = 0;
+// Pixel data buffer — accumulated during receive, flushed to SPI after CRC verified
+static uint8_t* imgPixelBuf = nullptr;
+static size_t imgPixelBufSize = 0;
+static size_t imgPixelBufIndex = 0;
+
+// Image transfer profiling
+static struct {
+  unsigned long t0;           // frame begin (header parsed) — micros()
+  unsigned long tReceived;    // all payload bytes buffered
+  unsigned long tCrcDone;     // CRC verified, dispatch called
+  unsigned long tSemAcq;      // screen semaphore acquired
+  unsigned long tSpiDone;     // SPI render complete
+  uint32_t drainReads;        // usbSerial.read() calls during this image
+  uint32_t drainBytes;        // total bytes read from USB
+  uint32_t drainWakes;        // task wakeups during image receive
+  bool active;                // profiling in progress
+  void reset() { memset(this, 0, sizeof(*this)); }
+} imgProf;
 
 // CRC-32 using ESP32 ROM hardware acceleration (esp_crc32_le)
 // No lookup table needed — uses the chip's built-in CRC unit.
@@ -108,15 +126,86 @@ static unsigned long meterStreamLastSend = 0;
 static uint8_t meterSubPayload[3];
 static size_t meterSubPayloadIndex = 0;
 
+// Pluggable binary command handler registry
+static const BinCommandHandler* binHandlers[BIN_MAX_HANDLERS] = {};
+static size_t binHandlerCount = 0;
+static const BinCommandHandler* binActiveHandler = nullptr;
+
+TaskHandle_t exterTaskHandle = nullptr;
+
+// --- Fast CDC RX path: bypass Arduino per-byte queue via --wrap linker intercept ---
+static StreamBufferHandle_t cdcRxStream = NULL;
+#define CDC_STREAM_SIZE 8192
+
+extern "C" void __real_tud_cdc_rx_cb(uint8_t itf);
+
+extern "C" void __wrap_tud_cdc_rx_cb(uint8_t itf) {
+    if (itf != 0 || !cdcRxStream) {
+        __real_tud_cdc_rx_cb(itf);  // fallback to Arduino during early boot
+        return;
+    }
+    // Drain TinyUSB FIFO into StreamBuffer in one bulk operation
+    uint8_t buf[CONFIG_TINYUSB_CDC_RX_BUFSIZE];
+    uint32_t count = tud_cdc_n_read(itf, buf, sizeof(buf));
+    if (count > 0) {
+        xStreamBufferSend(cdcRxStream, buf, count, 0);
+        USBSerialActivity = true;
+        if (exterTaskHandle) xTaskNotifyGive(exterTaskHandle);
+    }
+}
+
+// --- Fix ESP32-S3 USB bootloader entry ---
+// Arduino's usb_persist_enabled is commented out (esp32-hal-tinyusb.c:566) and
+// Espressif confirmed USB persist "does not work on S3 at all." The problem is
+// that TinyUSB holds the USB PHY pins, preventing the host from detecting the
+// disconnect/reconnect during usb_switch_to_cdc_jtag(). Community workaround:
+// call tud_disconnect() and release GPIO 19/20 before usb_persist_restart().
+//
+// The delay must be long enough for the host to fully process the USB disconnect
+// before usb_switch_to_cdc_jtag() drives D-/D+ low and waits for BUS_RESET.
+// Too short and the host is still handling the disconnect, causing the BUS_RESET
+// semaphore to timeout and leaving USB Serial JTAG half-initialized.
+#include "soc/rtc_cntl_reg.h"
+#include "driver/gpio.h"
+
+extern "C" void __real_usb_persist_restart(uint32_t mode);
+extern "C" void usb_persist_restart(uint32_t mode);
+
+extern "C" void __wrap_usb_persist_restart(uint32_t mode) {
+    if (mode == 2) {  // RESTART_BOOTLOADER
+        tud_disconnect();
+        gpio_reset_pin((gpio_num_t)19);  // D-
+        gpio_reset_pin((gpio_num_t)20);  // D+
+        delay(1000);  // host needs time to fully process disconnect
+    }
+    __real_usb_persist_restart(mode);
+}
+
+static void enterBootloader() {
+    usb_persist_restart(2);  // RESTART_BOOTLOADER — goes through our wrapper
+}
+
+void binRegisterCommand(const BinCommandHandler* handler) {
+  if (binHandlerCount < BIN_MAX_HANDLERS) {
+    binHandlers[binHandlerCount++] = handler;
+  }
+}
+
+static const BinCommandHandler* binFindHandler(uint16_t cmd) {
+  for (size_t i = 0; i < binHandlerCount; i++) {
+    if (binHandlers[i]->cmd == cmd) return binHandlers[i];
+  }
+  return nullptr;
+}
+
 // Forward declarations
 static void binReset();
-static void binDispatch();
-static void binProcessPayloadByte(uint8_t byte);
 static void binImageBegin();
 static void binImagePayloadByte(uint8_t byte);
-static void binImageFlushPixels();
-static void binImageEnd(bool success);
-static void binEchoBegin();
+static void binImageRender();
+static void binImageCleanup();
+static void binImageFreeBuffer();
+static void binEchoBegin(uint32_t payloadLen);
 static void binEchoPayloadByte(uint8_t byte);
 static void binEchoEnd();
 static void binMeterStreamPayloadByte(uint8_t byte);
@@ -124,6 +213,148 @@ static void binMeterStreamDispatch();
 static void binMeterStreamSendSample();
 static void binSendBinaryFrame(uint16_t cmd, const uint8_t* payload, size_t len);
 static void binSendResponse(uint16_t cmd, const char* message, bool ok = true);
+
+// --- Pluggable command handler structs ---
+
+static const BinCommandHandler imageHandler = {
+  .cmd = BIN_CMD_IMAGE,
+  .begin = [](uint16_t, uint16_t, uint32_t) -> bool {
+    imgSubHeaderIndex = 0;
+    imgFailed = false;
+    imgPixelBufIndex = 0;
+    imgProf.reset();
+    imgProf.t0 = micros();
+    imgProf.active = true;
+    return true;
+  },
+  .payloadByte = binImagePayloadByte,
+  .dispatch = []() {
+    if (!imgFailed) binImageRender();
+  },
+  .reset = []() {
+    // Keep pixel buffer for reuse (avoids heap fragmentation)
+    // Buffer is freed on PC disconnect via binImageFreeBuffer()
+    imgPixelBufIndex = 0;
+    imgSubHeaderIndex = 0;
+    imgFailed = false;
+  },
+};
+
+static const BinCommandHandler echoHandler = {
+  .cmd = BIN_CMD_ECHO,
+  .begin = [](uint16_t, uint16_t, uint32_t payloadLen) -> bool {
+    binEchoBegin(payloadLen);
+    return echoBuffer != nullptr || payloadLen == 0;
+  },
+  .payloadByte = binEchoPayloadByte,
+  .dispatch = binEchoEnd,
+  .reset = []() {
+    free(echoBuffer);
+    echoBuffer = nullptr;
+    echoBufferSize = 0;
+    echoBufferIndex = 0;
+  },
+};
+
+static const BinCommandHandler meterHandler = {
+  .cmd = BIN_CMD_METER_STREAM,
+  .begin = [](uint16_t, uint16_t, uint32_t) -> bool {
+    meterSubPayloadIndex = 0;
+    return true;
+  },
+  .payloadByte = binMeterStreamPayloadByte,
+  .dispatch = binMeterStreamDispatch,
+  .reset = nullptr,
+};
+
+// --- Screen lock command (cmd=0x0004) ---
+static uint8_t screenLockPayload[2];
+static size_t screenLockPayloadIndex = 0;
+
+static const BinCommandHandler screenLockHandler = {
+  .cmd = BIN_CMD_SCREEN_LOCK,
+  .begin = [](uint16_t, uint16_t, uint32_t payloadLen) -> bool {
+    screenLockPayloadIndex = 0;
+    if (payloadLen != 2) {
+      binSendResponse(BIN_CMD_SCREEN_LOCK, "payload must be 2 bytes", false);
+      return false;
+    }
+    return true;
+  },
+  .payloadByte = [](uint8_t byte) {
+    if (screenLockPayloadIndex < sizeof(screenLockPayload))
+      screenLockPayload[screenLockPayloadIndex++] = byte;
+  },
+  .dispatch = []() {
+    uint8_t mask = screenLockPayload[0];
+    uint8_t action = screenLockPayload[1];
+    if (mask == 0 || mask > 0x07) {
+      binSendResponse(BIN_CMD_SCREEN_LOCK, "invalid channel mask", false);
+      return;
+    }
+    if (action > 1) {
+      binSendResponse(BIN_CMD_SCREEN_LOCK, "invalid action (0 or 1)", false);
+      return;
+    }
+    unsigned long now = millis();
+    for (int i = 0; i < 3; i++) {
+      if (mask & (1 << i)) {
+        if (action == 1) {
+          imageMode[i] = true;
+          screenLockTime[i] = now;
+        } else {
+          imageMode[i] = false;
+          screenLockTime[i] = 0;
+        }
+      }
+    }
+    char msg[48];
+    snprintf(msg, sizeof(msg), "%s mask=0x%02X", action ? "locked" : "unlocked", mask);
+    binSendResponse(BIN_CMD_SCREEN_LOCK, msg);
+  },
+  .reset = nullptr,
+};
+
+// --- Screen ready command (cmd=0x0005) ---
+static uint8_t screenReadyChannel = 0;
+
+static const BinCommandHandler screenReadyHandler = {
+  .cmd = BIN_CMD_SCREEN_READY,
+  .begin = [](uint16_t, uint16_t, uint32_t payloadLen) -> bool {
+    screenReadyChannel = 0;
+    if (payloadLen != 1) {
+      binSendResponse(BIN_CMD_SCREEN_READY, "payload must be 1 byte", false);
+      return false;
+    }
+    return true;
+  },
+  .payloadByte = [](uint8_t byte) {
+    screenReadyChannel = byte;
+  },
+  .dispatch = []() {
+    if (screenReadyChannel < 1 || screenReadyChannel > 3) {
+      binSendResponse(BIN_CMD_SCREEN_READY, "invalid channel (1-3)", false);
+      return;
+    }
+    uint8_t idx = screenReadyChannel - 1;
+    if (!imageMode[idx]) {
+      binSendResponse(BIN_CMD_SCREEN_READY, "channel not locked", false);
+      return;
+    }
+    // Refresh lock timeout
+    screenLockTime[idx] = millis();
+    // Set pending bit and wait for render loop to signal
+    screenReadyPending |= (1 << idx);
+    if (xSemaphoreTake(screenReadySemaphore, pdMS_TO_TICKS(250)) == pdTRUE) {
+      screenReadyPending &= ~(1 << idx);
+      binSendResponse(BIN_CMD_SCREEN_READY, "ready");
+    } else {
+      screenReadyPending &= ~(1 << idx);
+      binSendResponse(BIN_CMD_SCREEN_READY, "timeout", false);
+    }
+  },
+  .reset = nullptr,
+};
 
 //Internal functions
 void parseDataPC();
@@ -201,13 +432,24 @@ void iniExtercomms(GlobalState* globalState, GlobalConfig* globalConfig){
     USB.onEvent(usbEventCallback);
     usbSerial.onEvent(usbEventCallback);
 
+    cdcRxStream = xStreamBufferCreate(CDC_STREAM_SIZE, 1);
+    usbSerial.setRxBufferSize(256);  // Arduino queue only used as fallback before StreamBuffer ready
     usbSerial.begin(115200);
     usbSerial.enableReboot(globalConfig->features.reboot_enabled == ENABLE);
     USB.manufacturerName("Aerio");
     USB.productName("InsightHUB Controller");
     USB.begin();
 
-    xTaskCreatePinnedToCore(taskExterCheckActivity, "Extercom check", 4096, NULL, 5, NULL, APP_CORE);
+    // Register pluggable binary command handlers
+    binRegisterCommand(&imageHandler);
+    binRegisterCommand(&echoHandler);
+    binRegisterCommand(&meterHandler);
+    binRegisterCommand(&screenLockHandler);
+    binRegisterCommand(&screenReadyHandler);
+
+    screenReadySemaphore = xSemaphoreCreateBinary();
+
+    xTaskCreatePinnedToCore(taskExterCheckActivity, "Extercom check", 6144, NULL, 5, &exterTaskHandle, APP_CORE);
 
 }
 
@@ -215,13 +457,35 @@ void iniExtercommsBinaryTransport(Screen* screen){
   gloScreen = screen;
 }
 
-//serial loop - check if there has been serial activity to update the pc-connection status icon 
+//serial loop - check if there has been serial activity to update the pc-connection status icon
 void taskExterCheckActivity(void *pvParameters){
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-    unsigned long lastPCcom;
+    unsigned long lastPCcom = 0;
     unsigned long now;
     for(;;){
-        now= millis();
+        // Wait for CDC RX notification or timeout for periodic tasks
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(SERIAL_CHECK_PERIOD));
+
+        now = millis();
+
+        if (imgProf.active) imgProf.drainWakes++;
+
+        // Drain CDC StreamBuffer — bulk read, no per-byte FreeRTOS queue overhead
+        rawBufIndex = xStreamBufferReceive(cdcRxStream, rawBuffer, sizeof(rawBuffer), 0);
+        if (rawBufIndex > 0) {
+          if (imgProf.active) {
+            imgProf.drainReads++;
+            imgProf.drainBytes += rawBufIndex;
+          }
+          onSerialDataReceived();
+        }
+
+        // Binary parse timeout — recover if sender drops mid-frame
+        if (parseState != PARSE_TEXT && (millis() - binLastByteTime > BIN_TIMEOUT_MS)) {
+          ESP_LOGW(TAG, "Binary: timeout in state %d cmd=%u payload=%u/%u",
+                   parseState, binCmd, binPayloadReceived, binPayloadLen);
+          binSendResponse(binCmd, "timeout", false);
+          binReset();
+        }
 
         if(USBSerialActivity){
           lastPCcom = millis();
@@ -230,17 +494,38 @@ void taskExterCheckActivity(void *pvParameters){
           USBSerialActivity=false;
         }
 
-        if(now-lastPCcom > PC_CONNECTION_TIMEOUT){
+        if(millis()-lastPCcom > PC_CONNECTION_TIMEOUT){
+          if (gloState->features.pcConnected) {
+            // Release all screen locks on PC disconnect
+            for (int i = 0; i < 3; i++) {
+              if (imageMode[i]) {
+                imageMode[i] = false;
+                screenLockTime[i] = 0;
+                ESP_LOGI(TAG, "Screen lock: CH%d released (PC disconnected)", i + 1);
+              }
+            }
+            binImageFreeBuffer();  // Release pixel buffer on disconnect
+          }
           gloState->features.pcConnected = false;
         }
 
-        if(now-lastPCcom > PC_CONNECTION_TIMEOUT+DISPLAY_CLEAR_AFTER_TIMEOUT 
+        if(now-lastPCcom > PC_CONNECTION_TIMEOUT+DISPLAY_CLEAR_AFTER_TIMEOUT
            && gloState->features.enableClearScreenText){
           //clear display texts.
           gloState->features.clearScreenText = true;    
           for(int i=0; i<3; i++){
             gloState->usbInfo[i].numDev = 0; //avoids reprint of previous texts
             gloState->usbInfo[i].usbType = 0; //avoids reprint of previous texts
+          }
+        }
+
+        // Screen lock timeout — auto-release if host hasn't refreshed
+        for (int i = 0; i < 3; i++) {
+          if (imageMode[i] && screenLockTime[i] != 0 &&
+              (millis() - screenLockTime[i] > SCREEN_LOCK_TIMEOUT_MS)) {
+            imageMode[i] = false;
+            screenLockTime[i] = 0;
+            ESP_LOGI(TAG, "Screen lock: CH%d auto-released (timeout)", i + 1);
           }
         }
 
@@ -254,14 +539,15 @@ void taskExterCheckActivity(void *pvParameters){
           meterStreamLastSend = now;
           binMeterStreamSendSample();
         }
-
-        vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(SERIAL_CHECK_PERIOD));
-        //vTaskDelay(pdMS_TO_TICKS(SERIAL_CHECK_PERIOD));
     }
 
 }
 
 static void binReset() {
+  if (binActiveHandler && binActiveHandler->reset) {
+    binActiveHandler->reset();
+  }
+  binActiveHandler = nullptr;
   parseState = PARSE_TEXT;
   binHeaderIndex = 0;
   binPayloadLen = 0;
@@ -270,16 +556,6 @@ static void binReset() {
   binFlags = 0;
   binRunningCRC = 0;
   binChecksumIndex = 0;
-  imgSubHeaderIndex = 0;
-  imgStreamActive = false;
-  imgFailed = false;
-  imgBytesReceived = 0;
-  pixStreamBufCount = 0;
-  pixStreamRawCount = 0;
-  if (echoBuffer) { free(echoBuffer); echoBuffer = nullptr; }
-  echoBufferSize = 0;
-  echoBufferIndex = 0;
-  meterSubPayloadIndex = 0;
 }
 
 static void binSendResponse(uint16_t cmd, const char* message, bool ok) {
@@ -291,63 +567,25 @@ static void binSendResponse(uint16_t cmd, const char* message, bool ok) {
   usbSerial.flush();
 }
 
-// Called when full binary frame is received and checksum verified
-static void binDispatch() {
-  switch (binCmd) {
-    case BIN_CMD_IMAGE:
-      if (!imgFailed) {
-        binImageEnd(true);
-      }
-      // If imgFailed, error was already sent during validation
-      break;
-    case BIN_CMD_ECHO:
-      binEchoEnd();
-      break;
-    case BIN_CMD_METER_STREAM:
-      binMeterStreamDispatch();
-      break;
-    default:
-      binSendResponse(binCmd, "unknown command", false);
-      break;
-  }
-}
 
-// Process image sub-header bytes, then stream pixel data
+// Buffer pixel data during receive — NO SPI during parsing (avoids CDC overflow).
+// SPI transfer happens in binImageRender() after full frame + CRC verified.
 static void binImagePayloadByte(uint8_t byte) {
   if (imgFailed) return;  // validation failed — consume silently
 
   if (imgSubHeaderIndex < IMAGE_SUBHEADER_SIZE) {
     imgSubHeader[imgSubHeaderIndex++] = byte;
     if (imgSubHeaderIndex == IMAGE_SUBHEADER_SIZE) {
-      binImageBegin();
+      binImageBegin();  // validates header, allocates pixel buffer
     }
     return;
   }
 
   if (imgFailed) return;  // binImageBegin() may have set this
 
-  // Pixel data — stream to display
-  imgBytesReceived++;
-
-  if (imgBpp == 16) {
-    // Accumulate pairs of bytes into RGB565 pixels
-    pixStreamRaw[pixStreamRawCount++] = byte;
-    if (pixStreamRawCount >= 2) {
-      // Little-endian RGB565
-      pixStreamBuf[pixStreamBufCount++] = pixStreamRaw[0] | (pixStreamRaw[1] << 8);
-      pixStreamRawCount = 0;
-      if (pixStreamBufCount >= 64) {
-        binImageFlushPixels();
-      }
-    }
-  } else if (imgBpp == 8) {
-    // RGB332 — convert via palette and buffer
-    if (gloScreen) {
-      pixStreamBuf[pixStreamBufCount++] = gloScreen->palette[byte];
-    }
-    if (pixStreamBufCount >= 64) {
-      binImageFlushPixels();
-    }
+  // Buffer pixel data — will be flushed to display in binImageRender()
+  if (imgPixelBuf && imgPixelBufIndex < imgPixelBufSize) {
+    imgPixelBuf[imgPixelBufIndex++] = byte;
   }
 }
 
@@ -387,7 +625,6 @@ static void binImageBegin() {
     imgFailed = true;
     return;
   }
-
   if (!gloScreen) {
     ESP_LOGE(TAG, "Image: screen not initialized");
     binSendResponse(BIN_CMD_IMAGE, "screen not initialized", false);
@@ -395,20 +632,56 @@ static void binImageBegin() {
     return;
   }
 
-  // Acquire screen semaphore — block up to 200ms
-  if (xSemaphoreTake(screen_Semaphore, pdMS_TO_TICKS(200)) != pdTRUE) {
-    ESP_LOGW(TAG, "Image: screen busy");
-    binSendResponse(BIN_CMD_IMAGE, "screen busy", false);
+  // Reuse pixel buffer if same size; reallocate only if size changed
+  if (imgPixelBuf && imgPixelBufSize == expectedDataBytes) {
+    imgPixelBufIndex = 0;  // reuse existing buffer
+  } else {
+    free(imgPixelBuf);
+    imgPixelBuf = nullptr;
+    imgPixelBufSize = expectedDataBytes;
+    imgPixelBufIndex = 0;
+    imgPixelBuf = (uint8_t*)malloc(imgPixelBufSize);
+  }
+  if (!imgPixelBuf) {
+    static char oomMsg[80];
+    snprintf(oomMsg, sizeof(oomMsg), "out of memory (need %u, free %u)",
+             (unsigned)imgPixelBufSize, (unsigned)esp_get_free_heap_size());
+    ESP_LOGE(TAG, "Image: %s", oomMsg);
+    binSendResponse(BIN_CMD_IMAGE, oomMsg, false);
     imgFailed = true;
     return;
   }
 
+  ESP_LOGI(TAG, "Image: port=%u bpp=%u %ux%u (%u bytes buffered)",
+           imgPort, imgBpp, imgWidth, imgHeight, imgPixelBufSize);
+}
+
+// Called after full frame received and CRC verified — does the actual SPI transfer.
+static void binImageRender() {
+  if (!imgPixelBuf || !gloScreen) {
+    binImageCleanup();
+    return;
+  }
+
+  unsigned long tPreSem = micros();
+
+  // Acquire screen semaphore — block up to 200ms
+  if (xSemaphoreTake(screen_Semaphore, pdMS_TO_TICKS(200)) != pdTRUE) {
+    ESP_LOGW(TAG, "Image: screen busy");
+    binSendResponse(BIN_CMD_IMAGE, "screen busy", false);
+    binImageCleanup();
+    return;
+  }
+
+  imgProf.tSemAcq = micros();
+
   // Mark this channel as image mode so render loop skips it
   imageMode[imgPort - 1] = true;
+  screenLockTime[imgPort - 1] = millis();
 
-  // Determine display position — center the image in the info area
-  int32_t x = 7;   // info area X offset
-  int32_t y = 40;   // info area Y offset
+  // Display position — info area offset
+  int32_t x = 7;
+  int32_t y = 40;
 
   // Get CS pin for target display
   uint8_t cs_pin;
@@ -420,75 +693,111 @@ static void binImageBegin() {
   }
 
   gloScreen->streamBegin(cs_pin, x, y, imgWidth, imgHeight);
-  imgStreamActive = true;
-  imgBytesReceived = 0;
-  pixStreamBufCount = 0;
-  pixStreamRawCount = 0;
 
-  ESP_LOGI(TAG, "Image: port=%u bpp=%u %ux%u", imgPort, imgBpp, imgWidth, imgHeight);
+  // Stream buffered pixel data to display
+  uint16_t pixBuf[64];
+  size_t pixCount = 0;
+  size_t i = 0;
+
+  if (imgBpp == 16) {
+    while (i + 1 < imgPixelBufIndex) {
+      pixBuf[pixCount++] = imgPixelBuf[i] | (imgPixelBuf[i + 1] << 8);
+      i += 2;
+      if (pixCount >= 64) {
+        gloScreen->streamPixels(pixBuf, pixCount);
+        pixCount = 0;
+      }
+    }
+  } else if (imgBpp == 8) {
+    while (i < imgPixelBufIndex) {
+      pixBuf[pixCount++] = gloScreen->palette[imgPixelBuf[i++]];
+      if (pixCount >= 64) {
+        gloScreen->streamPixels(pixBuf, pixCount);
+        pixCount = 0;
+      }
+    }
+  }
+
+  // Flush remaining pixels
+  if (pixCount > 0) {
+    gloScreen->streamPixels(pixBuf, pixCount);
+  }
+
+  gloScreen->streamEnd();
+  xSemaphoreGive(screen_Semaphore);
+
+  imgProf.tSpiDone = micros();
+  imgProf.active = false;
+
+  // Send profiling data in the response
+  unsigned long total = imgProf.tSpiDone - imgProf.t0;
+  unsigned long usb = imgProf.tReceived - imgProf.t0;
+  unsigned long crc = imgProf.tCrcDone - imgProf.tReceived;
+  unsigned long sem = imgProf.tSemAcq - tPreSem;
+  unsigned long spi = imgProf.tSpiDone - imgProf.tSemAcq;
+
+  static char buf[256];
+  snprintf(buf, sizeof(buf),
+    "{\"status\":\"ok\",\"data\":{\"cmd\":1,\"message\":\"image complete\","
+    "\"prof\":{\"total_us\":%lu,\"usb_us\":%lu,\"crc_us\":%lu,"
+    "\"sem_us\":%lu,\"spi_us\":%lu,"
+    "\"reads\":%u,\"bytes\":%u,\"wakes\":%u,\"avg_read\":%u}}}",
+    total, usb, crc, sem, spi,
+    imgProf.drainReads, imgProf.drainBytes, imgProf.drainWakes,
+    imgProf.drainReads ? imgProf.drainBytes / imgProf.drainReads : 0);
+  usbSerial.println(buf);
+  usbSerial.flush();
+
+  binImageCleanup();
 }
 
-static void binImageFlushPixels() {
-  if (pixStreamBufCount > 0 && gloScreen && imgStreamActive) {
-    gloScreen->streamPixels(pixStreamBuf, pixStreamBufCount);
-    pixStreamBufCount = 0;
-  }
+static void binImageCleanup() {
+  // Keep buffer allocated for reuse (avoids heap fragmentation on rapid frames)
+  imgPixelBufIndex = 0;
 }
 
-static void binImageEnd(bool success) {
-  if (imgStreamActive) {
-    // Flush any remaining pixels
-    binImageFlushPixels();
-    gloScreen->streamEnd();
-    xSemaphoreGive(screen_Semaphore);
-    imgStreamActive = false;
-  }
-
-  if (success) {
-    binSendResponse(BIN_CMD_IMAGE, "image complete");
-  }
-  // Error responses are sent by the caller before calling binImageEnd(false)
+static void binImageFreeBuffer() {
+  free(imgPixelBuf);
+  imgPixelBuf = nullptr;
+  imgPixelBufSize = 0;
+  imgPixelBufIndex = 0;
 }
 
 // --- Echo command (cmd=0x0002) ---
 // Echoes payload back as a binary frame with the same cmd.
 // Useful for round-trip latency testing and protocol verification.
 
-static void binEchoBegin() {
-  if (binPayloadLen > 4096) {
+static void binEchoBegin(uint32_t payloadLen) {
+  if (payloadLen > 4096) {
     binSendResponse(BIN_CMD_ECHO, "echo payload too large", false);
     echoBuffer = nullptr;
     return;
   }
-  echoBuffer = (uint8_t*)malloc(binPayloadLen);
+  if (payloadLen == 0) {
+    echoBuffer = nullptr;
+    echoBufferSize = 0;
+    echoBufferIndex = 0;
+    return;
+  }
+  echoBuffer = (uint8_t*)malloc(payloadLen);
   if (!echoBuffer) {
     binSendResponse(BIN_CMD_ECHO, "out of memory", false);
     return;
   }
-  echoBufferSize = binPayloadLen;
+  echoBufferSize = payloadLen;
   echoBufferIndex = 0;
 }
 
 static void binEchoPayloadByte(uint8_t byte) {
-  if (echoBufferIndex == 0 && !echoBuffer) {
-    binEchoBegin();
-    if (!echoBuffer) return;  // allocation failed
-  }
+  if (!echoBuffer) return;
   if (echoBufferIndex < echoBufferSize) {
     echoBuffer[echoBufferIndex++] = byte;
   }
 }
 
 static void binEchoEnd() {
-  // Handle zero-length echo (binEchoPayloadByte was never called)
-  if (!echoBuffer && binPayloadLen == 0) {
-    echoBufferIndex = 0;
-  } else if (!echoBuffer) {
-    return;  // allocation failed earlier
-  }
-
+  // Send directly — safe because we're in task context now
   binSendBinaryFrame(BIN_CMD_ECHO, echoBuffer, echoBufferIndex);
-
   free(echoBuffer);
   echoBuffer = nullptr;
   echoBufferSize = 0;
@@ -563,7 +872,7 @@ static void binSendBinaryFrame(uint16_t cmd, const uint8_t* payload, size_t len)
     crc = esp_crc32_le(crc, payload, len);
   }
 
-  uint8_t escape = 0x00;
+  uint8_t escape = BIN_ESCAPE;
   usbSerial.write(&escape, 1);
   usbSerial.write(header, 9);
   if (len > 0) {
@@ -613,42 +922,25 @@ static void binMeterStreamSendSample() {
   binSendBinaryFrame(BIN_CMD_METER_STREAM, buf, payloadLen);
 }
 
-// Route payload bytes to the appropriate command handler
-static void binProcessPayloadByte(uint8_t byte) {
-  switch (binCmd) {
-    case BIN_CMD_IMAGE:
-      binImagePayloadByte(byte);
-      break;
-    case BIN_CMD_ECHO:
-      binEchoPayloadByte(byte);
-      break;
-    case BIN_CMD_METER_STREAM:
-      binMeterStreamPayloadByte(byte);
-      break;
-    default:
-      // Unknown command — just consume bytes, error sent at dispatch
-      break;
-  }
-}
 
 //void onSerialDataReceived(const uint8_t* data, size_t length){
 void onSerialDataReceived(){
-  if (millis() - lastSerialTime > SERIAL_BUFFER_TIMEOUT_MS) {
-    binReset();
+  // Update binary timeout whenever we receive data in a binary state
+  if (parseState != PARSE_TEXT) {
+    binLastByteTime = millis();
   }
-  lastSerialTime = millis();
-
   // Process each byte
   for (size_t i = 0; i < rawBufIndex; i++) {
     uint8_t c = (uint8_t)rawBuffer[i];
 
     switch (parseState) {
     case PARSE_TEXT:
-      if (c == 0x00) {
-        // Binary escape — switch to binary header mode
+      if (c == BIN_ESCAPE) {
+        // SOH — switch to binary header mode
         parseState = PARSE_BIN_HEADER;
         binHeaderIndex = 0;
         binRunningCRC = 0;
+        binLastByteTime = millis();
         break;
       }
 
@@ -692,7 +984,19 @@ void onSerialDataReceived(){
         }
 
         binPayloadReceived = 0;
-        imgSubHeaderIndex = 0;
+
+        // Look up handler for this command
+        binActiveHandler = binFindHandler(binCmd);
+        if (!binActiveHandler) {
+          binSendResponse(binCmd, "unknown command", false);
+          binReset();
+          break;
+        }
+        if (!binActiveHandler->begin(binCmd, binFlags, binPayloadLen)) {
+          // Handler rejected — it sent its own error response
+          binReset();
+          break;
+        }
 
         if (binPayloadLen == 0) {
           // No payload — go straight to checksum
@@ -706,10 +1010,11 @@ void onSerialDataReceived(){
 
     case PARSE_BIN_PAYLOAD:
       binRunningCRC = esp_crc32_le(binRunningCRC, &c, 1);
-      binProcessPayloadByte(c);
+      binActiveHandler->payloadByte(c);
       binPayloadReceived++;
 
       if (binPayloadReceived >= binPayloadLen) {
+        if (imgProf.active) imgProf.tReceived = micros();
         parseState = PARSE_BIN_CHECKSUM;
         binChecksumIndex = 0;
       }
@@ -718,15 +1023,15 @@ void onSerialDataReceived(){
     case PARSE_BIN_CHECKSUM:
       binChecksumBuf[binChecksumIndex++] = c;
       if (binChecksumIndex == BIN_CHECKSUM_SIZE) {
+        if (imgProf.active) imgProf.tCrcDone = micros();
         uint32_t expected = binChecksumBuf[0] | (binChecksumBuf[1] << 8) |
                            (binChecksumBuf[2] << 16) | (binChecksumBuf[3] << 24);
         if (expected != binRunningCRC) {
           ESP_LOGW(TAG, "Binary: checksum mismatch (expected 0x%08X, got 0x%08X)",
                    expected, binRunningCRC);
-          binImageEnd(false);
           binSendResponse(binCmd, "checksum mismatch", false);
         } else {
-          binDispatch();
+          binActiveHandler->dispatch();
         }
         binReset();
       }
@@ -746,7 +1051,7 @@ void processJsonRpcMessage(const char* jsonString) {
     return;
   }
   
-  if (!doc["action"] || !doc["params"]) {  
+  if (!doc["action"]) {
     String err = "{\"status\": \"error\", \"data\": {\"code\": -32600, \"message\": \"Invalid request\"}}";
     printErr(err);
     return;
@@ -819,7 +1124,24 @@ void processJsonRpcMessage(const char* jsonString) {
       }
     }
 
-
+    if(params.containsKey("screenLock")){
+      JsonObject lp = params["screenLock"].as<JsonObject>();
+      for (int i = 0; i < 3; i++) {
+        String key = "CH" + String(i + 1);
+        if (lp.containsKey(key)) {
+          int val = lp[key].as<int>();
+          if (val == 1) {
+            imageMode[i] = true;
+            screenLockTime[i] = millis();
+          } else if (val == 0) {
+            imageMode[i] = false;
+            screenLockTime[i] = 0;
+          } else {
+            result[key] = "fail";
+          }
+        }
+      }
+    }
     if(params["ledState"]){
       int inx = getEnumIndex(params["ledState"].as<const char*>(),t_bool,ARR_SIZE(t_bool));
       inx != -1 ? gloState->system.ledState = inx : result["ledState"] = "fail";        
@@ -970,6 +1292,11 @@ void processJsonRpcMessage(const char* jsonString) {
         result["pacRev"]      = String(gloState->system.pacRevisionID);
       if(pName == "uptime"    || all || state)
         result["uptime"]      = millis();
+      if(pName == "screenLock" || all || state) {
+        JsonObject lo = result["screenLock"].to<JsonObject>();
+        for (int i = 0; i < 3; i++)
+          lo["CH" + String(i + 1)] = imageMode[i] ? 1 : 0;
+      }
 
       for(int i = 0; i<3; i++){
         if (pName == "CH"+String(i+1) || pName == "CH"+String(i+1)+"_all"){
@@ -1010,6 +1337,18 @@ void processJsonRpcMessage(const char* jsonString) {
     } else {
       RestartService::restartNow();
     }
+  }
+
+  else if(action == "bootloader"){
+    if(gloConfig->features.reboot_enabled != ENABLE){
+      result["error"] = "reboot_enabled must be set to 1 first";
+      sendJsonResponse(0, result);
+      return;
+    }
+    sendJsonResponse(0, result);
+    usbSerial.flush();
+    delay(100);
+    enterBootloader();
   }
 
 }
@@ -1091,17 +1430,10 @@ static void usbEventCallback(void* arg, esp_event_base_t event_base, int32_t eve
         ESP_LOGI(TAG,"CDC LINE CODING: bit_rate: %u, data_bits: %u, stop_bits: %u, parity: %u\n", data->line_coding.bit_rate, data->line_coding.data_bits, data->line_coding.stop_bits, data->line_coding.parity);
         break;
       case ARDUINO_USB_CDC_RX_EVENT:
-        //ESP_LOGV(TAG,"CDC RX [%u]:", data->rx.len);
-        {
-            //uint8_t buf[data->rx.len]; //redundant- left for reference
-
-            rawBufIndex = usbSerial.read(rawBuffer,data->rx.len);
-            onSerialDataReceived();
-
-            USBSerialActivity=true;
-            gloState->features.pcConnected = true;
-            
-        }
+        // With __wrap_tud_cdc_rx_cb, this event only fires if StreamBuffer
+        // isn't ready yet (early boot fallback). Notify task as before.
+        USBSerialActivity = true;
+        if (exterTaskHandle) xTaskNotifyGive(exterTaskHandle);
         break;
       case ARDUINO_USB_CDC_RX_OVERFLOW_EVENT:
         ESP_LOGW(TAG,"CDC RX Overflow of %d bytes", data->rx_overflow.dropped_bytes);

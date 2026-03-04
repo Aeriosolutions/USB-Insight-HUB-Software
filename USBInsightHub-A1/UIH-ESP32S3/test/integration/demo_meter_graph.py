@@ -264,8 +264,8 @@ class MeterReceiver(threading.Thread):
 
             # Try to parse frames from buf
             while True:
-                # Look for frame start (\0)
-                idx = buf.find(b'\x00')
+                # Look for frame start (SOH = 0x01)
+                idx = buf.find(b'\x01')
                 if idx < 0:
                     # No frame start — might be JSON text, discard
                     buf.clear()

@@ -12,18 +12,12 @@ import time
 
 import pytest
 
-from binary_transport import build_echo_frame, parse_frame, BIN_CMD_ECHO
+from binary_transport import build_echo_frame, parse_frame, BIN_CMD_ECHO, BIN_ESCAPE
 
 log = logging.getLogger("test_binary_echo")
 
 
-@pytest.fixture
-def hub(hub_connection):
-    """Use the shared hub fixture from conftest."""
-    return hub_connection
-
-
-def send_and_receive_echo(hub, payload: bytes, timeout: float = 2.0) -> bytes:
+def send_and_receive_echo(hub, payload: bytes, timeout: float = 5.0) -> bytes:
     """Send an echo frame and read the binary response frame."""
     frame = build_echo_frame(payload)
     log.info("Sending echo (%d byte payload, %d byte frame)", len(payload), len(frame))
@@ -31,17 +25,22 @@ def send_and_receive_echo(hub, payload: bytes, timeout: float = 2.0) -> bytes:
     hub.ser.write(frame)
     hub.ser.flush()
 
-    # Read response — binary frame starts with \0
-    # Read until we have enough data (header + payload + crc)
-    expected_size = 1 + 9 + len(payload) + 4  # \0 + header + payload + crc32
-    response = b""
-    deadline = time.monotonic() + timeout
-    while len(response) < expected_size and time.monotonic() < deadline:
-        chunk = hub.ser.read(expected_size - len(response))
-        if chunk:
-            response += chunk
-        else:
-            time.sleep(0.01)
+    # Read response — binary frame starts with SOH (0x01)
+    # Use short serial timeout so the read loop iterates quickly
+    expected_size = 1 + 9 + len(payload) + 4  # SOH + header + payload + crc32
+    old_timeout = hub.ser.timeout
+    hub.ser.timeout = 0.2
+    try:
+        response = b""
+        deadline = time.monotonic() + timeout
+        while len(response) < expected_size and time.monotonic() < deadline:
+            chunk = hub.ser.read(expected_size - len(response))
+            if chunk:
+                response += chunk
+            else:
+                time.sleep(0.01)
+    finally:
+        hub.ser.timeout = old_timeout
 
     if len(response) < expected_size:
         raise TimeoutError(

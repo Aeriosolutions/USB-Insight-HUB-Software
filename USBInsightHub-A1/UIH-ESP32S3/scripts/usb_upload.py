@@ -47,28 +47,54 @@ def _run(cmd, **kwargs):
     return r
 
 
+def _normalize_serial(serial):
+    """Strip colons/dashes and lowercase for comparison."""
+    if not serial:
+        return ""
+    return serial.replace(":", "").replace("-", "").lower()
+
+
 def _find_app_port():
-    """Find the Insight Hub running the application firmware."""
+    """Find the Insight Hub running the application firmware.
+
+    Returns (device_path, serial_number) or (None, None).
+    """
     from serial.tools.list_ports import comports
 
     for p in comports():
         if p.vid == 0x303A and p.product == "InsightHUB Controller":
-            return p.device
-    return None
+            return p.device, p.serial_number
+    return None, None
 
 
-def _find_bootloader_port():
-    """Find the ESP32-S3 ROM bootloader port."""
+def _find_bootloader_port(expected_serial=None):
+    """Find the ESP32-S3 ROM bootloader port.
+
+    If *expected_serial* is given, only match a bootloader whose serial
+    number matches (ignoring colons/dashes/case).  This prevents
+    accidentally flashing a different ESP32-S3 device.
+    """
     from serial.tools.list_ports import comports
 
+    norm_expected = _normalize_serial(expected_serial)
     for p in comports():
         if p.vid == 0x303A and p.product == "USB JTAG/serial debug unit":
+            if norm_expected and _normalize_serial(p.serial_number) != norm_expected:
+                continue
             return p.device
     return None
 
 
-def _enter_bootloader(port):
-    """Enable reboot and do a 1200-baud touch to enter the ROM bootloader."""
+def _enter_bootloader(port, serial_number):
+    """Enter ROM bootloader via the serial API bootloader command.
+
+    Sends ``{"action":"bootloader"}`` which triggers ``tud_disconnect()``,
+    GPIO release, ``FORCE_DOWNLOAD_BOOT``, and ``esp_restart()``.  The ROM
+    bootloader re-enumerates on USB Serial JTAG.
+
+    Falls back to 1200-baud touch if the firmware doesn't support the
+    bootloader command (older firmware).
+    """
     import json
     import termios
 
@@ -93,6 +119,7 @@ def _enter_bootloader(port):
         s.flush()
         return s.readline().decode("utf-8", errors="replace").strip()
 
+    # Enable reboot (required by both bootloader command and 1200-baud path)
     _log(f"Enabling reboot on {port}...")
     resp = _send({"action": "set", "params": {"reboot_enabled": 1}})
     _LOG_FILE.write(f"  reboot_enabled response: {resp}\n")
@@ -104,24 +131,31 @@ def _enter_bootloader(port):
     for ch in ("CH1", "CH2", "CH3"):
         _send({"action": "set", "params": {ch: {"Dev1_name": "BOOT", "numDev": 1}}})
 
+    # Try dedicated bootloader command first
+    _log("Sending bootloader command...")
+    resp = _send({"action": "bootloader"})
+    _LOG_FILE.write(f"  bootloader response: {resp}\n")
+    use_1200_baud = "error" in resp or "ok" not in resp
     s.close()
-    time.sleep(0.3)
 
-    _log(f"1200-baud touch on {port}...")
-    s = serial.Serial(port, 1200)
-    time.sleep(0.5)
-    s.close()
-    time.sleep(3.0)
+    if use_1200_baud:
+        # Fallback: 1200-baud touch for older firmware
+        _log(f"Bootloader command not supported, falling back to 1200-baud touch on {port}...")
+        time.sleep(0.3)
+        s = serial.Serial(port, 1200)
+        time.sleep(0.5)
+        s.close()
+        time.sleep(3.0)
 
-    # Wait for bootloader to enumerate
-    deadline = time.monotonic() + 10.0
+    # Wait for bootloader to enumerate — match by serial number
+    deadline = time.monotonic() + 15.0
     while time.monotonic() < deadline:
-        bl_port = _find_bootloader_port()
+        bl_port = _find_bootloader_port(expected_serial=serial_number)
         if bl_port:
             return bl_port
         time.sleep(0.5)
 
-    sys.exit("Bootloader did not enumerate after 1200-baud touch.")
+    sys.exit("Bootloader did not enumerate within 15s.")
 
 
 def _clear_and_reset(esptool_path, python_path, port):
@@ -133,6 +167,7 @@ def _clear_and_reset(esptool_path, python_path, port):
         [python_path, esptool_path,
          "--chip", "esp32s3",
          "--port", port,
+         "--before", "no_reset",
          "--no-stub",
          "--after", "hard_reset",
          "write_mem", RTC_CNTL_OPTION1_REG, "0x0", "0x1"],
@@ -152,28 +187,34 @@ def usb_upload(source, target, env):
 
     _log(f"Upload log: {_LOG_PATH}")
 
-    # Determine device state
-    bl_port = _find_bootloader_port()
+    # Determine device state — use serial number to avoid flashing wrong device
+    app_port, app_serial = _find_app_port()
+    bl_port = _find_bootloader_port(expected_serial=app_serial)
     if bl_port:
-        _log(f"Device already in bootloader on {bl_port}")
+        _log(f"Device already in bootloader on {bl_port} (serial {app_serial})")
+    elif app_port:
+        bl_port = _enter_bootloader(app_port, app_serial)
     else:
-        app_port = _find_app_port()
-        if not app_port:
-            app_port = env.subst("$UPLOAD_PORT")
-            if not app_port:
-                sys.exit(
-                    "Hub not found. Connect the hub and ensure it is running."
-                )
-        bl_port = _enter_bootloader(app_port)
+        # No app port found — try bootloader without serial filter as last resort
+        bl_port = _find_bootloader_port()
+        if bl_port:
+            _log(f"Device in bootloader on {bl_port} (no app serial to verify)")
+        else:
+            sys.exit(
+                "Hub not found. Connect the hub and ensure it is running."
+            )
 
     _log(f"Flashing via bootloader on {bl_port}...")
 
     # Build the esptool write_flash command
+    # --before no_reset: the ROM bootloader is on USB Serial JTAG (not USB-OTG),
+    # so esptool must not attempt DTR/RTS reset sequences.
     flash_args = [
         python_path, esptool_path,
         "--chip", "esp32s3",
         "--port", bl_port,
         "--baud", env.subst("$UPLOAD_SPEED") or "921600",
+        "--before", "no_reset",
         "--no-stub",
         "--after", "no_reset",
         "write_flash", "-z",

@@ -25,10 +25,20 @@ IMAGE_WIDTH = 226
 IMAGE_HEIGHT = 90
 
 
-@pytest.fixture
-def hub(hub_connection):
-    """Use the shared hub fixture from conftest."""
-    return hub_connection
+def send_image_and_read_response(hub, frame, timeout=10.0):
+    """Send an image frame and read the JSON response with extended timeout."""
+    old_timeout = hub.ser.timeout
+    hub.ser.timeout = timeout
+    try:
+        t0 = time.monotonic()
+        hub.ser.write(frame)
+        hub.ser.flush()
+        line = hub.ser.readline().decode("utf-8", errors="replace").strip()
+        elapsed = time.monotonic() - t0
+        log.info("Response (%.1fs): %s", elapsed, line)
+        return line
+    finally:
+        hub.ser.timeout = old_timeout
 
 
 class TestBinaryImage:
@@ -40,10 +50,7 @@ class TestBinaryImage:
         frame = build_image_frame(1, 16, IMAGE_WIDTH, IMAGE_HEIGHT, pixels)
         log.info("Sending solid red to CH1 (%d bytes)", len(frame))
 
-        hub.ser.write(frame)
-        hub.ser.flush()
-        line = hub.ser.readline().decode("utf-8", errors="replace").strip()
-        log.info("Response: %s", line)
+        line = send_image_and_read_response(hub, frame)
 
         resp = json.loads(line)
         assert resp["status"] == "ok"
@@ -56,10 +63,7 @@ class TestBinaryImage:
         frame = build_image_frame(2, 16, IMAGE_WIDTH, IMAGE_HEIGHT, pixels)
         log.info("Sending solid green to CH2 (%d bytes)", len(frame))
 
-        hub.ser.write(frame)
-        hub.ser.flush()
-        line = hub.ser.readline().decode("utf-8", errors="replace").strip()
-        log.info("Response: %s", line)
+        line = send_image_and_read_response(hub, frame)
 
         resp = json.loads(line)
         assert resp["status"] == "ok"
@@ -70,10 +74,7 @@ class TestBinaryImage:
         frame = build_image_frame(3, 16, IMAGE_WIDTH, IMAGE_HEIGHT, pixels)
         log.info("Sending gradient to CH3 (%d bytes)", len(frame))
 
-        hub.ser.write(frame)
-        hub.ser.flush()
-        line = hub.ser.readline().decode("utf-8", errors="replace").strip()
-        log.info("Response: %s", line)
+        line = send_image_and_read_response(hub, frame)
 
         resp = json.loads(line)
         assert resp["status"] == "ok"
@@ -83,9 +84,7 @@ class TestBinaryImage:
         # Send an image first
         pixels = solid_image_rgb565(IMAGE_WIDTH, IMAGE_HEIGHT, 0, 0, 255)
         frame = build_image_frame(1, 16, IMAGE_WIDTH, IMAGE_HEIGHT, pixels)
-        hub.ser.write(frame)
-        hub.ser.flush()
-        hub.ser.readline()  # consume image response
+        line = send_image_and_read_response(hub, frame)
 
         time.sleep(0.1)
 
@@ -99,10 +98,7 @@ class TestBinaryImage:
         pixels = solid_image_rgb565(IMAGE_WIDTH, IMAGE_HEIGHT, 255, 255, 255)
         frame = build_image_frame(0, 16, IMAGE_WIDTH, IMAGE_HEIGHT, pixels)
 
-        hub.ser.write(frame)
-        hub.ser.flush()
-        line = hub.ser.readline().decode("utf-8", errors="replace").strip()
-        log.info("Response: %s", line)
+        line = send_image_and_read_response(hub, frame)
 
         resp = json.loads(line)
         assert resp["status"] == "error"
@@ -116,10 +112,7 @@ class TestBinaryImage:
         # Corrupt the last byte (checksum)
         frame[-1] ^= 0xFF
 
-        hub.ser.write(bytes(frame))
-        hub.ser.flush()
-        line = hub.ser.readline().decode("utf-8", errors="replace").strip()
-        log.info("Response: %s", line)
+        line = send_image_and_read_response(hub, bytes(frame))
 
         resp = json.loads(line)
         assert resp["status"] == "error"

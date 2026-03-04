@@ -1,40 +1,37 @@
 """Binary transport protocol for the Insight Hub.
 
-Builds and sends binary frames using the \0-escaped protocol:
+Builds and sends binary frames using SOH-escaped protocol:
 
-    \0  version(1)  cmd(2,LE)  flags(2,LE)  length(4,LE)  payload(length)  crc32(4,LE)
+    SOH  version(1)  cmd(2,LE)  flags(2,LE)  length(4,LE)  payload(length)  crc32(4,LE)
+
+SOH (0x01, Start of Header) is the binary escape byte.  It cannot appear
+in valid JSON text (RFC 8259 requires control chars U+0000–U+001F to be
+escaped), so it unambiguously signals a binary frame on a shared
+text/binary serial channel.
 
 All multi-byte fields are little-endian.  CRC-32 is computed over
-[version..payload] (everything after the \0 escape).
+[version..payload] (everything after the SOH escape).
 """
 
 import struct
+import zlib
 
+BIN_ESCAPE = 0x01  # SOH — binary frame escape byte
 BIN_PROTOCOL_VERSION = 0x01
 BIN_CMD_IMAGE = 0x0001
 BIN_CMD_ECHO = 0x0002
 BIN_CMD_METER_STREAM = 0x0003
-
-# CRC-32 lookup table (polynomial 0xEDB88320, same as ESP32 ROM)
-_CRC32_TABLE = []
-for _i in range(256):
-    _crc = _i
-    for _ in range(8):
-        if _crc & 1:
-            _crc = (_crc >> 1) ^ 0xEDB88320
-        else:
-            _crc >>= 1
-    _CRC32_TABLE.append(_crc)
+BIN_CMD_SCREEN_LOCK = 0x0004
+BIN_CMD_SCREEN_READY = 0x0005
 
 
 def crc32(data: bytes, crc: int = 0) -> int:
-    """Compute raw CRC-32 matching ESP32's esp_crc32_le(0, data, len).
+    """Compute CRC-32 matching ESP32's esp_crc32_le(crc, data, len).
 
-    Uses init=0, no final XOR — NOT the same as zlib.crc32.
+    esp_crc32_le uses standard CRC-32 (init=~crc, final=~reg),
+    which is equivalent to zlib.crc32.
     """
-    for b in data:
-        crc = _CRC32_TABLE[(crc ^ b) & 0xFF] ^ (crc >> 8)
-    return crc & 0xFFFFFFFF
+    return zlib.crc32(data, crc) & 0xFFFFFFFF
 
 
 def build_frame(cmd: int, payload: bytes, flags: int = 0) -> bytes:
@@ -51,12 +48,12 @@ def build_frame(cmd: int, payload: bytes, flags: int = 0) -> bytes:
     )
     checksummed = header + payload
     checksum = crc32(checksummed)
-    return b"\x00" + checksummed + struct.pack("<I", checksum)
+    return bytes([BIN_ESCAPE]) + checksummed + struct.pack("<I", checksum)
 
 
 def parse_frame(data: bytes) -> tuple:
     """Parse a binary frame. Returns (cmd, flags, payload) or raises ValueError."""
-    if len(data) < 14 or data[0] != 0x00:
+    if len(data) < 14 or data[0] != BIN_ESCAPE:
         raise ValueError("not a binary frame")
     version = data[1]
     if version != BIN_PROTOCOL_VERSION:
@@ -134,6 +131,24 @@ def parse_meter_sample(payload: bytes) -> dict:
         })
         offset += 9
     return {"timestamp_ms": timestamp_ms, "channels": channels}
+
+
+def build_screen_lock_frame(mask: int, action: int, flags: int = 0) -> bytes:
+    """Build a screen lock frame (cmd=0x0004).
+
+    *mask*: channel bitmask (bits 0-2 = CH1-CH3).
+    *action*: 1 = lock, 0 = unlock.
+    """
+    payload = struct.pack("<BB", mask, action)
+    return build_frame(BIN_CMD_SCREEN_LOCK, payload, flags)
+
+
+def build_screen_ready_frame(channel: int, flags: int = 0) -> bytes:
+    """Build a screen ready frame (cmd=0x0005).
+
+    *channel*: 1-3.  Response is deferred until the display's render slot.
+    """
+    return build_frame(BIN_CMD_SCREEN_READY, bytes([channel]), flags)
 
 
 def rgb565(r: int, g: int, b: int) -> int:
