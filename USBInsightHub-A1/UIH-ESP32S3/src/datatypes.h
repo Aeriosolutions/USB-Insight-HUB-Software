@@ -209,8 +209,9 @@ struct FeaturesConfig {
   uint8_t startUpmode;  
   uint8_t wifi_enabled;
   uint8_t hubMode;
-  uint8_t filterType;    
+  uint8_t filterType;
   uint8_t refreshRate;
+  uint8_t reboot_enabled;
 };
 
 struct StartupState { 
@@ -223,8 +224,12 @@ struct StartupConfig {
 
 struct ScreenConfig {
   uint8_t rotation;
-  uint16_t brightness;
+  uint16_t brightness;  // 10-bit PWM (0-1023)
 };
+
+// Brightness helpers — convert between user-facing percentage and internal PWM
+inline uint16_t brightnessPctToPwm(uint16_t pct) { return (uint16_t)((uint32_t)pct * 1023 + 50) / 100; }
+inline uint16_t brightnessPwmToPct(uint16_t pwm) { return (uint16_t)((uint32_t)pwm * 100 + 511) / 1023; }
 
 struct MeterState {
   float AvgVoltage;

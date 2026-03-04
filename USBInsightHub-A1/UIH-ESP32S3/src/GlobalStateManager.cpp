@@ -196,7 +196,8 @@ void setDefaultGlobalConfig(GlobalState *globalState, GlobalConfig *globalConfig
     globalConfig->features.wifi_enabled = ENABLE;
     globalConfig->features.hubMode = USB2_3;
     globalConfig->features.filterType = FILTER_TYPE_MEDIAN;
-    globalConfig->features.refreshRate = S0_5;        
+    globalConfig->features.refreshRate = S0_5;
+    globalConfig->features.reboot_enabled = DISABLE;
 
     for(int i=0; i<3; i++){
         globalConfig->startup[i].startup_timer = 1;
@@ -229,7 +230,8 @@ void writeGlobalConfigasKeyValuePairs(GlobalConfig *globalConfig)
     flashstorage.putUChar("f_hubMode", globalConfig->features.hubMode);
     flashstorage.putUChar("f_filterType", globalConfig->features.filterType);
     flashstorage.putUChar("f_refreshRate", globalConfig->features.refreshRate);
-    
+    flashstorage.putUChar("f_reboot_en", globalConfig->features.reboot_enabled);
+
     char key[16];  // <= 15 + null
 
     for(int i = 0; i < 3; i++) {
@@ -265,7 +267,8 @@ void readGlobalConfigasKeyValuePairs(GlobalConfig *globalConfig)
     globalConfig->features.hubMode = flashstorage.getUChar("f_hubMode", globalConfig->features.hubMode);
     globalConfig->features.filterType = flashstorage.getUChar("f_filterType", globalConfig->features.filterType);
     globalConfig->features.refreshRate = flashstorage.getUChar("f_refreshRate", globalConfig->features.refreshRate);
-    
+    globalConfig->features.reboot_enabled = flashstorage.getUChar("f_reboot_en", globalConfig->features.reboot_enabled);
+
     char key[16];  // <= 15 + null
 
     for(int i = 0; i < 3; i++) {
@@ -306,7 +309,15 @@ void migrateLegacyTemplate(GlobalConfig *globalConfig){
         for(int i = 0; i < 3; i++) {
             globalConfig->startup[i].startup_timer = lglobalConfig.startup[i].startup_timer;
             globalConfig->screen[i].rotation = lglobalConfig.screen[i].rotation;
-            globalConfig->screen[i].brightness = lglobalConfig.screen[i].brightness;
+            // v1.0.0 stored brightness inconsistently: serial API wrote 10-100
+            // (percentage), but the on-board menu wrote 50-1000 (raw PWM) and the
+            // default was 800 (PWM).  Detect which format we have by range.
+            uint16_t legacyBrightness = lglobalConfig.screen[i].brightness;
+            if (legacyBrightness <= 100) {
+                globalConfig->screen[i].brightness = brightnessPctToPwm(legacyBrightness);
+            } else {
+                globalConfig->screen[i].brightness = legacyBrightness;
+            }
             globalConfig->meter[i].backCLim = lglobalConfig.meter[i].backCLim;
             globalConfig->meter[i].fwdCLim = lglobalConfig.meter[i].fwdCLim;
         }
