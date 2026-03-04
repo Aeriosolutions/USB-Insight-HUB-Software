@@ -8,6 +8,7 @@ import json
 import logging
 import shutil
 import subprocess
+import termios
 import time
 from pathlib import Path
 
@@ -112,12 +113,26 @@ class Hub:
     def _connect(self):
         log.info("Opening %s (timeout=%.1fs)", self.port, self.timeout)
         if self.ser and self.ser.is_open:
-            self.ser.close()
-        self.ser = serial.Serial(self.port, 115200, timeout=self.timeout)
-        self.ser.dtr = True
-        time.sleep(CONNECT_SETTLE_S)
-        self.ser.reset_input_buffer()
-        log.info("Opened %s", self.port)
+            try:
+                self.ser.close()
+            except (serial.SerialException, OSError):
+                pass
+        for attempt in range(3):
+            try:
+                self.ser = serial.Serial(self.port, 115200, timeout=self.timeout)
+                self.ser.dtr = True
+                time.sleep(CONNECT_SETTLE_S)
+                self.ser.reset_input_buffer()
+                log.info("Opened %s", self.port)
+                return
+            except (serial.SerialException, termios.error, OSError) as e:
+                log.warning("Connect attempt %d failed: %s", attempt + 1, e)
+                if attempt < 2:
+                    time.sleep(1.0)
+                else:
+                    raise HubConnectionError(
+                        f"Cannot open {self.port} after 3 attempts: {e}"
+                    )
 
     def _dtr_reset(self):
         """Toggle DTR to trigger a CDC reconnect on the ESP32-S3."""

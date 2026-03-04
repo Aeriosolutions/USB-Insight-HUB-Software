@@ -132,6 +132,7 @@ class TestRebootConfig:
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(60)
 class TestRestart:
     """Serial restart command reboots the hub."""
 
@@ -162,6 +163,7 @@ class TestRestart:
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(90)
 class TestRebootToggle:
     """The reboot_enabled config gates 1200-baud bootloader entry."""
 

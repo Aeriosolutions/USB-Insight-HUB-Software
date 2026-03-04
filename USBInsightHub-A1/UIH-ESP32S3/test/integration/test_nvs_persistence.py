@@ -91,6 +91,7 @@ def expected_test_snapshot():
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(60)
 class TestNvsPersistenceAcrossReboot:
     """Config values set via serial API survive a software restart."""
 
@@ -150,11 +151,19 @@ class TestNvsPersistenceAcrossReboot:
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(60)
 class TestNvsIndividualFieldPersistence:
     """Each settable config field individually survives a reboot.
 
     Parametrized so failures pinpoint the exact field that didn't persist.
     """
+
+    @pytest.fixture(autouse=True)
+    def _save_and_restore_single(self, hub, request):
+        """Capture and restore just the field under test."""
+        self._field = None
+        yield
+        # Restore handled per-test below
 
     @pytest.mark.parametrize("field,test_val", [
         ("filterType", "moving_avg"),

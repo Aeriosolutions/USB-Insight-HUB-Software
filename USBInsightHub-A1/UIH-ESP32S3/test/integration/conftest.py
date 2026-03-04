@@ -103,7 +103,7 @@ def pytest_collection_modifyitems(session, config, items):
         pytest.exit("No Insight Hub found. Pass --port or connect a hub.", returncode=1)
     try:
         config._hub_instance = Hub(port)
-    except (HubConnectionError, serial.SerialException) as e:
+    except (HubConnectionError, serial.SerialException, OSError) as e:
         pytest.exit(f"ERROR: {e}", returncode=1)
 
     if config.getoption("--quick"):
