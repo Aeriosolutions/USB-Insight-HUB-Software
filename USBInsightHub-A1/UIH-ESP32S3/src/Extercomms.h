@@ -48,6 +48,7 @@ struct BinCommandHandler {
     uint16_t cmd;
     bool (*begin)(uint16_t cmd, uint16_t flags, uint32_t payloadLen);
     void (*payloadByte)(uint8_t byte);
+    void (*payloadBlock)(const uint8_t* data, size_t len);  // optional bulk handler
     void (*dispatch)();
     void (*reset)();   // optional, may be nullptr
 };

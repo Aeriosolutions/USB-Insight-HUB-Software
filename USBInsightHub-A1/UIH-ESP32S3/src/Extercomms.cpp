@@ -202,11 +202,13 @@ static const BinCommandHandler* binFindHandler(uint16_t cmd) {
 static void binReset();
 static void binImageBegin();
 static void binImagePayloadByte(uint8_t byte);
+static void binImagePayloadBlock(const uint8_t* data, size_t len);
 static void binImageRender();
 static void binImageCleanup();
 static void binImageFreeBuffer();
 static void binEchoBegin(uint32_t payloadLen);
 static void binEchoPayloadByte(uint8_t byte);
+static void binEchoPayloadBlock(const uint8_t* data, size_t len);
 static void binEchoEnd();
 static void binMeterStreamPayloadByte(uint8_t byte);
 static void binMeterStreamDispatch();
@@ -228,6 +230,7 @@ static const BinCommandHandler imageHandler = {
     return true;
   },
   .payloadByte = binImagePayloadByte,
+  .payloadBlock = binImagePayloadBlock,
   .dispatch = []() {
     if (!imgFailed) binImageRender();
   },
@@ -240,6 +243,13 @@ static const BinCommandHandler imageHandler = {
   },
 };
 
+static void binEchoPayloadBlock(const uint8_t* data, size_t len) {
+  if (echoBuffer && echoBufferIndex + len <= echoBufferSize) {
+    memcpy(echoBuffer + echoBufferIndex, data, len);
+    echoBufferIndex += len;
+  }
+}
+
 static const BinCommandHandler echoHandler = {
   .cmd = BIN_CMD_ECHO,
   .begin = [](uint16_t, uint16_t, uint32_t payloadLen) -> bool {
@@ -247,6 +257,7 @@ static const BinCommandHandler echoHandler = {
     return echoBuffer != nullptr || payloadLen == 0;
   },
   .payloadByte = binEchoPayloadByte,
+  .payloadBlock = binEchoPayloadBlock,
   .dispatch = binEchoEnd,
   .reset = []() {
     free(echoBuffer);
@@ -263,6 +274,7 @@ static const BinCommandHandler meterHandler = {
     return true;
   },
   .payloadByte = binMeterStreamPayloadByte,
+  .payloadBlock = nullptr,
   .dispatch = binMeterStreamDispatch,
   .reset = nullptr,
 };
@@ -285,6 +297,7 @@ static const BinCommandHandler screenLockHandler = {
     if (screenLockPayloadIndex < sizeof(screenLockPayload))
       screenLockPayload[screenLockPayloadIndex++] = byte;
   },
+  .payloadBlock = nullptr,
   .dispatch = []() {
     uint8_t mask = screenLockPayload[0];
     uint8_t action = screenLockPayload[1];
@@ -331,6 +344,7 @@ static const BinCommandHandler screenReadyHandler = {
   .payloadByte = [](uint8_t byte) {
     screenReadyChannel = byte;
   },
+  .payloadBlock = nullptr,
   .dispatch = []() {
     if (screenReadyChannel < 1 || screenReadyChannel > 3) {
       binSendResponse(BIN_CMD_SCREEN_READY, "invalid channel (1-3)", false);
@@ -469,9 +483,8 @@ void taskExterCheckActivity(void *pvParameters){
 
         if (imgProf.active) imgProf.drainWakes++;
 
-        // Drain CDC StreamBuffer — bulk read, no per-byte FreeRTOS queue overhead
-        rawBufIndex = xStreamBufferReceive(cdcRxStream, rawBuffer, sizeof(rawBuffer), 0);
-        if (rawBufIndex > 0) {
+        // Drain CDC StreamBuffer — tight loop until empty
+        while ((rawBufIndex = xStreamBufferReceive(cdcRxStream, rawBuffer, sizeof(rawBuffer), 0)) > 0) {
           if (imgProf.active) {
             imgProf.drainReads++;
             imgProf.drainBytes += rawBufIndex;
@@ -571,21 +584,44 @@ static void binSendResponse(uint16_t cmd, const char* message, bool ok) {
 // Buffer pixel data during receive — NO SPI during parsing (avoids CDC overflow).
 // SPI transfer happens in binImageRender() after full frame + CRC verified.
 static void binImagePayloadByte(uint8_t byte) {
-  if (imgFailed) return;  // validation failed — consume silently
+  if (imgFailed) return;
 
   if (imgSubHeaderIndex < IMAGE_SUBHEADER_SIZE) {
     imgSubHeader[imgSubHeaderIndex++] = byte;
     if (imgSubHeaderIndex == IMAGE_SUBHEADER_SIZE) {
-      binImageBegin();  // validates header, allocates pixel buffer
+      binImageBegin();
     }
     return;
   }
 
-  if (imgFailed) return;  // binImageBegin() may have set this
+  if (imgFailed) return;
 
-  // Buffer pixel data — will be flushed to display in binImageRender()
   if (imgPixelBuf && imgPixelBufIndex < imgPixelBufSize) {
     imgPixelBuf[imgPixelBufIndex++] = byte;
+  }
+}
+
+// Block handler — copies payload data in bulk using memcpy
+static void binImagePayloadBlock(const uint8_t* data, size_t len) {
+  if (imgFailed) return;
+
+  // Consume sub-header bytes first
+  while (imgSubHeaderIndex < IMAGE_SUBHEADER_SIZE && len > 0) {
+    imgSubHeader[imgSubHeaderIndex++] = *data++;
+    len--;
+    if (imgSubHeaderIndex == IMAGE_SUBHEADER_SIZE) {
+      binImageBegin();
+    }
+  }
+
+  if (imgFailed || len == 0) return;
+
+  // Bulk copy pixel data
+  if (imgPixelBuf) {
+    size_t space = imgPixelBufSize - imgPixelBufIndex;
+    size_t n = (len < space) ? len : space;
+    memcpy(imgPixelBuf + imgPixelBufIndex, data, n);
+    imgPixelBufIndex += n;
   }
 }
 
@@ -695,32 +731,24 @@ static void binImageRender() {
   gloScreen->streamBegin(cs_pin, x, y, imgWidth, imgHeight);
 
   // Stream buffered pixel data to display
-  uint16_t pixBuf[64];
-  size_t pixCount = 0;
-  size_t i = 0;
-
   if (imgBpp == 16) {
-    while (i + 1 < imgPixelBufIndex) {
-      pixBuf[pixCount++] = imgPixelBuf[i] | (imgPixelBuf[i + 1] << 8);
-      i += 2;
-      if (pixCount >= 64) {
-        gloScreen->streamPixels(pixBuf, pixCount);
-        pixCount = 0;
-      }
-    }
+    // RGB565 little-endian — push directly, no byte-swapping needed
+    uint32_t pixelCount = imgPixelBufIndex / 2;
+    gloScreen->streamPixels((const uint16_t*)imgPixelBuf, pixelCount);
   } else if (imgBpp == 8) {
-    while (i < imgPixelBufIndex) {
-      pixBuf[pixCount++] = gloScreen->palette[imgPixelBuf[i++]];
-      if (pixCount >= 64) {
+    // RGB332 — convert via palette in batches
+    uint16_t pixBuf[128];
+    size_t pixCount = 0;
+    for (size_t i = 0; i < imgPixelBufIndex; i++) {
+      pixBuf[pixCount++] = gloScreen->palette[imgPixelBuf[i]];
+      if (pixCount >= 128) {
         gloScreen->streamPixels(pixBuf, pixCount);
         pixCount = 0;
       }
     }
-  }
-
-  // Flush remaining pixels
-  if (pixCount > 0) {
-    gloScreen->streamPixels(pixBuf, pixCount);
+    if (pixCount > 0) {
+      gloScreen->streamPixels(pixBuf, pixCount);
+    }
   }
 
   gloScreen->streamEnd();
@@ -1008,10 +1036,27 @@ void onSerialDataReceived(){
       }
       break;
 
-    case PARSE_BIN_PAYLOAD:
-      binRunningCRC = esp_crc32_le(binRunningCRC, &c, 1);
-      binActiveHandler->payloadByte(c);
-      binPayloadReceived++;
+    case PARSE_BIN_PAYLOAD: {
+      // Process remaining payload bytes from rawBuffer as a block
+      uint32_t remaining = binPayloadLen - binPayloadReceived;
+      size_t available = rawBufIndex - i;
+      size_t chunk = (available < remaining) ? available : remaining;
+
+      // CRC over the block
+      binRunningCRC = esp_crc32_le(binRunningCRC, (const uint8_t*)&rawBuffer[i], chunk);
+
+      // Copy block into payload buffer (image, echo, etc.)
+      if (binActiveHandler->payloadBlock) {
+        binActiveHandler->payloadBlock((const uint8_t*)&rawBuffer[i], chunk);
+      } else {
+        // Fallback to per-byte for handlers without block support
+        for (size_t j = 0; j < chunk; j++) {
+          binActiveHandler->payloadByte((uint8_t)rawBuffer[i + j]);
+        }
+      }
+
+      binPayloadReceived += chunk;
+      i += chunk - 1;  // -1 because the for loop increments i
 
       if (binPayloadReceived >= binPayloadLen) {
         if (imgProf.active) imgProf.tReceived = micros();
@@ -1019,6 +1064,7 @@ void onSerialDataReceived(){
         binChecksumIndex = 0;
       }
       break;
+    }
 
     case PARSE_BIN_CHECKSUM:
       binChecksumBuf[binChecksumIndex++] = c;
