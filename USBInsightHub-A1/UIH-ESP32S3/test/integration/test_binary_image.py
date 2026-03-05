@@ -319,8 +319,12 @@ class TestRLECompression:
                                   flags=IMG_FLAG_SPRITE, compress=True)
         send_image_and_read_response(hub, frame)
 
-        time.sleep(0.5)
-        hub.ser.reset_input_buffer()
-        data = hub.get("hubMode")
-        assert data is not None
+        # After binary transfer, drain any residual data and retry JSON
+        for attempt in range(3):
+            time.sleep(0.3)
+            hub.ser.reset_input_buffer()
+            data = hub.get("hubMode")
+            if data is not None:
+                break
+        assert data is not None, "JSON API unresponsive after RLE transfer"
         assert "hubMode" in data
