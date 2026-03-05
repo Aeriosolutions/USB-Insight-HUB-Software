@@ -217,7 +217,7 @@ class TestRebootToggle:
         time.sleep(2.0)
 
         # Hub should NOT be responding to serial commands now
-        found = find_hub()
+        found = find_hub()[0]
         if found:
             try:
                 hub._connect()

@@ -176,7 +176,7 @@ def main():
                         help="Run animated plasma on CH1 (Ctrl-C to stop)")
     args = parser.parse_args()
 
-    port = args.port or find_hub()
+    port = args.port or find_hub()[0]
     if not port:
         print("No Insight Hub found. Pass --port or connect a hub.")
         sys.exit(1)

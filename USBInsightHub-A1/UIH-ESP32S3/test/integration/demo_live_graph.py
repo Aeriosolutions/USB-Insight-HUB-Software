@@ -449,7 +449,7 @@ def main():
 
     channels = [int(c) for c in args.channels.split(",")]
 
-    port = args.port or find_hub()
+    port = args.port or find_hub()[0]
     if not port:
         print("No Insight Hub found. Pass --port or connect a hub.")
         sys.exit(1)

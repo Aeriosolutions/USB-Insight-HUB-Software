@@ -30,33 +30,50 @@ NVS_OFFSET = 0x9000
 NVS_SIZE = 0x5000
 
 
+def _normalize_serial(serial_number):
+    """Normalize a USB serial number by removing colons and lowercasing.
+
+    The hub's serial changes format between app mode (B43A45B5582C) and
+    bootloader mode (B4:3A:45:B5:58:2C) — same bytes, different formatting.
+    """
+    if not serial_number:
+        return ""
+    return serial_number.replace(":", "").lower()
+
+
 def find_hub():
-    """Find the Insight Hub's serial port by USB VID/PID or product string.
+    """Find the Insight Hub's serial port by product string.
 
-    Excludes devices in ROM bootloader mode (same VID/PID but different
-    product string).
+    Returns (device, serial_number) tuple, or (None, None) if not found.
+    The serial_number is needed to identify the hub in bootloader mode.
     """
     for p in comports():
-        if p.product == BOOTLOADER_PRODUCT:
+        if p.product == INSIGHT_HUB_PRODUCT:
+            return p.device, p.serial_number
+    return None, None
+
+
+def find_bootloader(hub_serial=None):
+    """Find the hub's ROM bootloader serial port.
+
+    When *hub_serial* is provided (from a prior find_hub() call), matches
+    only the device whose normalized serial matches.  Without it, falls back
+    to returning the first bootloader-product device — which may be wrong
+    when multiple ESP32-S3 devices are connected.
+    """
+    norm = _normalize_serial(hub_serial)
+    fallback = None
+    for p in comports():
+        if p.product != BOOTLOADER_PRODUCT or p.vid != INSIGHT_HUB_VID:
             continue
-        if p.product == INSIGHT_HUB_PRODUCT or (
-            p.vid == INSIGHT_HUB_VID and p.pid == INSIGHT_HUB_PID
-        ):
+        if norm and _normalize_serial(p.serial_number) == norm:
             return p.device
-    return None
-
-
-def find_bootloader():
-    """Find an ESP32-S3 ROM bootloader serial port.
-
-    WARNING: If multiple ESP32-S3 devices are connected (e.g. hub + collar),
-    this may return the wrong one. Use --port to specify explicitly when
-    multiple devices are present.
-    """
-    for p in comports():
-        if p.product == BOOTLOADER_PRODUCT and p.vid == INSIGHT_HUB_VID:
-            return p.device
-    return None
+        if fallback is None:
+            fallback = p.device
+    # If we have a specific serial and didn't match, don't return the wrong device
+    if norm:
+        return None
+    return fallback
 
 
 def find_esptool():
@@ -103,9 +120,10 @@ class HubConnectionError(Exception):
 class Hub:
     """Thin wrapper around the Insight Hub's JSON serial API."""
 
-    def __init__(self, port, timeout=2.0):
+    def __init__(self, port, timeout=2.0, hub_serial=None):
         self.port = port
         self.timeout = timeout
+        self.hub_serial = hub_serial
         self.ser = None
         self._connect()
         self._verify_responsive()
@@ -207,7 +225,7 @@ class Hub:
         # Phase 1: brief wait for port to disappear (may not happen)
         phase1_deadline = min(time.monotonic() + 5.0, deadline)
         while time.monotonic() < phase1_deadline:
-            if not find_hub():
+            if not find_hub()[0]:
                 log.info("Hub disconnected from USB")
                 break
             time.sleep(poll_interval)
@@ -215,8 +233,10 @@ class Hub:
         # Phase 2: wait for the port to (re)appear
         port = None
         while time.monotonic() < deadline:
-            port = find_hub()
+            port, ser = find_hub()
             if port:
+                if ser:
+                    self.hub_serial = ser
                 break
             time.sleep(poll_interval)
         if not port:
@@ -248,12 +268,15 @@ class Hub:
         Clears FORCE_DOWNLOAD_BOOT via write_mem and triggers a hard reset
         so the chip boots the application.
         """
-        bl_port = find_bootloader()
+        bl_port = find_bootloader(self.hub_serial)
         if not bl_port:
-            app_port = find_hub()
+            # Device may have already recovered — check for normal app port
+            app_port, app_ser = find_hub()
             if app_port:
                 log.info("Hub already running (not in bootloader) on %s", app_port)
                 self.port = app_port
+                if app_ser:
+                    self.hub_serial = app_ser
                 self._connect()
                 self._verify_responsive()
                 return
@@ -287,7 +310,7 @@ class Hub:
         deadline = time.monotonic() + 30.0
         port = None
         while time.monotonic() < deadline:
-            port = find_hub()
+            port, ser = find_hub()
             if port:
                 break
             time.sleep(0.5)
@@ -324,7 +347,7 @@ class Hub:
         bl_port = None
         deadline = time.monotonic() + 10.0
         while time.monotonic() < deadline:
-            bl_port = find_bootloader()
+            bl_port = find_bootloader(self.hub_serial)
             if bl_port:
                 break
             time.sleep(0.5)
@@ -376,7 +399,7 @@ class Hub:
         bl_port = None
         deadline = time.monotonic() + 10.0
         while time.monotonic() < deadline:
-            bl_port = find_bootloader()
+            bl_port = find_bootloader(self.hub_serial)
             if bl_port:
                 break
             time.sleep(0.5)
@@ -405,8 +428,10 @@ class Hub:
         deadline = time.monotonic() + 30.0
         port = None
         while time.monotonic() < deadline:
-            port = find_hub()
+            port, ser = find_hub()
             if port:
+                if ser:
+                    self.hub_serial = ser
                 break
             time.sleep(0.5)
         if not port:

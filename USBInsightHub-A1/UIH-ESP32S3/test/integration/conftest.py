@@ -66,10 +66,7 @@ def pytest_terminal_summary(terminalreporter, config):
 
 
 def _recover_from_bootloader():
-    """If the hub is in ROM bootloader, try to recover via USB power cycle."""
-    import shutil
-    import time
-
+    """If the hub is in ROM bootloader, try to recover via esptool hard reset."""
     bl_port = find_bootloader()
     if not bl_port:
         return
@@ -78,9 +75,9 @@ def _recover_from_bootloader():
     log.warning("Hub detected in ROM bootloader on %s — recovering", bl_port)
 
     # Create a temporary Hub just for bootloader recovery
-    from hub import Hub
     tmp = Hub.__new__(Hub)
     tmp.port = bl_port
+    tmp.hub_serial = None
     tmp.ser = None
     try:
         tmp.boot_from_bootloader()
@@ -94,15 +91,22 @@ def _recover_from_bootloader():
 
 def pytest_collection_modifyitems(session, config, items):
     """Connect to the hub before any tests run. Abort early on failure."""
-    port = config.getoption("--port") or find_hub()
+    explicit_port = config.getoption("--port")
+    hub_serial = None
+
+    if explicit_port:
+        port = explicit_port
+    else:
+        port, hub_serial = find_hub()
+
     if not port:
         # No hub found — check if it's stuck in bootloader
         _recover_from_bootloader()
-        port = find_hub()
+        port, hub_serial = find_hub()
     if not port:
         pytest.exit("No Insight Hub found. Pass --port or connect a hub.", returncode=1)
     try:
-        config._hub_instance = Hub(port)
+        config._hub_instance = Hub(port, hub_serial=hub_serial)
     except (HubConnectionError, serial.SerialException, OSError) as e:
         pytest.exit(f"ERROR: {e}", returncode=1)
 
