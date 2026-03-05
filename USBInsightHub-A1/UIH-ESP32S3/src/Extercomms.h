@@ -67,6 +67,7 @@ void iniExtercommsBinaryTransport(Screen* screen);
 #define IMG_FLAG_BUFFER  0   // buffer pixels → flush after CRC (default)
 #define IMG_FLAG_SPRITE  1   // write into TFT_eSprite (8bpp only)
 #define IMG_FLAG_DIRECT  2   // stream directly to SPI (no buffer, CRC-unsafe)
+#define IMG_FLAG_RLE     0x04  // bit 2: payload is RLE-compressed (count+value pairs)
 
 // Image mode flags — when set, render loop skips that channel
 extern volatile bool imageMode[3];

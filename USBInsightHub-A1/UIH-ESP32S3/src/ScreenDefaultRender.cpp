@@ -224,21 +224,23 @@ void Screen::screenDefaultRender(chScreenData Screen, bool chromeOnly){
   // HWSerial.println(cval);
   img.fillRect(65, 222, cval, 18, TFT_CYAN) ;
 
+  // Power border — always drawn (chrome)
+  if (Screen.tProp.numDev != 11) {
+    img.fillSmoothRoundRect(0, 33, 240, 104, 10, color_border, TFT_BLACK);
+    if (!chromeOnly)
+      img.fillSmoothRoundRect(7, 40, 226, 90, 10, DARKGREY, color_border);
+  }
+
   if(!chromeOnly) {
     //Device name box
     if (Screen.tProp.numDev == 11) {
       imagePrint(Screen.tProp.imgBuffer, Screen.tProp.imgBPP, color_border);
-    } else {
-      img.fillSmoothRoundRect(0, 33, 240, 104, 10, color_border, TFT_BLACK);
-      img.fillSmoothRoundRect(7, 40, 226, 90, 10, DARKGREY, color_border);
     }
 
     //Device text print
-    //img.setTextSize(2);
     img.unloadFont();
     img.loadFont(modenine50);
 
-    //Screen.tProp.numDev=10;
     bool colorText = true;
     Screen.autoTxtClear==true ? colorText = Screen.pconnected: colorText = true;
 
@@ -249,16 +251,13 @@ void Screen::screenDefaultRender(chScreenData Screen, bool chromeOnly){
     }
     else if(Screen.tProp.numDev == 1){
       colorText == true ? img.setTextColor(TFT_YELLOW) : img.setTextColor(TFT_LIGHTGREY);
-      //img.setTextColor(TFT_YELLOW);
       device = Screen.tProp.Dev1_Name;
       img.drawCentreString(device, 120, 65, 4); //**
     }
     else if(Screen.tProp.numDev == 2){
       colorText == true ? img.setTextColor(TFT_YELLOW) : img.setTextColor(TFT_LIGHTGREY);
-      //img.setTextColor(TFT_YELLOW);
       img.drawCentreString(Screen.tProp.Dev1_Name,120,45,4);
       colorText == true ? img.setTextColor(TFT_WHITE) : img.setTextColor(TFT_LIGHTGREY);
-      //img.setTextColor(TFT_ORANGE);
       img.drawCentreString(Screen.tProp.Dev2_Name,120,85,4); //**
     }
     img.unloadFont();

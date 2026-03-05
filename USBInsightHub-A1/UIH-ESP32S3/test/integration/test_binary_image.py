@@ -16,6 +16,7 @@ import pytest
 from binary_transport import (
     IMG_FLAG_BUFFER,
     IMG_FLAG_DIRECT,
+    IMG_FLAG_RLE,
     IMG_FLAG_SPRITE,
     build_image_frame,
     gradient_image_rgb565,
@@ -259,3 +260,66 @@ class TestImageModes:
         line = send_image_and_read_response(hub, frame2)
         resp = json.loads(line)
         assert resp["status"] == "ok"
+
+
+class TestRLECompression:
+    """Test RLE-compressed image transfers."""
+
+    def test_rle_buffer_mode(self, hub):
+        """RLE + buffer mode (16bpp) — solid red should compress well."""
+        pixels = solid_image_rgb565(IMAGE_WIDTH, IMAGE_HEIGHT, 255, 0, 0)
+        frame = build_image_frame(1, 16, IMAGE_WIDTH, IMAGE_HEIGHT, pixels,
+                                  compress=True)
+        log.info("Sending RLE buffer solid red (%d bytes)", len(frame))
+
+        line = send_image_and_read_response(hub, frame)
+        resp = json.loads(line)
+        assert resp["status"] == "ok"
+        assert "image complete" in resp["data"]["message"]
+
+    def test_rle_sprite_mode(self, hub):
+        """RLE + sprite mode (8bpp) — solid color."""
+        pixels = _solid_rgb332(IMAGE_WIDTH, IMAGE_HEIGHT, 0xE0)
+        frame = build_image_frame(1, 8, IMAGE_WIDTH, IMAGE_HEIGHT, pixels,
+                                  flags=IMG_FLAG_SPRITE, compress=True)
+        log.info("Sending RLE sprite solid red (%d bytes)", len(frame))
+
+        line = send_image_and_read_response(hub, frame)
+        resp = json.loads(line)
+        assert resp["status"] == "ok"
+        assert "sprite complete" in resp["data"]["message"]
+
+    def test_rle_direct_mode(self, hub):
+        """RLE + direct mode (16bpp) — solid blue."""
+        pixels = solid_image_rgb565(IMAGE_WIDTH, IMAGE_HEIGHT, 0, 0, 255)
+        frame = build_image_frame(1, 16, IMAGE_WIDTH, IMAGE_HEIGHT, pixels,
+                                  flags=IMG_FLAG_DIRECT, compress=True)
+        log.info("Sending RLE direct solid blue (%d bytes)", len(frame))
+
+        line = send_image_and_read_response(hub, frame)
+        resp = json.loads(line)
+        assert resp["status"] == "ok"
+        assert "direct complete" in resp["data"]["message"]
+
+    def test_rle_gradient(self, hub):
+        """RLE with gradient (poor compression) should still work."""
+        pixels = gradient_image_rgb565(IMAGE_WIDTH, IMAGE_HEIGHT)
+        frame = build_image_frame(1, 16, IMAGE_WIDTH, IMAGE_HEIGHT, pixels,
+                                  compress=True)
+        log.info("Sending RLE gradient (%d bytes)", len(frame))
+
+        line = send_image_and_read_response(hub, frame)
+        resp = json.loads(line)
+        assert resp["status"] == "ok"
+
+    def test_json_after_rle(self, hub):
+        """JSON API still works after RLE image transfer."""
+        pixels = _solid_rgb332(IMAGE_WIDTH, IMAGE_HEIGHT, 0x1C)
+        frame = build_image_frame(2, 8, IMAGE_WIDTH, IMAGE_HEIGHT, pixels,
+                                  flags=IMG_FLAG_SPRITE, compress=True)
+        send_image_and_read_response(hub, frame)
+
+        time.sleep(0.1)
+        data = hub.get("hubMode")
+        assert data is not None
+        assert "hubMode" in data

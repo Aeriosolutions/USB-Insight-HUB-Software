@@ -28,6 +28,7 @@ BIN_CMD_SCREEN_READY = 0x0005
 IMG_FLAG_BUFFER = 0   # buffer pixels → flush after CRC (default)
 IMG_FLAG_SPRITE = 1   # write into TFT_eSprite (8bpp only)
 IMG_FLAG_DIRECT = 2   # stream directly to SPI (no buffer, CRC-unsafe)
+IMG_FLAG_RLE    = 0x04  # bit 2: payload is RLE-compressed (count+value pairs)
 
 
 def crc32(data: bytes, crc: int = 0) -> int:
@@ -74,6 +75,26 @@ def parse_frame(data: bytes) -> tuple:
     return cmd, flags, payload
 
 
+def rle_encode(data: bytes) -> bytes:
+    """RLE-encode a bytes object: [count][value] pairs, max run 255."""
+    if not data:
+        return b""
+    out = bytearray()
+    prev = data[0]
+    count = 1
+    for b in data[1:]:
+        if b == prev and count < 255:
+            count += 1
+        else:
+            out.append(count)
+            out.append(prev)
+            prev = b
+            count = 1
+    out.append(count)
+    out.append(prev)
+    return bytes(out)
+
+
 def build_image_frame(
     port: int,
     bpp: int,
@@ -81,13 +102,20 @@ def build_image_frame(
     height: int,
     pixel_data: bytes,
     flags: int = 0,
+    compress: bool = False,
 ) -> bytes:
     """Build a binary frame for the image command (cmd=0x0001).
 
     *pixel_data* should be raw pixel bytes:
       - 16bpp: little-endian RGB565, width*height*2 bytes
       - 8bpp:  RGB332, width*height bytes
+
+    If *compress* is True, pixel_data is RLE-encoded and IMG_FLAG_RLE
+    is ORed into *flags*.
     """
+    if compress:
+        pixel_data = rle_encode(pixel_data)
+        flags |= IMG_FLAG_RLE
     sub_header = struct.pack("<BBHH", port, bpp, width, height)
     payload = sub_header + pixel_data
     return build_frame(BIN_CMD_IMAGE, payload, flags)

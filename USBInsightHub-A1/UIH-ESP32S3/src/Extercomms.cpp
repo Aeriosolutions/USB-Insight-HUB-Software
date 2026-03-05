@@ -88,7 +88,15 @@ static uint16_t imgWidth = 0;
 static uint16_t imgHeight = 0;
 static uint32_t imgPixelsExpected = 0;
 static bool imgFailed = false;  // set if image validation failed; suppresses dispatch
-static uint16_t imgFlags = 0;  // write mode: 0=buffer, 1=sprite, 2=direct
+static uint16_t imgFlags = 0;  // raw flags from frame header
+static uint16_t imgMode = 0;   // low 2 bits: buffer/sprite/direct
+static bool imgRLE = false;     // bit 2: RLE-compressed payload
+
+// RLE decoder state — carries across payload blocks
+// Phase: 0=expecting count byte, 1=expecting value byte, 2=expanding run
+static uint8_t imgRLEPhase = 0;
+static uint8_t imgRLECount = 0;  // remaining run length
+static uint8_t imgRLEValue = 0;  // current run value
 
 // Direct mode state — SPI streaming during receive
 static int imgDirectCSPin = -1;
@@ -239,6 +247,10 @@ static const BinCommandHandler imageHandler = {
     imgFailed = false;
     imgPixelBufIndex = 0;
     imgFlags = flags;
+    imgMode = flags & 0x03;
+    imgRLE = (flags & IMG_FLAG_RLE) != 0;
+    imgRLEPhase = 0;
+    imgRLECount = 0;
     imgDirectActive = false;
     imgDirectSemHeld = false;
     imgDirectCSPin = -1;
@@ -246,8 +258,8 @@ static const BinCommandHandler imageHandler = {
     imgProf.reset();
     imgProf.t0 = micros();
     imgProf.active = true;
-    // Validate flags early
-    if (flags > IMG_FLAG_DIRECT) {
+    // Validate flags — only mode bits [1:0] and RLE bit [2] are defined
+    if (imgMode > IMG_FLAG_DIRECT || (flags & ~0x07) != 0) {
       binSendResponse(BIN_CMD_IMAGE, "invalid flags", false);
       return false;
     }
@@ -275,6 +287,10 @@ static const BinCommandHandler imageHandler = {
     imgSubHeaderIndex = 0;
     imgFailed = false;
     imgFlags = 0;
+    imgMode = 0;
+    imgRLE = false;
+    imgRLEPhase = 0;
+    imgRLECount = 0;
     imgDirectHasCarry = false;
   },
 };
@@ -617,53 +633,93 @@ static void binSendResponse(uint16_t cmd, const char* message, bool ok) {
 }
 
 
-// Payload byte handler — routes to buffer/sprite/direct based on imgFlags.
-// Block handler (binImagePayloadBlock) is preferred for performance.
-static void binImagePayloadByte(uint8_t byte) {
-  if (imgFailed) return;
-
-  if (imgSubHeaderIndex < IMAGE_SUBHEADER_SIZE) {
-    imgSubHeader[imgSubHeaderIndex++] = byte;
-    if (imgSubHeaderIndex == IMAGE_SUBHEADER_SIZE) {
-      binImageBegin();
+// RLE decoder: expand RLE-encoded data into imgPixelBuf.
+// RLE format: [count][value][count][value]...
+// Phase state machine carries across calls:
+//   phase 0: expecting count byte
+//   phase 1: expecting value byte (count already stored)
+//   phase 2: expanding run (count/value stored)
+static void binImageRLEDecode(const uint8_t* data, size_t len) {
+  if (!imgPixelBuf) return;
+  size_t i = 0;
+  while (i < len && imgPixelBufIndex < imgPixelBufSize) {
+    switch (imgRLEPhase) {
+      case 0:  // expecting count
+        imgRLECount = data[i++];
+        imgRLEPhase = 1;
+        break;
+      case 1:  // expecting value
+        imgRLEValue = data[i++];
+        imgRLEPhase = 2;
+        break;
+      case 2: {  // expanding run
+        size_t space = imgPixelBufSize - imgPixelBufIndex;
+        size_t n = imgRLECount;
+        if (n > space) n = space;
+        memset(imgPixelBuf + imgPixelBufIndex, imgRLEValue, n);
+        imgPixelBufIndex += n;
+        imgRLECount -= n;
+        if (imgRLECount == 0) imgRLEPhase = 0;
+        break;
+      }
     }
-    return;
   }
+}
 
-  if (imgFailed) return;
-
-  if (imgFlags == IMG_FLAG_SPRITE) {
-    // Buffer into imgPixelBuf — copied into sprite during render (inside semaphore)
-    if (imgPixelBuf && imgPixelBufIndex < imgPixelBufSize) {
-      imgPixelBuf[imgPixelBufIndex++] = byte;
-    }
-  } else if (imgFlags == IMG_FLAG_DIRECT) {
-    if (imgDirectActive) {
-      if (imgBpp == 8) {
-        gloScreen->streamPixelsRGB332(&byte, 1);
-      } else if (imgBpp == 16) {
-        if (imgDirectHasCarry) {
-          uint16_t pixel = imgDirectCarry | ((uint16_t)byte << 8);
-          gloScreen->streamPixels(&pixel, 1);
-          imgDirectHasCarry = false;
-        } else {
-          imgDirectCarry = byte;
-          imgDirectHasCarry = true;
+// RLE decoder for active direct mode: decode into stack buffer, stream to SPI.
+static void binImageRLEDecodeDirect(const uint8_t* data, size_t len) {
+  uint8_t tmpBuf[128];
+  size_t i = 0;
+  while (i < len) {
+    // Fill tmpBuf with decoded pixels
+    size_t tmpIdx = 0;
+    while (i < len && tmpIdx < sizeof(tmpBuf)) {
+      switch (imgRLEPhase) {
+        case 0:
+          imgRLECount = data[i++];
+          imgRLEPhase = 1;
+          break;
+        case 1:
+          imgRLEValue = data[i++];
+          imgRLEPhase = 2;
+          break;
+        case 2: {
+          size_t space = sizeof(tmpBuf) - tmpIdx;
+          size_t n = imgRLECount;
+          if (n > space) n = space;
+          memset(tmpBuf + tmpIdx, imgRLEValue, n);
+          tmpIdx += n;
+          imgRLECount -= n;
+          if (imgRLECount == 0) imgRLEPhase = 0;
+          break;
         }
       }
-    } else {
-      // Deferred direct mode — buffer bytes
-      if (imgPixelBuf && imgPixelBufIndex < imgPixelBufSize) {
-        imgPixelBuf[imgPixelBufIndex] = byte;
-      }
     }
-    imgPixelBufIndex++;
-  } else {
-    // Buffer mode
-    if (imgPixelBuf && imgPixelBufIndex < imgPixelBufSize) {
-      imgPixelBuf[imgPixelBufIndex++] = byte;
+    // Stream decoded pixels to SPI
+    if (tmpIdx > 0) {
+      if (imgBpp == 8) {
+        gloScreen->streamPixelsRGB332(tmpBuf, tmpIdx);
+      } else if (imgBpp == 16) {
+        // 16bpp RLE expands to raw bytes — need byte-pair handling
+        for (size_t j = 0; j < tmpIdx; j++) {
+          if (imgDirectHasCarry) {
+            uint16_t pixel = imgDirectCarry | ((uint16_t)tmpBuf[j] << 8);
+            gloScreen->streamPixels(&pixel, 1);
+            imgDirectHasCarry = false;
+          } else {
+            imgDirectCarry = tmpBuf[j];
+            imgDirectHasCarry = true;
+          }
+        }
+      }
+      imgPixelBufIndex += tmpIdx;
     }
   }
+}
+
+// Payload byte handler — delegates to block handler (handles RLE and all modes).
+static void binImagePayloadByte(uint8_t byte) {
+  binImagePayloadBlock(&byte, 1);
 }
 
 // Block handler — copies payload data in bulk using memcpy (buffer mode),
@@ -682,65 +738,79 @@ static void binImagePayloadBlock(const uint8_t* data, size_t len) {
 
   if (imgFailed || len == 0) return;
 
-  if (imgFlags == IMG_FLAG_SPRITE) {
+  if (imgMode == IMG_FLAG_SPRITE) {
     // Sprite mode — buffer into imgPixelBuf (copied into sprite during render)
-    if (imgPixelBuf) {
+    if (imgRLE) {
+      binImageRLEDecode(data, len);
+    } else if (imgPixelBuf) {
       size_t space = imgPixelBufSize - imgPixelBufIndex;
       size_t n = (len < space) ? len : space;
       memcpy(imgPixelBuf + imgPixelBufIndex, data, n);
       imgPixelBufIndex += n;
     }
-  } else if (imgFlags == IMG_FLAG_DIRECT) {
+  } else if (imgMode == IMG_FLAG_DIRECT) {
     // Direct mode — stream pixels to SPI as they arrive, or buffer if deferred
-    size_t remaining = (imgPixelsExpected * ((imgBpp + 7) / 8)) - imgPixelBufIndex;
-    size_t n = (len < remaining) ? len : remaining;
     if (!imgDirectActive) {
       // Deferred direct mode — buffer bytes (same as buffer mode)
-      if (imgPixelBuf) {
-        size_t space = imgPixelBufSize - imgPixelBufIndex;
-        size_t copy = (n < space) ? n : space;
-        memcpy(imgPixelBuf + imgPixelBufIndex, data, copy);
+      if (imgRLE) {
+        binImageRLEDecode(data, len);
+      } else {
+        size_t remaining = (imgPixelsExpected * ((imgBpp + 7) / 8)) - imgPixelBufIndex;
+        size_t n = (len < remaining) ? len : remaining;
+        if (imgPixelBuf) {
+          size_t space = imgPixelBufSize - imgPixelBufIndex;
+          size_t copy = (n < space) ? n : space;
+          memcpy(imgPixelBuf + imgPixelBufIndex, data, copy);
+        }
+        imgPixelBufIndex += n;
       }
-      imgPixelBufIndex += n;
       return;
     }
-    if (imgBpp == 16) {
-      const uint8_t* p = data;
-      size_t left = n;
-      // Handle carry byte from previous block
-      if (imgDirectHasCarry && left > 0) {
-        uint16_t pixel = imgDirectCarry | ((uint16_t)*p << 8);
-        gloScreen->streamPixels(&pixel, 1);
-        p++;
-        left--;
-        imgDirectHasCarry = false;
-      }
-      // Stream aligned pairs
-      if (left >= 2) {
-        // Use memcpy-based approach to avoid unaligned pointer cast
-        size_t pairs = left / 2;
-        uint16_t pixBuf[128];
-        while (pairs > 0) {
-          size_t batch = (pairs < 128) ? pairs : 128;
-          memcpy(pixBuf, p, batch * 2);
-          gloScreen->streamPixels(pixBuf, batch);
-          p += batch * 2;
-          pairs -= batch;
+    // Active direct mode — stream to SPI
+    if (imgRLE) {
+      binImageRLEDecodeDirect(data, len);
+    } else {
+      size_t remaining = (imgPixelsExpected * ((imgBpp + 7) / 8)) - imgPixelBufIndex;
+      size_t n = (len < remaining) ? len : remaining;
+      if (imgBpp == 16) {
+        const uint8_t* p = data;
+        size_t left = n;
+        // Handle carry byte from previous block
+        if (imgDirectHasCarry && left > 0) {
+          uint16_t pixel = imgDirectCarry | ((uint16_t)*p << 8);
+          gloScreen->streamPixels(&pixel, 1);
+          p++;
+          left--;
+          imgDirectHasCarry = false;
         }
-        left = left % 2;
+        // Stream aligned pairs
+        if (left >= 2) {
+          size_t pairs = left / 2;
+          uint16_t pixBuf[128];
+          while (pairs > 0) {
+            size_t batch = (pairs < 128) ? pairs : 128;
+            memcpy(pixBuf, p, batch * 2);
+            gloScreen->streamPixels(pixBuf, batch);
+            p += batch * 2;
+            pairs -= batch;
+          }
+          left = left % 2;
+        }
+        // Save odd trailing byte for next block
+        if (left == 1) {
+          imgDirectCarry = *p;
+          imgDirectHasCarry = true;
+        }
+      } else if (imgBpp == 8) {
+        gloScreen->streamPixelsRGB332(data, n);
       }
-      // Save odd trailing byte for next block
-      if (left == 1) {
-        imgDirectCarry = *p;
-        imgDirectHasCarry = true;
-      }
-    } else if (imgBpp == 8) {
-      gloScreen->streamPixelsRGB332(data, n);
+      imgPixelBufIndex += n;
     }
-    imgPixelBufIndex += n;
   } else {
     // Buffer mode (default) — bulk copy pixel data
-    if (imgPixelBuf) {
+    if (imgRLE) {
+      binImageRLEDecode(data, len);
+    } else if (imgPixelBuf) {
       size_t space = imgPixelBufSize - imgPixelBufIndex;
       size_t n = (len < space) ? len : space;
       memcpy(imgPixelBuf + imgPixelBufIndex, data, n);
@@ -788,7 +858,14 @@ static void binImageBegin() {
     imgFailed = true;
     return;
   }
-  if (expectedPayload != binPayloadLen) {
+  if (imgRLE) {
+    // RLE: compressed payload is smaller than raw pixels — just validate minimum
+    if (binPayloadLen < IMAGE_SUBHEADER_SIZE) {
+      binSendResponse(BIN_CMD_IMAGE, "payload too short for RLE", false);
+      imgFailed = true;
+      return;
+    }
+  } else if (expectedPayload != binPayloadLen) {
     ESP_LOGW(TAG, "Image: payload length mismatch (expected %u, got %u)", expectedPayload, binPayloadLen);
     binSendResponse(BIN_CMD_IMAGE, "payload length mismatch", false);
     imgFailed = true;
@@ -802,7 +879,7 @@ static void binImageBegin() {
   }
 
   // Mode-specific validation and setup
-  if (imgFlags == IMG_FLAG_SPRITE) {
+  if (imgMode == IMG_FLAG_SPRITE) {
     // Sprite mode: 8bpp only, must fit viewport
     if (imgBpp != 8) {
       binSendResponse(BIN_CMD_IMAGE, "sprite mode requires 8bpp", false);
@@ -836,7 +913,7 @@ static void binImageBegin() {
     ESP_LOGI(TAG, "Image: sprite mode port=%u %ux%u (%u bytes)",
              imgPort, imgWidth, imgHeight, imgPixelBufSize);
 
-  } else if (imgFlags == IMG_FLAG_DIRECT) {
+  } else if (imgMode == IMG_FLAG_DIRECT) {
     // Direct mode: try to acquire semaphore non-blocking to start SPI streaming.
     // If semaphore isn't available (DefaultView is rendering), fall back to
     // buffered mode — blocking here would stall the byte drain loop and cause
@@ -914,7 +991,7 @@ static void binImageRender() {
 
   unsigned long tPreSem = micros();
 
-  if (imgFlags == IMG_FLAG_SPRITE) {
+  if (imgMode == IMG_FLAG_SPRITE) {
     // Sprite mode — copy buffered pixels into sprite, then push viewport.
     // All sprite writes happen inside semaphore to avoid race with DefaultView.
     if (!imgPixelBuf) {
@@ -967,7 +1044,7 @@ static void binImageRender() {
     return;
   }
 
-  if (imgFlags == IMG_FLAG_DIRECT) {
+  if (imgMode == IMG_FLAG_DIRECT) {
     if (imgDirectActive) {
       // True direct mode — SPI streaming already happened during payload.
       gloScreen->streamEnd();

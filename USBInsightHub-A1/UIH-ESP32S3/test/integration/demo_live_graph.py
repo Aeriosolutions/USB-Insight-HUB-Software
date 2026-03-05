@@ -23,7 +23,7 @@ import time
 
 from binary_transport import (
     IMG_FLAG_BUFFER, IMG_FLAG_DIRECT, IMG_FLAG_SPRITE,
-    build_image_frame, rgb565_bytes,
+    build_image_frame, rgb565_bytes, rle_encode,
 )
 from hub import Hub, find_hub
 
@@ -317,18 +317,67 @@ def render(fb, ch, v_hist, i_hist, axis_mode="min-span"):
             prev_cx, prev_cy = x, cy
 
 
+# ── RLE compression analysis ─────────────────────────────────────
+
+class RLEStats:
+    """Accumulate RLE compression statistics across frames."""
+
+    def __init__(self):
+        self.frames = 0
+        self.total_raw = 0
+        self.total_rle = 0
+        self.best_ratio = 1.0
+        self.worst_ratio = 0.0
+
+    def analyze(self, pixels_8bpp):
+        """Analyze one frame's 8bpp pixel data. Returns (raw, rle, ratio)."""
+        raw_size = len(pixels_8bpp)
+        rle_data = rle_encode(pixels_8bpp)
+        rle_size = len(rle_data)
+        ratio = rle_size / raw_size if raw_size else 1.0
+
+        self.frames += 1
+        self.total_raw += raw_size
+        self.total_rle += rle_size
+        self.best_ratio = min(self.best_ratio, ratio)
+        self.worst_ratio = max(self.worst_ratio, ratio)
+
+        return raw_size, rle_size, ratio
+
+    def summary(self):
+        if self.frames == 0:
+            return "No frames analyzed"
+        avg = self.total_rle / self.total_raw
+        saving_pct = (1.0 - avg) * 100
+        return (
+            f"RLE over {self.frames} frames: "
+            f"avg {avg:.2f}x ({saving_pct:+.1f}% size), "
+            f"best {self.best_ratio:.2f}x, worst {self.worst_ratio:.2f}x, "
+            f"raw {self.total_raw // 1024}KB total → "
+            f"rle {self.total_rle // 1024}KB"
+        )
+
+
 # ── serial helpers ────────────────────────────────────────────────
 
-def send_image(hub, ch, fb, bpp=8, flags=IMG_FLAG_SPRITE):
+def send_image(hub, ch, fb, bpp=8, flags=IMG_FLAG_SPRITE, rle_stats=None,
+               compress=False):
     """Send an image frame and read the response.
 
     Uses 8bpp RGB332 by default (half the data, ~2x FPS for graphs).
+    If *rle_stats* is provided, runs RLE analysis on the pixel data.
+    If *compress* is True, RLE-compresses the pixel data.
     """
     if bpp == 8:
         pixels = fb.bytes_rgb332()
     else:
         pixels = fb.bytes()
-    frame = build_image_frame(ch, bpp, WIDTH, HEIGHT, pixels, flags=flags)
+
+    if rle_stats is not None:
+        rle_stats.analyze(pixels)
+
+    frame = build_image_frame(ch, bpp, WIDTH, HEIGHT, pixels, flags=flags,
+                              compress=compress)
 
     # Write the binary frame
     hub.ser.write(frame)
@@ -387,6 +436,10 @@ def main():
              "'min-span' (auto with minimum range, default), "
              "'auto' (tight auto-scale)",
     )
+    parser.add_argument(
+        "--no-rle", action="store_true", default=False,
+        help="Disable RLE compression (for A/B comparison)",
+    )
     args = parser.parse_args()
 
     channels = [int(c) for c in args.channels.split(",")]
@@ -426,14 +479,18 @@ def main():
     bpp = 8
     if img_flags == IMG_FLAG_SPRITE:
         bpp = 8  # sprite requires 8bpp
+    use_rle = not args.no_rle
 
     print(f"Graphing CH{','.join(str(c) for c in channels)} "
           f"mode={args.mode} bpp={bpp} axis={args.axis} "
+          f"rle={'on' if use_rle else 'off'} "
           "— Ctrl-C or press a hub button to stop")
     if recording:
         print(f"Recording up to {args.max_frames} frames per channel "
               f"(scale {args.scale}x) → {args.record}")
     print()
+
+    rle_stats = RLEStats()
 
     frame_count = 0
     t_start = time.monotonic()
@@ -473,7 +530,8 @@ def main():
                 if recording and len(recorded_frames[ch]) < args.max_frames:
                     recorded_frames[ch].append(fb.to_image(args.scale))
 
-                ok, resp = send_image(hub, ch, fb, bpp=bpp, flags=img_flags)
+                ok, resp = send_image(hub, ch, fb, bpp=bpp, flags=img_flags,
+                                      rle_stats=rle_stats, compress=use_rle)
                 if not ok:
                     errors += 1
                     if errors <= 5:
@@ -505,6 +563,7 @@ def main():
           f"({fps / len(channels):.1f} per channel)")
     if errors:
         print(f"  {errors} errors")
+    print(f"  {rle_stats.summary()}")
 
     # Save recorded GIF
     if recording:
