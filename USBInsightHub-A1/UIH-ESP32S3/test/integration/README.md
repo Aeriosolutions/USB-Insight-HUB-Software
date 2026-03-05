@@ -138,6 +138,7 @@ using the binary transport protocol. All demos auto-detect the hub and support
 `--port` to override. Press Ctrl-C to stop.
 
 All demos support `--mode buffer|sprite|direct` to select the image write mode.
+Image data is RLE-compressed by default (~87% size reduction for typical frames).
 
 ### Plasma — `demo_plasma.py`
 
@@ -163,6 +164,7 @@ python demo_live_graph.py                      # all 3 channels, fixed axes
 python demo_live_graph.py --channels 1         # single channel
 python demo_live_graph.py --axis min-span      # auto-scale with minimum range
 python demo_live_graph.py --axis auto          # tight auto-scale
+python demo_live_graph.py --no-rle             # disable RLE compression
 python demo_live_graph.py --record graph.gif   # save frames as animated GIF
 ```
 
