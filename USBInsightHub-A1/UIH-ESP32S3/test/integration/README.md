@@ -131,15 +131,81 @@ The reboot toggle test (`test_enabled_enters_bootloader`) puts the hub into ROM
 bootloader and recovers it via `usb-device boot`. If recovery fails, power-cycle
 the hub.
 
+## Demos
+
+Interactive demo scripts that stream real-time visuals to the hub's displays
+using the binary transport protocol. All demos auto-detect the hub and support
+`--port` to override. Press Ctrl-C to stop.
+
+All demos support `--mode buffer|sprite|direct` to select the image write mode.
+
+### Plasma — `demo_plasma.py`
+
+Animated plasma effect with selectable color palettes.
+
+```bash
+python demo_plasma.py                          # channel 2, rainbow palette
+python demo_plasma.py --palette neon           # hot pink / cyan / green
+python demo_plasma.py --palette fire --fps     # red / orange / yellow + FPS
+python demo_plasma.py --channels 1,2,3         # all 3 displays
+python demo_plasma.py --mode direct            # use direct SPI streaming
+```
+
+Palettes: `rainbow`, `neon`, `fire`, `ocean`, `lava`
+
+### Live Graph — `demo_live_graph.py`
+
+Scrolling dual-trace voltage/current graph. Polls each channel's meter data
+and renders a real-time graph on the corresponding display.
+
+```bash
+python demo_live_graph.py                      # all 3 channels, fixed axes
+python demo_live_graph.py --channels 1         # single channel
+python demo_live_graph.py --axis min-span      # auto-scale with minimum range
+python demo_live_graph.py --axis auto          # tight auto-scale
+python demo_live_graph.py --record graph.gif   # save frames as animated GIF
+```
+
+Y-axis modes: `fixed` (default, 0–5.5V / 0–2A), `min-span` (auto with minimum
+range to suppress noise), `auto` (tight auto-scale).
+
+### Tear Test — `demo_tear_test.py`
+
+High-contrast scrolling bars designed to make display tearing visible. If the
+display updates mid-frame, you'll see a horizontal offset in the sharp
+black/white boundary.
+
+```bash
+python demo_tear_test.py                       # default settings
+python demo_tear_test.py --bar-height 8        # thinner bars
+python demo_tear_test.py --speed 4             # faster scroll
+```
+
+### Binary Transport Demo — `demo_binary_transport.py`
+
+Showcases the binary protocol with test patterns (solid fills, rainbow bars,
+gradient, checkerboard) and echo latency measurement.
+
+```bash
+python demo_binary_transport.py                # run all demos
+```
+
 ## Test Structure
 
 ```
-conftest.py               — Pytest fixtures, hub connection, CLI options
-hub.py                    — Hub class and device discovery (reusable outside pytest)
+hub.py                    — Hub connection class, device discovery, bootloader recovery
+conftest.py               — Pytest fixtures, logging, hub auto-detection, CLI options
+binary_transport.py       — Binary frame protocol: build/parse frames, image helpers
 test_serial_api.py        — Serial API test cases
 test_reboot.py            — Restart, uptime, and reboot toggle tests
+test_binary_echo.py       — Binary echo command tests
+test_binary_image.py      — Binary image streaming tests (buffer, sprite, direct modes)
 test_nvs_persistence.py   — NVS config persistence across reboots
 test_nvs_upgrade.py       — NVS migration from v1.0.0 to current firmware
+demo_plasma.py            — Animated plasma with selectable palettes
+demo_live_graph.py        — Real-time voltage/current graph
+demo_tear_test.py         — Display tearing detection
+demo_binary_transport.py  — Binary protocol test patterns and echo
 requirements.txt          — Python dependencies
 snapshots/                — Config snapshots from upgrade test runs
 ```

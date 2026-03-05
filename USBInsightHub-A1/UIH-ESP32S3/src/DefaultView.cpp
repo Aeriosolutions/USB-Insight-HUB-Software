@@ -267,7 +267,6 @@ void taskDefaultScreenLoop(void *pvParameters){
       defaultScreenSlowDataUpdate();
     }
 
-    // Skip rendering for channels in image mode (host owns the display)
     if(!imageMode[iScnt]) {
       //update screen only if something changed or on the first update cycle
       if(memcmp(&prevScreenArr[iScnt],&(ScreenArr[iScnt]),sizeof(prevScreenArr[iScnt])) != 0 || !firstPass){
@@ -277,9 +276,22 @@ void taskDefaultScreenLoop(void *pvParameters){
         prevScreenArr[iScnt] = ScreenArr[iScnt];
         //ESP_LOGI(TAG,"%u",timere-timers);
       }
-    } else if (screenReadyPending & (1 << iScnt)) {
-      // Host is waiting for this channel's render slot — signal ready
-      if (screenReadySemaphore) xSemaphoreGive(screenReadySemaphore);
+    } else {
+      // Image mode: render chrome, push 4 strips around viewport (7,40,226,90)
+      iScreen->screenDefaultRender(ScreenArr[iScnt], true);
+      // screenDefaultRender deselected CS — reselect for strip push
+      uint8_t cs = ScreenArr[iScnt].dProp.cs_pin;
+      digitalWrite(cs, LOW);
+      iScreen->tft.setRotation(ScreenArr[iScnt].dProp.rotation);
+      iScreen->img.pushSprite(0, 0, 0, 0, 240, 40);         // top strip
+      iScreen->img.pushSprite(0, 130, 0, 130, 240, 110);     // bottom strip
+      iScreen->img.pushSprite(0, 40, 0, 40, 7, 90);          // left strip
+      iScreen->img.pushSprite(233, 40, 233, 40, 7, 90);      // right strip
+      digitalWrite(cs, HIGH);
+
+      if (screenReadyPending & (1 << iScnt)) {
+        if (screenReadySemaphore) xSemaphoreGive(screenReadySemaphore);
+      }
     }
 
     iScnt++;

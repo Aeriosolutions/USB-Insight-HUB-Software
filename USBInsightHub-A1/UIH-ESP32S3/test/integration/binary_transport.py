@@ -24,6 +24,11 @@ BIN_CMD_METER_STREAM = 0x0003
 BIN_CMD_SCREEN_LOCK = 0x0004
 BIN_CMD_SCREEN_READY = 0x0005
 
+# Image write mode flags (passed in frame flags field)
+IMG_FLAG_BUFFER = 0   # buffer pixels → flush after CRC (default)
+IMG_FLAG_SPRITE = 1   # write into TFT_eSprite (8bpp only)
+IMG_FLAG_DIRECT = 2   # stream directly to SPI (no buffer, CRC-unsafe)
+
 
 def crc32(data: bytes, crc: int = 0) -> int:
     """Compute CRC-32 matching ESP32's esp_crc32_le(crc, data, len).
@@ -152,13 +157,27 @@ def build_screen_ready_frame(channel: int, flags: int = 0) -> bytes:
 
 
 def rgb565(r: int, g: int, b: int) -> int:
-    """Convert 8-bit RGB to 16-bit RGB565."""
+    """Convert 8-bit RGB to 16-bit RGB565.
+
+    Returns the standard RGB565 value (R in high bits, B in low bits).
+    """
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+
+
+def rgb565_bytes(r: int, g: int, b: int) -> bytes:
+    """Convert 8-bit RGB to 2-byte RGB565 in display byte order.
+
+    The ESP32 SPI peripheral sends bytes MSB-first, and the ESP32 is
+    little-endian, so a uint16_t 0xF800 in memory is [0x00, 0xF8] which
+    gets sent as 0x00,0xF8 — wrong.  We need the high byte first in
+    memory so SPI sends it correctly.  Pack as big-endian.
+    """
+    return struct.pack(">H", rgb565(r, g, b))
 
 
 def solid_image_rgb565(width: int, height: int, r: int, g: int, b: int) -> bytes:
     """Generate a solid-color RGB565 image."""
-    pixel = struct.pack("<H", rgb565(r, g, b))
+    pixel = rgb565_bytes(r, g, b)
     return pixel * (width * height)
 
 
@@ -170,5 +189,5 @@ def gradient_image_rgb565(width: int, height: int) -> bytes:
             r = int(255 * (1 - x / width))
             b = int(255 * x / width)
             g = int(128 * y / height)
-            pixels += struct.pack("<H", rgb565(r, g, b))
+            pixels += rgb565_bytes(r, g, b)
     return bytes(pixels)

@@ -88,6 +88,20 @@ static uint16_t imgWidth = 0;
 static uint16_t imgHeight = 0;
 static uint32_t imgPixelsExpected = 0;
 static bool imgFailed = false;  // set if image validation failed; suppresses dispatch
+static uint16_t imgFlags = 0;  // write mode: 0=buffer, 1=sprite, 2=direct
+
+// Direct mode state — SPI streaming during receive
+static int imgDirectCSPin = -1;
+static bool imgDirectActive = false;
+static bool imgDirectSemHeld = false;  // track if we're holding screen_Semaphore
+static uint8_t imgDirectCarry = 0;     // leftover byte for 16bpp cross-block alignment
+static bool imgDirectHasCarry = false;
+
+// Sprite mode — viewport coordinates for writing into sprite buffer
+#define VIEWPORT_X 7
+#define VIEWPORT_Y 40
+#define VIEWPORT_W 226
+#define VIEWPORT_H 90
 
 // Pixel data buffer — accumulated during receive, flushed to SPI after CRC verified
 static uint8_t* imgPixelBuf = nullptr;
@@ -220,13 +234,23 @@ static void binSendResponse(uint16_t cmd, const char* message, bool ok = true);
 
 static const BinCommandHandler imageHandler = {
   .cmd = BIN_CMD_IMAGE,
-  .begin = [](uint16_t, uint16_t, uint32_t) -> bool {
+  .begin = [](uint16_t, uint16_t flags, uint32_t) -> bool {
     imgSubHeaderIndex = 0;
     imgFailed = false;
     imgPixelBufIndex = 0;
+    imgFlags = flags;
+    imgDirectActive = false;
+    imgDirectSemHeld = false;
+    imgDirectCSPin = -1;
+    imgDirectHasCarry = false;
     imgProf.reset();
     imgProf.t0 = micros();
     imgProf.active = true;
+    // Validate flags early
+    if (flags > IMG_FLAG_DIRECT) {
+      binSendResponse(BIN_CMD_IMAGE, "invalid flags", false);
+      return false;
+    }
     return true;
   },
   .payloadByte = binImagePayloadByte,
@@ -235,11 +259,23 @@ static const BinCommandHandler imageHandler = {
     if (!imgFailed) binImageRender();
   },
   .reset = []() {
-    // Keep pixel buffer for reuse (avoids heap fragmentation)
-    // Buffer is freed on PC disconnect via binImageFreeBuffer()
+    // Clean up direct mode if in progress (timeout/error recovery)
+    if (imgDirectActive && gloScreen) {
+      gloScreen->streamEnd();
+      imgDirectActive = false;
+    }
+    if (imgDirectSemHeld) {
+      xSemaphoreGive(screen_Semaphore);
+      imgDirectSemHeld = false;
+    }
+    // Don't clear imageMode here — it's cleared by the 10s screen lock
+    // timeout or PC disconnect. Clearing it between frames causes DefaultView
+    // to overwrite the viewport with the default chrome.
     imgPixelBufIndex = 0;
     imgSubHeaderIndex = 0;
     imgFailed = false;
+    imgFlags = 0;
+    imgDirectHasCarry = false;
   },
 };
 
@@ -581,8 +617,8 @@ static void binSendResponse(uint16_t cmd, const char* message, bool ok) {
 }
 
 
-// Buffer pixel data during receive — NO SPI during parsing (avoids CDC overflow).
-// SPI transfer happens in binImageRender() after full frame + CRC verified.
+// Payload byte handler — routes to buffer/sprite/direct based on imgFlags.
+// Block handler (binImagePayloadBlock) is preferred for performance.
 static void binImagePayloadByte(uint8_t byte) {
   if (imgFailed) return;
 
@@ -596,12 +632,42 @@ static void binImagePayloadByte(uint8_t byte) {
 
   if (imgFailed) return;
 
-  if (imgPixelBuf && imgPixelBufIndex < imgPixelBufSize) {
-    imgPixelBuf[imgPixelBufIndex++] = byte;
+  if (imgFlags == IMG_FLAG_SPRITE) {
+    // Buffer into imgPixelBuf — copied into sprite during render (inside semaphore)
+    if (imgPixelBuf && imgPixelBufIndex < imgPixelBufSize) {
+      imgPixelBuf[imgPixelBufIndex++] = byte;
+    }
+  } else if (imgFlags == IMG_FLAG_DIRECT) {
+    if (imgDirectActive) {
+      if (imgBpp == 8) {
+        gloScreen->streamPixelsRGB332(&byte, 1);
+      } else if (imgBpp == 16) {
+        if (imgDirectHasCarry) {
+          uint16_t pixel = imgDirectCarry | ((uint16_t)byte << 8);
+          gloScreen->streamPixels(&pixel, 1);
+          imgDirectHasCarry = false;
+        } else {
+          imgDirectCarry = byte;
+          imgDirectHasCarry = true;
+        }
+      }
+    } else {
+      // Deferred direct mode — buffer bytes
+      if (imgPixelBuf && imgPixelBufIndex < imgPixelBufSize) {
+        imgPixelBuf[imgPixelBufIndex] = byte;
+      }
+    }
+    imgPixelBufIndex++;
+  } else {
+    // Buffer mode
+    if (imgPixelBuf && imgPixelBufIndex < imgPixelBufSize) {
+      imgPixelBuf[imgPixelBufIndex++] = byte;
+    }
   }
 }
 
-// Block handler — copies payload data in bulk using memcpy
+// Block handler — copies payload data in bulk using memcpy (buffer mode),
+// writes into sprite buffer (sprite mode), or streams to SPI (direct mode)
 static void binImagePayloadBlock(const uint8_t* data, size_t len) {
   if (imgFailed) return;
 
@@ -616,12 +682,79 @@ static void binImagePayloadBlock(const uint8_t* data, size_t len) {
 
   if (imgFailed || len == 0) return;
 
-  // Bulk copy pixel data
-  if (imgPixelBuf) {
-    size_t space = imgPixelBufSize - imgPixelBufIndex;
-    size_t n = (len < space) ? len : space;
-    memcpy(imgPixelBuf + imgPixelBufIndex, data, n);
+  if (imgFlags == IMG_FLAG_SPRITE) {
+    // Sprite mode — buffer into imgPixelBuf (copied into sprite during render)
+    if (imgPixelBuf) {
+      size_t space = imgPixelBufSize - imgPixelBufIndex;
+      size_t n = (len < space) ? len : space;
+      memcpy(imgPixelBuf + imgPixelBufIndex, data, n);
+      imgPixelBufIndex += n;
+    }
+  } else if (imgFlags == IMG_FLAG_DIRECT) {
+    // Direct mode — stream pixels to SPI as they arrive, or buffer if deferred
+    size_t remaining = (imgPixelsExpected * ((imgBpp + 7) / 8)) - imgPixelBufIndex;
+    size_t n = (len < remaining) ? len : remaining;
+    if (!imgDirectActive) {
+      // Deferred direct mode — buffer bytes (same as buffer mode)
+      if (imgPixelBuf) {
+        size_t space = imgPixelBufSize - imgPixelBufIndex;
+        size_t copy = (n < space) ? n : space;
+        memcpy(imgPixelBuf + imgPixelBufIndex, data, copy);
+      }
+      imgPixelBufIndex += n;
+      return;
+    }
+    if (imgBpp == 16) {
+      const uint8_t* p = data;
+      size_t left = n;
+      // Handle carry byte from previous block
+      if (imgDirectHasCarry && left > 0) {
+        uint16_t pixel = imgDirectCarry | ((uint16_t)*p << 8);
+        gloScreen->streamPixels(&pixel, 1);
+        p++;
+        left--;
+        imgDirectHasCarry = false;
+      }
+      // Stream aligned pairs
+      if (left >= 2) {
+        // Use memcpy-based approach to avoid unaligned pointer cast
+        size_t pairs = left / 2;
+        uint16_t pixBuf[128];
+        while (pairs > 0) {
+          size_t batch = (pairs < 128) ? pairs : 128;
+          memcpy(pixBuf, p, batch * 2);
+          gloScreen->streamPixels(pixBuf, batch);
+          p += batch * 2;
+          pairs -= batch;
+        }
+        left = left % 2;
+      }
+      // Save odd trailing byte for next block
+      if (left == 1) {
+        imgDirectCarry = *p;
+        imgDirectHasCarry = true;
+      }
+    } else if (imgBpp == 8) {
+      gloScreen->streamPixelsRGB332(data, n);
+    }
     imgPixelBufIndex += n;
+  } else {
+    // Buffer mode (default) — bulk copy pixel data
+    if (imgPixelBuf) {
+      size_t space = imgPixelBufSize - imgPixelBufIndex;
+      size_t n = (len < space) ? len : space;
+      memcpy(imgPixelBuf + imgPixelBufIndex, data, n);
+      imgPixelBufIndex += n;
+    }
+  }
+}
+
+static uint8_t binImageGetCSPin(uint8_t port) {
+  switch (port) {
+    case 1: return DISPLAY_CS_1;
+    case 2: return DISPLAY_CS_2;
+    case 3: return DISPLAY_CS_3;
+    default: return DISPLAY_CS_1;
   }
 }
 
@@ -668,38 +801,246 @@ static void binImageBegin() {
     return;
   }
 
-  // Reuse pixel buffer if same size; reallocate only if size changed
-  if (imgPixelBuf && imgPixelBufSize == expectedDataBytes) {
-    imgPixelBufIndex = 0;  // reuse existing buffer
-  } else {
-    free(imgPixelBuf);
-    imgPixelBuf = nullptr;
-    imgPixelBufSize = expectedDataBytes;
-    imgPixelBufIndex = 0;
-    imgPixelBuf = (uint8_t*)malloc(imgPixelBufSize);
-  }
-  if (!imgPixelBuf) {
-    static char oomMsg[80];
-    snprintf(oomMsg, sizeof(oomMsg), "out of memory (need %u, free %u)",
-             (unsigned)imgPixelBufSize, (unsigned)esp_get_free_heap_size());
-    ESP_LOGE(TAG, "Image: %s", oomMsg);
-    binSendResponse(BIN_CMD_IMAGE, oomMsg, false);
-    imgFailed = true;
-    return;
-  }
+  // Mode-specific validation and setup
+  if (imgFlags == IMG_FLAG_SPRITE) {
+    // Sprite mode: 8bpp only, must fit viewport
+    if (imgBpp != 8) {
+      binSendResponse(BIN_CMD_IMAGE, "sprite mode requires 8bpp", false);
+      imgFailed = true;
+      return;
+    }
+    if (imgWidth > VIEWPORT_W || imgHeight > VIEWPORT_H) {
+      binSendResponse(BIN_CMD_IMAGE, "exceeds viewport", false);
+      imgFailed = true;
+      return;
+    }
+    // Allocate/reuse pixel buffer (same pattern as buffer mode)
+    // Pixels are buffered here, then copied into sprite during render (inside semaphore)
+    // to avoid race with DefaultView's chrome rendering on the shared sprite.
+    if (imgPixelBuf && imgPixelBufSize == expectedDataBytes) {
+      imgPixelBufIndex = 0;
+    } else {
+      free(imgPixelBuf);
+      imgPixelBuf = nullptr;
+      imgPixelBufSize = expectedDataBytes;
+      imgPixelBufIndex = 0;
+      imgPixelBuf = (uint8_t*)malloc(imgPixelBufSize);
+    }
+    if (!imgPixelBuf) {
+      binSendResponse(BIN_CMD_IMAGE, "out of memory", false);
+      imgFailed = true;
+      return;
+    }
+    imageMode[imgPort - 1] = true;
+    screenLockTime[imgPort - 1] = millis();
+    ESP_LOGI(TAG, "Image: sprite mode port=%u %ux%u (%u bytes)",
+             imgPort, imgWidth, imgHeight, imgPixelBufSize);
 
-  ESP_LOGI(TAG, "Image: port=%u bpp=%u %ux%u (%u bytes buffered)",
-           imgPort, imgBpp, imgWidth, imgHeight, imgPixelBufSize);
+  } else if (imgFlags == IMG_FLAG_DIRECT) {
+    // Direct mode: try to acquire semaphore non-blocking to start SPI streaming.
+    // If semaphore isn't available (DefaultView is rendering), fall back to
+    // buffered mode — blocking here would stall the byte drain loop and cause
+    // USB data loss (StreamBuffer overflow → binary parser timeout).
+    if (imgWidth > VIEWPORT_W || imgHeight > VIEWPORT_H) {
+      binSendResponse(BIN_CMD_IMAGE, "exceeds viewport", false);
+      imgFailed = true;
+      return;
+    }
+    if (xSemaphoreTake(screen_Semaphore, 0) == pdTRUE) {
+      // Got semaphore — true direct SPI streaming
+      imgDirectSemHeld = true;
+      imageMode[imgPort - 1] = true;
+      screenLockTime[imgPort - 1] = millis();
+      imgDirectCSPin = binImageGetCSPin(imgPort);
+      gloScreen->streamBegin(imgDirectCSPin, VIEWPORT_X, VIEWPORT_Y, imgWidth, imgHeight);
+      imgDirectActive = true;
+      ESP_LOGI(TAG, "Image: direct mode port=%u bpp=%u %ux%u", imgPort, imgBpp, imgWidth, imgHeight);
+    } else {
+      // Semaphore busy — fall back to buffered direct mode
+      imgDirectActive = false;
+      imgDirectSemHeld = false;
+      // Allocate buffer (same as buffer mode)
+      if (imgPixelBuf && imgPixelBufSize == expectedDataBytes) {
+        imgPixelBufIndex = 0;
+      } else {
+        free(imgPixelBuf);
+        imgPixelBuf = nullptr;
+        imgPixelBufSize = expectedDataBytes;
+        imgPixelBufIndex = 0;
+        imgPixelBuf = (uint8_t*)malloc(imgPixelBufSize);
+      }
+      if (!imgPixelBuf) {
+        binSendResponse(BIN_CMD_IMAGE, "out of memory", false);
+        imgFailed = true;
+        return;
+      }
+      imageMode[imgPort - 1] = true;
+      screenLockTime[imgPort - 1] = millis();
+      ESP_LOGI(TAG, "Image: direct-deferred mode port=%u bpp=%u %ux%u (sem busy)",
+               imgPort, imgBpp, imgWidth, imgHeight);
+    }
+
+  } else {
+    // Buffer mode (default) — allocate/reuse pixel buffer
+    if (imgPixelBuf && imgPixelBufSize == expectedDataBytes) {
+      imgPixelBufIndex = 0;  // reuse existing buffer
+    } else {
+      free(imgPixelBuf);
+      imgPixelBuf = nullptr;
+      imgPixelBufSize = expectedDataBytes;
+      imgPixelBufIndex = 0;
+      imgPixelBuf = (uint8_t*)malloc(imgPixelBufSize);
+    }
+    if (!imgPixelBuf) {
+      static char oomMsg[80];
+      snprintf(oomMsg, sizeof(oomMsg), "out of memory (need %u, free %u)",
+               (unsigned)imgPixelBufSize, (unsigned)esp_get_free_heap_size());
+      ESP_LOGE(TAG, "Image: %s", oomMsg);
+      binSendResponse(BIN_CMD_IMAGE, oomMsg, false);
+      imgFailed = true;
+      return;
+    }
+    ESP_LOGI(TAG, "Image: buffer mode port=%u bpp=%u %ux%u (%u bytes)",
+             imgPort, imgBpp, imgWidth, imgHeight, imgPixelBufSize);
+  }
 }
 
-// Called after full frame received and CRC verified — does the actual SPI transfer.
+// Called after full frame received and CRC verified — does the actual work.
 static void binImageRender() {
-  if (!imgPixelBuf || !gloScreen) {
+  if (!gloScreen) {
     binImageCleanup();
     return;
   }
 
   unsigned long tPreSem = micros();
+
+  if (imgFlags == IMG_FLAG_SPRITE) {
+    // Sprite mode — copy buffered pixels into sprite, then push viewport.
+    // All sprite writes happen inside semaphore to avoid race with DefaultView.
+    if (!imgPixelBuf) {
+      binImageCleanup();
+      return;
+    }
+    if (xSemaphoreTake(screen_Semaphore, pdMS_TO_TICKS(200)) != pdTRUE) {
+      ESP_LOGW(TAG, "Image: screen busy");
+      binSendResponse(BIN_CMD_IMAGE, "screen busy", false);
+      binImageCleanup();
+      return;
+    }
+
+    imgProf.tSemAcq = micros();
+    imageMode[imgPort - 1] = true;
+    screenLockTime[imgPort - 1] = millis();
+
+    // Copy pixel data into sprite at viewport offset
+    uint8_t* spritePtr = (uint8_t*)gloScreen->img.getPointer();
+    if (spritePtr) {
+      for (uint16_t row = 0; row < imgHeight; row++) {
+        size_t srcOff = row * imgWidth;
+        size_t dstOff = (VIEWPORT_Y + row) * 240 + VIEWPORT_X;
+        size_t copyLen = (srcOff + imgWidth <= imgPixelBufIndex) ? imgWidth : (imgPixelBufIndex > srcOff ? imgPixelBufIndex - srcOff : 0);
+        if (copyLen > 0) {
+          memcpy(spritePtr + dstOff, imgPixelBuf + srcOff, copyLen);
+        }
+      }
+    }
+
+    // Select target display CS pin
+    uint8_t cs_pin = binImageGetCSPin(imgPort);
+    digitalWrite(DISPLAY_CS_1, HIGH);
+    digitalWrite(DISPLAY_CS_2, HIGH);
+    digitalWrite(DISPLAY_CS_3, HIGH);
+    digitalWrite(cs_pin, LOW);
+
+    // Push viewport sub-region from sprite to display (8bpp→RGB565 via palette)
+    gloScreen->img.pushSprite(VIEWPORT_X, VIEWPORT_Y,
+                              VIEWPORT_X, VIEWPORT_Y, imgWidth, imgHeight);
+
+    digitalWrite(cs_pin, HIGH);
+    xSemaphoreGive(screen_Semaphore);
+
+    imgProf.tSpiDone = micros();
+    imgProf.active = false;
+
+    binSendResponse(BIN_CMD_IMAGE, "sprite complete");
+    binImageCleanup();
+    return;
+  }
+
+  if (imgFlags == IMG_FLAG_DIRECT) {
+    if (imgDirectActive) {
+      // True direct mode — SPI streaming already happened during payload.
+      gloScreen->streamEnd();
+      imgDirectActive = false;
+      if (imgDirectSemHeld) {
+        xSemaphoreGive(screen_Semaphore);
+        imgDirectSemHeld = false;
+      }
+      screenLockTime[imgPort - 1] = millis();
+
+      imgProf.tSemAcq = micros();
+      imgProf.tSpiDone = micros();
+      imgProf.active = false;
+
+      binSendResponse(BIN_CMD_IMAGE, "direct complete");
+      binImageCleanup();
+      return;
+    }
+
+    // Deferred direct mode — pixels buffered because semaphore was busy during
+    // payload receive. Now stream them to SPI (blocking semaphore OK here since
+    // all bytes are already received).
+    if (!imgPixelBuf) {
+      binImageCleanup();
+      return;
+    }
+    if (xSemaphoreTake(screen_Semaphore, pdMS_TO_TICKS(200)) != pdTRUE) {
+      ESP_LOGW(TAG, "Image: screen busy (deferred direct)");
+      binSendResponse(BIN_CMD_IMAGE, "screen busy", false);
+      binImageCleanup();
+      return;
+    }
+
+    imgProf.tSemAcq = micros();
+    screenLockTime[imgPort - 1] = millis();
+
+    uint8_t cs_pin = binImageGetCSPin(imgPort);
+    gloScreen->streamBegin(cs_pin, VIEWPORT_X, VIEWPORT_Y, imgWidth, imgHeight);
+
+    if (imgBpp == 16) {
+      uint32_t pixelCount = imgPixelBufIndex / 2;
+      gloScreen->streamPixels((const uint16_t*)imgPixelBuf, pixelCount);
+    } else if (imgBpp == 8) {
+      uint16_t pixBuf[128];
+      size_t pixCount = 0;
+      for (size_t i = 0; i < imgPixelBufIndex; i++) {
+        pixBuf[pixCount++] = gloScreen->palette[imgPixelBuf[i]];
+        if (pixCount >= 128) {
+          gloScreen->streamPixels(pixBuf, pixCount);
+          pixCount = 0;
+        }
+      }
+      if (pixCount > 0) {
+        gloScreen->streamPixels(pixBuf, pixCount);
+      }
+    }
+
+    gloScreen->streamEnd();
+    xSemaphoreGive(screen_Semaphore);
+
+    imgProf.tSpiDone = micros();
+    imgProf.active = false;
+
+    binSendResponse(BIN_CMD_IMAGE, "direct complete");
+    binImageCleanup();
+    return;
+  }
+
+  // Buffer mode (default) — transfer buffered pixels to display via SPI
+  if (!imgPixelBuf) {
+    binImageCleanup();
+    return;
+  }
 
   // Acquire screen semaphore — block up to 200ms
   if (xSemaphoreTake(screen_Semaphore, pdMS_TO_TICKS(200)) != pdTRUE) {
@@ -715,28 +1056,14 @@ static void binImageRender() {
   imageMode[imgPort - 1] = true;
   screenLockTime[imgPort - 1] = millis();
 
-  // Display position — info area offset
-  int32_t x = 7;
-  int32_t y = 40;
-
-  // Get CS pin for target display
-  uint8_t cs_pin;
-  switch (imgPort) {
-    case 1: cs_pin = DISPLAY_CS_1; break;
-    case 2: cs_pin = DISPLAY_CS_2; break;
-    case 3: cs_pin = DISPLAY_CS_3; break;
-    default: cs_pin = DISPLAY_CS_1; break;
-  }
-
-  gloScreen->streamBegin(cs_pin, x, y, imgWidth, imgHeight);
+  uint8_t cs_pin = binImageGetCSPin(imgPort);
+  gloScreen->streamBegin(cs_pin, VIEWPORT_X, VIEWPORT_Y, imgWidth, imgHeight);
 
   // Stream buffered pixel data to display
   if (imgBpp == 16) {
-    // RGB565 little-endian — push directly, no byte-swapping needed
     uint32_t pixelCount = imgPixelBufIndex / 2;
     gloScreen->streamPixels((const uint16_t*)imgPixelBuf, pixelCount);
   } else if (imgBpp == 8) {
-    // RGB332 — convert via palette in batches
     uint16_t pixBuf[128];
     size_t pixCount = 0;
     for (size_t i = 0; i < imgPixelBufIndex; i++) {
@@ -785,9 +1112,9 @@ static void binImageCleanup() {
 }
 
 static void binImageFreeBuffer() {
-  free(imgPixelBuf);
-  imgPixelBuf = nullptr;
-  imgPixelBufSize = 0;
+  // Keep the buffer allocated — freeing and re-mallocing 40KB causes
+  // heap fragmentation on the ESP32-S3, leading to OOM on reconnect.
+  // The buffer is reused if the next image has the same dimensions.
   imgPixelBufIndex = 0;
 }
 

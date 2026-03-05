@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from binary_transport import build_image_frame, rgb565, solid_image_rgb565
+from binary_transport import build_image_frame, rgb565_bytes, solid_image_rgb565
 
 log = logging.getLogger("test_animation")
 
@@ -91,11 +91,11 @@ def make_scrolling_bars(n, width, height, bar_width=16):
             for x in range(width):
                 stripe = ((x + offset) // bar_width) % 3
                 if stripe == 0:
-                    buf += struct.pack("<H", rgb565(255, 0, 0))
+                    buf += rgb565_bytes(255, 0, 0)
                 elif stripe == 1:
-                    buf += struct.pack("<H", rgb565(0, 255, 0))
+                    buf += rgb565_bytes(0, 255, 0)
                 else:
-                    buf += struct.pack("<H", rgb565(0, 0, 255))
+                    buf += rgb565_bytes(0, 0, 255)
         frames.append(build_image_frame(1, 16, width, height, bytes(buf)))
     return frames
 
@@ -119,7 +119,7 @@ def make_bouncing_ball(n, width, height, radius=12):
 
         # Render frame
         buf = bytearray()
-        bg = struct.pack("<H", rgb565(0, 0, 32))
+        bg = rgb565_bytes(0, 0, 32)
         r2 = radius * radius
         icx, icy = int(cx), int(cy)
         for y in range(height):
@@ -128,7 +128,7 @@ def make_bouncing_ball(n, width, height, radius=12):
             for x in range(width):
                 dx = x - icx
                 if dx * dx + dy2 <= r2:
-                    buf += struct.pack("<H", rgb565(255, 255, 255))
+                    buf += rgb565_bytes(255, 255, 255)
                 else:
                     buf += bg
         frames.append(build_image_frame(1, 16, width, height, bytes(buf)))

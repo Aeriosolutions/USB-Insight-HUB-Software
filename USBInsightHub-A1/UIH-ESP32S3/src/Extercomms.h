@@ -63,6 +63,11 @@ void iniExtercomms(GlobalState* globalState,GlobalConfig* globalConfig);
 class Screen;
 void iniExtercommsBinaryTransport(Screen* screen);
 
+// Image write mode flags (selected via binary frame flags field)
+#define IMG_FLAG_BUFFER  0   // buffer pixels → flush after CRC (default)
+#define IMG_FLAG_SPRITE  1   // write into TFT_eSprite (8bpp only)
+#define IMG_FLAG_DIRECT  2   // stream directly to SPI (no buffer, CRC-unsafe)
+
 // Image mode flags — when set, render loop skips that channel
 extern volatile bool imageMode[3];
 

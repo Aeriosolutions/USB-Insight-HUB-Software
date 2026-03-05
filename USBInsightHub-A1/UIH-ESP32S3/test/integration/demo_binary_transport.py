@@ -25,7 +25,7 @@ from binary_transport import (
     build_image_frame,
     crc32,
     parse_frame,
-    rgb565,
+    rgb565_bytes,
     solid_image_rgb565,
 )
 from hub import Hub, find_hub
@@ -43,7 +43,7 @@ def gradient_image(width, height):
             r = int(255 * (1 - x / width))
             b = int(255 * x / width)
             g = int(128 * y / height)
-            pixels += struct.pack("<H", rgb565(r, g, b))
+            pixels += rgb565_bytes(r, g, b)
     return bytes(pixels)
 
 
@@ -65,7 +65,7 @@ def rainbow_bars(width, height):
         for x in range(width):
             idx = min(x // bar_width, len(colors) - 1)
             r, g, b = colors[idx]
-            pixels += struct.pack("<H", rgb565(r, g, b))
+            pixels += rgb565_bytes(r, g, b)
     return bytes(pixels)
 
 
@@ -76,9 +76,9 @@ def checkerboard(width, height, block=8):
         for x in range(width):
             white = ((x // block) + (y // block)) % 2 == 0
             if white:
-                pixels += struct.pack("<H", rgb565(255, 255, 255))
+                pixels += rgb565_bytes(255, 255, 255)
             else:
-                pixels += struct.pack("<H", rgb565(0, 0, 0))
+                pixels += rgb565_bytes(0, 0, 0)
     return bytes(pixels)
 
 
@@ -97,7 +97,7 @@ def plasma(width, height, t=0.0):
             r = int(128 + 127 * math.sin(v * math.pi))
             g = int(128 + 127 * math.sin(v * math.pi + 2.094))
             b = int(128 + 127 * math.sin(v * math.pi + 4.189))
-            pixels += struct.pack("<H", rgb565(r, g, b))
+            pixels += rgb565_bytes(r, g, b)
     return bytes(pixels)
 
 

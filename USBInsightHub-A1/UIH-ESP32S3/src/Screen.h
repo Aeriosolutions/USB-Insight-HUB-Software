@@ -100,7 +100,7 @@ class Screen{
   public:
     //void start(TFT_eSPI *r_tft, TFT_eSprite *r_img);
     void start();
-    void screenDefaultRender(chScreenData Screen);
+    void screenDefaultRender(chScreenData Screen, bool chromeOnly = false);
     void screenSetBackLight(int pwm);
     void screenSetBackLight(int pwm, uint8_t ch);
     void usbIconDraw(uint8_t type, bool active,bool com);
