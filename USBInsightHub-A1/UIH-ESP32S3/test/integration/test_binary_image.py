@@ -319,7 +319,8 @@ class TestRLECompression:
                                   flags=IMG_FLAG_SPRITE, compress=True)
         send_image_and_read_response(hub, frame)
 
-        time.sleep(0.1)
+        time.sleep(0.5)
+        hub.ser.reset_input_buffer()
         data = hub.get("hubMode")
         assert data is not None
         assert "hubMode" in data

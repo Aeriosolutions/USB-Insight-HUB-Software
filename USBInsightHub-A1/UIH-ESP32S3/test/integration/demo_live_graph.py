@@ -216,11 +216,13 @@ def fmt_ma(val):
     return f"{val:.1f}mA"
 
 
-def render(fb, ch, v_hist, i_hist, axis_mode="min-span"):
+def render(fb, ch, v_hist, i_hist, axis_mode="min-span", scroll_offset=0):
     """Render dual-trace graph into framebuffer.
 
     *axis_mode*: 'auto' (tight), 'min-span' (auto with minimum range),
                  'fixed' (0-5.5V, 0-2A).
+    *scroll_offset*: horizontal scroll position for vertical grid lines
+                     (increments with each new sample).
     """
     fb.clear(*BG)
 
@@ -248,11 +250,14 @@ def render(fb, ch, v_hist, i_hist, axis_mode="min-span"):
         for x in range(gx + 1, gx + gw, 4):
             fb.pixel(x, row, *GRID)
 
-    # ── grid: 4 vertical divisions, dashed ──
-    for div in range(1, 4):
-        col = gx + int(gw * div / 4)
+    # ── grid: vertical divisions, scrolling with data ──
+    grid_spacing = gw // 4
+    offset = scroll_offset % grid_spacing
+    col = gx + grid_spacing - offset
+    while col < gx + gw:
         for y in range(gy, gy + gh, 4):
             fb.pixel(col, y, *GRID)
+        col += grid_spacing
 
     n = len(v_hist)
     if n < 2:
@@ -465,9 +470,10 @@ def main():
     # 10-second auto-timeout. This lets buttons still work: if the user
     # presses a button (menuIsActive), we detect it and exit gracefully.
 
-    # Per-channel history buffers
+    # Per-channel history buffers and sample counters
     v_hist = {ch: collections.deque(maxlen=args.history) for ch in channels}
     i_hist = {ch: collections.deque(maxlen=args.history) for ch in channels}
+    sample_count = {ch: 0 for ch in channels}
 
     fb = Framebuf(WIDTH, HEIGHT)
 
@@ -518,6 +524,7 @@ def main():
                     if v is not None and i is not None:
                         v_hist[ch].append(float(v))
                         i_hist[ch].append(float(i))
+                        sample_count[ch] += 1
 
             # ── render and push each channel ──
             for ch in channels:
@@ -525,7 +532,8 @@ def main():
                     continue
 
                 render(fb, ch, list(v_hist[ch]), list(i_hist[ch]),
-                       axis_mode=args.axis)
+                       axis_mode=args.axis,
+                       scroll_offset=sample_count[ch])
 
                 if recording and len(recorded_frames[ch]) < args.max_frames:
                     recorded_frames[ch].append(fb.to_image(args.scale))
