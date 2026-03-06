@@ -183,22 +183,44 @@ extern "C" void __wrap_tud_cdc_rx_cb(uint8_t itf) {
 // disconnect/reconnect during usb_switch_to_cdc_jtag(). Community workaround:
 // call tud_disconnect() and release GPIO 19/20 before usb_persist_restart().
 //
-// The delay must be long enough for the host to fully process the USB disconnect
-// before usb_switch_to_cdc_jtag() drives D-/D+ low and waits for BUS_RESET.
-// Too short and the host is still handling the disconnect, causing the BUS_RESET
-// semaphore to timeout and leaving USB Serial JTAG half-initialized.
 #include "soc/rtc_cntl_reg.h"
-#include "driver/gpio.h"
 
 extern "C" void __real_usb_persist_restart(uint32_t mode);
 extern "C" void usb_persist_restart(uint32_t mode);
 
+// Deferred bootloader entry — runs outside the USB callback context.
+// The 1200-baud detection fires inside a TinyUSB SET_LINE_CODING callback;
+// we can't reset from there, so we defer to a FreeRTOS task.
+static void bootloaderTask(void* param) {
+    delay(100);  // let USB callback return
+
+    // On ESP32-S3, esp_restart() only resets CPUs, NOT digital peripherals.
+    // We need a true system reset so the ROM re-initializes USB Serial JTAG
+    // and checks FORCE_DOWNLOAD_BOOT.
+
+    // 1. Disconnect TinyUSB cleanly so host processes removal
+    tud_disconnect();
+    delay(500);
+
+    // 2. Route PHY to USB Serial JTAG (clear SW override → hardware default)
+    CLEAR_PERI_REG_MASK(RTC_CNTL_USB_CONF_REG,
+        RTC_CNTL_SW_HW_USB_PHY_SEL | RTC_CNTL_SW_USB_PHY_SEL |
+        RTC_CNTL_USB_PAD_ENABLE);
+
+    // 3. Set FORCE_DOWNLOAD_BOOT
+    REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+
+    // 4. True system reset (resets CPU + all digital peripherals).
+    //    esp_restart()/esp_restart_noos() only reset CPUs on ESP32-S3.
+    SET_PERI_REG_MASK(RTC_CNTL_OPTIONS0_REG, RTC_CNTL_SW_SYS_RST);
+    while (true) { ; }
+}
+
 extern "C" void __wrap_usb_persist_restart(uint32_t mode) {
     if (mode == 2) {  // RESTART_BOOTLOADER
-        tud_disconnect();
-        gpio_reset_pin((gpio_num_t)19);  // D-
-        gpio_reset_pin((gpio_num_t)20);  // D+
-        delay(1000);  // host needs time to fully process disconnect
+        // Defer to a task so we exit the USB callback context first
+        xTaskCreate(bootloaderTask, "bootloader", 4096, NULL, configMAX_PRIORITIES - 1, NULL);
+        return;  // return to USB callback — task will handle the rest
     }
     __real_usb_persist_restart(mode);
 }
@@ -1692,7 +1714,6 @@ void processJsonRpcMessage(const char* jsonString) {
         result["brightness"]    = brightnessPwmToPct(gloConfig->screen[0].brightness);
       if(pName == "reboot_enabled" || all || conf)
         result["reboot_enabled"] = gloConfig->features.reboot_enabled;
-
 
       if(pName == "startUpActive" || all || state)
         result["startUpActive"] = gloState->features.startUpActive;
