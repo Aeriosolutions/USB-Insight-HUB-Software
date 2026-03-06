@@ -122,3 +122,18 @@ def hub(request):
     h = request.config._hub_instance
     yield h
     h.close()
+
+
+@pytest.fixture(autouse=True)
+def _flush_serial(request):
+    """Flush residual data between tests so binary leftovers don't corrupt JSON."""
+    import time
+    hub = getattr(request.config, "_hub_instance", None)
+    if not hub or not hub.ser or not hub.ser.is_open:
+        return
+
+    # Send a bare newline — breaks any partial JSON buffering on the hub
+    # without triggering the binary parser (newline is 0x0A, not SOH).
+    hub.ser.write(b"\n")
+    time.sleep(0.05)
+    hub.ser.reset_input_buffer()

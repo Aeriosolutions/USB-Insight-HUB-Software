@@ -463,46 +463,6 @@ int getEnumIndex(const char* name, const char* const* array, int size);
 // FreeRTOS task with a true system reset (RTC_CNTL_SW_SYS_RST).
 #include "soc/rtc_cntl_reg.h"
 
-extern "C" void __real_usb_persist_restart(uint32_t mode);
-extern "C" void usb_persist_restart(uint32_t mode);
-
-// Deferred bootloader entry — runs outside the USB callback context.
-// The 1200-baud detection fires inside a TinyUSB SET_LINE_CODING callback;
-// we can't reset from there, so we defer to a FreeRTOS task.
-static void bootloaderTask(void* param) {
-    delay(100);  // let USB callback return
-
-    // On ESP32-S3, esp_restart() only resets CPUs, NOT digital peripherals.
-    // We need a true system reset so the ROM re-initializes USB Serial JTAG
-    // and checks FORCE_DOWNLOAD_BOOT.
-
-    // 1. Disconnect TinyUSB cleanly so host processes removal
-    tud_disconnect();
-    delay(500);
-
-    // 2. Route PHY to USB Serial JTAG (clear SW override → hardware default)
-    CLEAR_PERI_REG_MASK(RTC_CNTL_USB_CONF_REG,
-        RTC_CNTL_SW_HW_USB_PHY_SEL | RTC_CNTL_SW_USB_PHY_SEL |
-        RTC_CNTL_USB_PAD_ENABLE);
-
-    // 3. Set FORCE_DOWNLOAD_BOOT
-    REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
-
-    // 4. True system reset (resets CPU + all digital peripherals).
-    //    esp_restart()/esp_restart_noos() only reset CPUs on ESP32-S3.
-    SET_PERI_REG_MASK(RTC_CNTL_OPTIONS0_REG, RTC_CNTL_SW_SYS_RST);
-    while (true) { ; }
-}
-
-extern "C" void __wrap_usb_persist_restart(uint32_t mode) {
-    if (mode == 2) {  // RESTART_BOOTLOADER
-        // Defer to a task so we exit the USB callback context first
-        xTaskCreate(bootloaderTask, "bootloader", 4096, NULL, configMAX_PRIORITIES - 1, NULL);
-        return;  // return to USB callback — task will handle the rest
-    }
-    __real_usb_persist_restart(mode);
-}
-
 void iniExtercomms(GlobalState* globalState, GlobalConfig* globalConfig){
 
     gloState = globalState;
