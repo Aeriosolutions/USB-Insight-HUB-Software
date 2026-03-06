@@ -228,8 +228,8 @@ struct ScreenConfig {
 };
 
 // Brightness helpers — convert between user-facing percentage and internal PWM
-inline uint16_t brightnessPctToPwm(uint16_t pct) { return (uint16_t)((uint32_t)pct * 1023 + 50) / 100; }
-inline uint16_t brightnessPwmToPct(uint16_t pwm) { return (uint16_t)((uint32_t)pwm * 100 + 511) / 1023; }
+inline uint16_t brightnessPctToPwm(uint16_t pct) { return (uint16_t)(((uint32_t)pct * 1023 + 50) / 100); }
+inline uint16_t brightnessPwmToPct(uint16_t pwm) { return (uint16_t)(((uint32_t)pwm * 100 + 511) / 1023); }
 
 struct MeterState {
   float AvgVoltage;
