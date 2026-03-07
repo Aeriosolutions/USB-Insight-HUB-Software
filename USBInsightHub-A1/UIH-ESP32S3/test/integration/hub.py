@@ -137,7 +137,7 @@ class Hub:
                 pass
         for attempt in range(3):
             try:
-                self.ser = serial.Serial(self.port, 115200, timeout=self.timeout)
+                self.ser = serial.Serial(self.port, 115200, timeout=self.timeout, exclusive=True)
                 self.ser.dtr = True
                 time.sleep(CONNECT_SETTLE_S)
                 self.ser.reset_input_buffer()

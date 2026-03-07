@@ -15,7 +15,19 @@ import time
 
 import pytest
 
-from binary_transport import build_image_frame, rgb565_bytes, solid_image_rgb565
+from binary_transport import (
+    build_echo_frame,
+    build_image_frame,
+    IMG_FLAG_SPRITE,
+    IMG_FLAG_RLE,
+    parse_frame,
+    rgb565_bytes,
+    rle_encode,
+    solid_image_rgb565,
+    BIN_CMD_ECHO,
+)
+from demo_plasma import build_plasma_lut, render_plasma
+from demo_tear_test import render_hbars
 
 log = logging.getLogger("test_animation")
 
@@ -301,3 +313,191 @@ class TestAnimation:
             "(avg %.3fs/frame)",
             total_frames, n_per_ch, total, fps, total / total_frames,
         )
+
+
+# ---------------------------------------------------------------------------
+# Sustained workload generators — import rendering from demos
+# ---------------------------------------------------------------------------
+
+def make_plasma_frames(n, width, height):
+    """N frames of plasma animation using demo_plasma's renderer."""
+    palette = build_plasma_lut("ocean")
+    frames = []
+    for i in range(n):
+        t = i * 0.2  # 200ms spacing between frames
+        pixels = render_plasma(t, palette)
+        frames.append(build_image_frame(1, 16, width, height, pixels))
+    return frames
+
+
+def make_hbar_dual_frames(n, width, height, bar_height=16, speed=2):
+    """N frame-pairs of scrolling horizontal bars on CH1 and CH2."""
+    white = rgb565_bytes(255, 255, 255)
+    black = rgb565_bytes(0, 0, 0)
+    frames = []  # list of (ch1_frame, ch2_frame)
+    for i in range(n):
+        offset = i * speed
+        pixels = render_hbars(offset, bar_height, white, black)
+        frames.append((
+            build_image_frame(1, 16, width, height, pixels),
+            build_image_frame(2, 16, width, height, pixels),
+        ))
+    return frames
+
+
+def make_graph_rle_frames(n, width, height):
+    """N frames of graph-like 8bpp content with RLE — black bg, colored line."""
+    frames = []
+    for i in range(n):
+        buf = bytearray(width * height)
+        # Simulate a graph: horizontal colored line sweeping vertically
+        line_y = int((i / n) * height) % height
+        for x in range(width):
+            # Green line (RGB332: 0b000_111_00 = 0x1C)
+            buf[line_y * width + x] = 0x1C
+        pixels = bytes(buf)
+        compressed = rle_encode(pixels)
+        frames.append(build_image_frame(
+            1, 8, width, height, compressed,
+            flags=IMG_FLAG_SPRITE | IMG_FLAG_RLE,
+        ))
+    return frames
+
+
+# ---------------------------------------------------------------------------
+# Sustained workload tests
+# ---------------------------------------------------------------------------
+
+class TestDemoWorkloads:
+    """Sustained workloads derived from demo scripts, with FPS baselines."""
+
+    @pytest.mark.slow
+    def test_plasma_sustained(self, hub):
+        """100 frames of plasma — sustained 16bpp buffer-mode throughput."""
+        n = 100
+        log.info("Pre-building %d plasma frames...", n)
+        frames = make_plasma_frames(n, WIDTH, HEIGHT)
+
+        log.info("Streaming %d frames to CH1...", n)
+        errors = 0
+        times = []
+        for i, frame in enumerate(frames):
+            elapsed, ok, _ = send_frame(hub, frame)
+            times.append(elapsed)
+            if not ok:
+                errors += 1
+
+        total = sum(times)
+        fps = n / total
+        log.info("Plasma sustained: %d frames in %.1fs — %.1f FPS, %d errors",
+                 n, total, fps, errors)
+
+        assert errors == 0, f"{errors} frame errors"
+        assert fps >= 4.0, f"Plasma FPS {fps:.1f} below 4.0 baseline"
+
+        state = hub.get("state")
+        assert state is not None, "CDC unresponsive after plasma workload"
+        log.info("CDC ok after plasma workload (uptime=%s)", state.get("uptime"))
+
+    @pytest.mark.slow
+    def test_teartest_dual_channel(self, hub):
+        """100 frame-pairs on CH1+CH2 — dual-channel throughput."""
+        n = 100
+        log.info("Pre-building %d dual-channel h-bar frame-pairs...", n)
+        frame_pairs = make_hbar_dual_frames(n, WIDTH, HEIGHT)
+
+        log.info("Streaming %d frame-pairs to CH1+CH2...", n)
+        errors = 0
+        times = []
+        for i, (f1, f2) in enumerate(frame_pairs):
+            for frame in (f1, f2):
+                elapsed, ok, _ = send_frame(hub, frame)
+                times.append(elapsed)
+                if not ok:
+                    errors += 1
+
+        total = sum(times)
+        total_frames = n * 2
+        fps = total_frames / total
+        log.info("Tear test dual: %d frames in %.1fs — %.1f FPS (%.1f/ch), %d errors",
+                 total_frames, total, fps, fps / 2, errors)
+
+        assert errors == 0, f"{errors} frame errors"
+        assert fps >= 4.0, f"Dual-channel FPS {fps:.1f} below 4.0 baseline"
+
+        state = hub.get("state")
+        assert state is not None, "CDC unresponsive after tear test workload"
+        log.info("CDC ok after tear test workload (uptime=%s)", state.get("uptime"))
+
+    @pytest.mark.slow
+    def test_graph_sprite_rle(self, hub):
+        """100 frames of 8bpp sprite+RLE — measures RLE throughput."""
+        n = 100
+        log.info("Pre-building %d graph-like 8bpp+RLE frames...", n)
+        frames = make_graph_rle_frames(n, WIDTH, HEIGHT)
+
+        log.info("Streaming %d RLE sprite frames to CH1...", n)
+        errors = 0
+        times = []
+        for i, frame in enumerate(frames):
+            elapsed, ok, _ = send_frame(hub, frame)
+            times.append(elapsed)
+            if not ok:
+                errors += 1
+
+        total = sum(times)
+        fps = n / total
+        log.info("Graph RLE sprite: %d frames in %.1fs — %.1f FPS, %d errors",
+                 n, total, fps, errors)
+
+        assert errors == 0, f"{errors} frame errors"
+        assert fps >= 12.0, f"RLE sprite FPS {fps:.1f} below 12.0 baseline"
+
+        state = hub.get("state")
+        assert state is not None, "CDC unresponsive after RLE workload"
+        log.info("CDC ok after RLE workload (uptime=%s)", state.get("uptime"))
+
+    @pytest.mark.slow
+    def test_echo_sustained(self, hub):
+        """50 echo round-trips with 4KB payloads — sustained binary echo."""
+        n = 50
+        payload = b"X" * 4096
+        frame = build_echo_frame(payload)
+        expected_size = 1 + 9 + len(payload) + 4  # SOH + header + payload + CRC
+
+        log.info("Sending %d echo frames (%d bytes each)...", n, len(payload))
+        old_timeout = hub.ser.timeout
+        hub.ser.timeout = 5.0
+        errors = 0
+        times = []
+        try:
+            for i in range(n):
+                t0 = time.monotonic()
+                hub.ser.write(frame)
+                hub.ser.flush()
+                resp = hub.ser.read(expected_size)
+                elapsed = time.monotonic() - t0
+                times.append(elapsed)
+
+                if len(resp) != expected_size:
+                    errors += 1
+                    log.warning("Echo %d: got %d bytes, expected %d", i, len(resp), expected_size)
+                    continue
+
+                cmd, flags, echoed = parse_frame(resp)
+                if cmd != BIN_CMD_ECHO or echoed != payload:
+                    errors += 1
+                    log.warning("Echo %d: payload mismatch", i)
+        finally:
+            hub.ser.timeout = old_timeout
+
+        total = sum(times)
+        avg_ms = (total / n) * 1000
+        log.info("Echo sustained: %d round-trips in %.1fs — avg %.1fms, %d errors",
+                 n, total, avg_ms, errors)
+
+        assert errors == 0, f"{errors} echo errors"
+
+        state = hub.get("state")
+        assert state is not None, "CDC unresponsive after echo workload"
+        log.info("CDC ok after echo workload (uptime=%s)", state.get("uptime"))

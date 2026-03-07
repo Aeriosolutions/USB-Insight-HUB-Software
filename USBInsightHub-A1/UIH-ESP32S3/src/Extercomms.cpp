@@ -19,8 +19,8 @@
 #include "Screen.h"
 #include <RestartService.h>
 #include <esp_crc.h>
+#include <esp_heap_caps.h>
 #include "freertos/stream_buffer.h"
-#include "tusb.h"
 
 //USB Serial and Harware Serial (Debug)
 #if ARDUINO_USB_CDC_ON_BOOT
@@ -48,7 +48,7 @@ volatile unsigned long screenLockTime[3] = {0, 0, 0};
 volatile uint8_t screenReadyPending = 0;
 SemaphoreHandle_t screenReadySemaphore = NULL;
 
-char rawBuffer[4096];
+char rawBuffer[2048];
 size_t rawBufIndex = 0;
 char inputBuffer[MAX_BUFFER_SIZE];   //working array JSON-RPC
 size_t bufferIndex = 0;
@@ -87,7 +87,9 @@ static uint8_t imgBpp = 0;
 static uint16_t imgWidth = 0;
 static uint16_t imgHeight = 0;
 static uint32_t imgPixelsExpected = 0;
-static bool imgFailed = false;  // set if image validation failed; suppresses dispatch
+// imgFailed removed — error handling is now centralized in binFrameFailed.
+// Handlers call binSendResponse() which sets binFrameFailed; the common parser
+// then stops forwarding payload bytes and skips dispatch.
 static uint16_t imgFlags = 0;  // raw flags from frame header
 static uint16_t imgMode = 0;   // low 2 bits: buffer/sprite/direct
 static bool imgRLE = false;     // bit 2: RLE-compressed payload
@@ -157,7 +159,7 @@ TaskHandle_t exterTaskHandle = nullptr;
 
 // --- Fast CDC RX path: bypass Arduino per-byte queue via --wrap linker intercept ---
 static StreamBufferHandle_t cdcRxStream = NULL;
-#define CDC_STREAM_SIZE 8192
+#define CDC_STREAM_SIZE 4096
 
 extern "C" void __real_tud_cdc_rx_cb(uint8_t itf);
 
@@ -259,6 +261,7 @@ static void binMeterStreamDispatch();
 static void binMeterStreamSendSample();
 static void binSendBinaryFrame(uint16_t cmd, const uint8_t* payload, size_t len);
 static void binSendResponse(uint16_t cmd, const char* message, bool ok = true);
+static void binFlushPendingResponse();
 
 // --- Pluggable command handler structs ---
 
@@ -266,7 +269,6 @@ static const BinCommandHandler imageHandler = {
   .cmd = BIN_CMD_IMAGE,
   .begin = [](uint16_t, uint16_t flags, uint32_t) -> bool {
     imgSubHeaderIndex = 0;
-    imgFailed = false;
     imgPixelBufIndex = 0;
     imgFlags = flags;
     imgMode = flags & 0x03;
@@ -290,7 +292,7 @@ static const BinCommandHandler imageHandler = {
   .payloadByte = binImagePayloadByte,
   .payloadBlock = binImagePayloadBlock,
   .dispatch = []() {
-    if (!imgFailed) binImageRender();
+    binImageRender();
   },
   .reset = []() {
     // Clean up direct mode if in progress (timeout/error recovery)
@@ -307,7 +309,6 @@ static const BinCommandHandler imageHandler = {
     // to overwrite the viewport with the default chrome.
     imgPixelBufIndex = 0;
     imgSubHeaderIndex = 0;
-    imgFailed = false;
     imgFlags = 0;
     imgMode = 0;
     imgRLE = false;
@@ -532,6 +533,7 @@ void taskExterCheckActivity(void *pvParameters){
                    parseState, binCmd, binPayloadReceived, binPayloadLen);
           binSendResponse(binCmd, "timeout", false);
           binReset();
+          binFlushPendingResponse();
         }
 
         if(USBSerialActivity){
@@ -590,6 +592,22 @@ void taskExterCheckActivity(void *pvParameters){
 
 }
 
+// Deferred response — buffers the response JSON so it can be sent AFTER the
+// binary frame is fully consumed (payload + checksum).  Sending during RX-heavy
+// payload draining can stall the USB CDC TX path and cause the hub to hang.
+static char binPendingResponse[128];
+static bool binHasPendingResponse = false;
+
+// Frame-level failure flag.  When a handler (or the parser) calls
+// binSendResponse() with ok=false during binary frame processing, this flag
+// is set.  The common parser code then:
+//  - Stops forwarding payload bytes to the handler
+//  - Skips dispatch() after checksum
+//  - Sends the deferred error response after the frame is fully consumed
+// Handlers that detect errors just call binSendResponse() and return — they
+// don't need their own "failed" tracking or drain logic.
+static bool binFrameFailed = false;
+
 static void binReset() {
   if (binActiveHandler && binActiveHandler->reset) {
     binActiveHandler->reset();
@@ -603,15 +621,35 @@ static void binReset() {
   binFlags = 0;
   binRunningCRC = 0;
   binChecksumIndex = 0;
+  binFrameFailed = false;
 }
 
 static void binSendResponse(uint16_t cmd, const char* message, bool ok) {
-  char buf[128];
-  snprintf(buf, sizeof(buf),
+  snprintf(binPendingResponse, sizeof(binPendingResponse),
     "{\"status\":\"%s\",\"data\":{\"cmd\":%u,\"message\":\"%s\"}}",
     ok ? "ok" : "error", cmd, message);
-  usbSerial.println(buf);
+
+  // If we're in the middle of processing a binary frame, defer the send.
+  // The response will be flushed after checksum verification in PARSE_BIN_CHECKSUM.
+  if (parseState != PARSE_TEXT) {
+    binHasPendingResponse = true;
+    if (!ok) binFrameFailed = true;
+    return;
+  }
+
+  // Not in binary frame — send immediately (e.g. from dispatch or timeout handler)
+  usbSerial.println(binPendingResponse);
   usbSerial.flush();
+  binHasPendingResponse = false;
+}
+
+// Flush any deferred response — called after binary frame is fully consumed.
+static void binFlushPendingResponse() {
+  if (binHasPendingResponse) {
+    usbSerial.println(binPendingResponse);
+    usbSerial.flush();
+    binHasPendingResponse = false;
+  }
 }
 
 
@@ -707,8 +745,6 @@ static void binImagePayloadByte(uint8_t byte) {
 // Block handler — copies payload data in bulk using memcpy (buffer mode),
 // writes into sprite buffer (sprite mode), or streams to SPI (direct mode)
 static void binImagePayloadBlock(const uint8_t* data, size_t len) {
-  if (imgFailed) return;
-
   // Consume sub-header bytes first
   while (imgSubHeaderIndex < IMAGE_SUBHEADER_SIZE && len > 0) {
     imgSubHeader[imgSubHeaderIndex++] = *data++;
@@ -718,7 +754,10 @@ static void binImagePayloadBlock(const uint8_t* data, size_t len) {
     }
   }
 
-  if (imgFailed || len == 0) return;
+  // If binImageBegin() rejected the frame (called binSendResponse with ok=false),
+  // binFrameFailed is set.  The common parser will stop calling us for remaining
+  // payload bytes.  For bytes already in this batch, return early.
+  if (binFrameFailed || len == 0) return;
 
   if (imgMode == IMG_FLAG_SPRITE) {
     // Sprite mode — buffer into imgPixelBuf (copied into sprite during render)
@@ -821,42 +860,43 @@ static void binImageBegin() {
   uint32_t expectedDataBytes = imgPixelsExpected * bytesPerPixel;
   uint32_t expectedPayload = IMAGE_SUBHEADER_SIZE + expectedDataBytes;
 
-  // Validate — on failure, set imgFailed so remaining bytes are consumed silently
+  // Validate — on failure, binSendResponse() sets binFrameFailed; common parser
+  // drains remaining payload and sends the deferred response after checksum.
   if (imgPort < 1 || imgPort > 3) {
     ESP_LOGW(TAG, "Image: invalid port %u", imgPort);
     binSendResponse(BIN_CMD_IMAGE, "invalid port", false);
-    imgFailed = true;
+
     return;
   }
   if (imgBpp != 8 && imgBpp != 16) {
     ESP_LOGW(TAG, "Image: unsupported bpp %u", imgBpp);
     binSendResponse(BIN_CMD_IMAGE, "unsupported bpp", false);
-    imgFailed = true;
+
     return;
   }
   if (imgWidth == 0 || imgHeight == 0 || imgWidth > 240 || imgHeight > 240) {
     ESP_LOGW(TAG, "Image: invalid dimensions %ux%u", imgWidth, imgHeight);
     binSendResponse(BIN_CMD_IMAGE, "invalid dimensions", false);
-    imgFailed = true;
+
     return;
   }
   if (imgRLE) {
     // RLE: compressed payload is smaller than raw pixels — just validate minimum
     if (binPayloadLen < IMAGE_SUBHEADER_SIZE) {
       binSendResponse(BIN_CMD_IMAGE, "payload too short for RLE", false);
-      imgFailed = true;
+  
       return;
     }
   } else if (expectedPayload != binPayloadLen) {
     ESP_LOGW(TAG, "Image: payload length mismatch (expected %u, got %u)", expectedPayload, binPayloadLen);
     binSendResponse(BIN_CMD_IMAGE, "payload length mismatch", false);
-    imgFailed = true;
+
     return;
   }
   if (!gloScreen) {
     ESP_LOGE(TAG, "Image: screen not initialized");
     binSendResponse(BIN_CMD_IMAGE, "screen not initialized", false);
-    imgFailed = true;
+
     return;
   }
 
@@ -865,12 +905,12 @@ static void binImageBegin() {
     // Sprite mode: 8bpp only, must fit viewport
     if (imgBpp != 8) {
       binSendResponse(BIN_CMD_IMAGE, "sprite mode requires 8bpp", false);
-      imgFailed = true;
+  
       return;
     }
     if (imgWidth > VIEWPORT_W || imgHeight > VIEWPORT_H) {
       binSendResponse(BIN_CMD_IMAGE, "exceeds viewport", false);
-      imgFailed = true;
+  
       return;
     }
     // Allocate/reuse pixel buffer (same pattern as buffer mode)
@@ -887,7 +927,7 @@ static void binImageBegin() {
     }
     if (!imgPixelBuf) {
       binSendResponse(BIN_CMD_IMAGE, "out of memory", false);
-      imgFailed = true;
+  
       return;
     }
     imageMode[imgPort - 1] = true;
@@ -902,7 +942,7 @@ static void binImageBegin() {
     // USB data loss (StreamBuffer overflow → binary parser timeout).
     if (imgWidth > VIEWPORT_W || imgHeight > VIEWPORT_H) {
       binSendResponse(BIN_CMD_IMAGE, "exceeds viewport", false);
-      imgFailed = true;
+  
       return;
     }
     if (xSemaphoreTake(screen_Semaphore, 0) == pdTRUE) {
@@ -930,7 +970,7 @@ static void binImageBegin() {
       }
       if (!imgPixelBuf) {
         binSendResponse(BIN_CMD_IMAGE, "out of memory", false);
-        imgFailed = true;
+    
         return;
       }
       imageMode[imgPort - 1] = true;
@@ -951,12 +991,13 @@ static void binImageBegin() {
       imgPixelBuf = (uint8_t*)malloc(imgPixelBufSize);
     }
     if (!imgPixelBuf) {
-      static char oomMsg[80];
-      snprintf(oomMsg, sizeof(oomMsg), "out of memory (need %u, free %u)",
-               (unsigned)imgPixelBufSize, (unsigned)esp_get_free_heap_size());
+      static char oomMsg[120];
+      snprintf(oomMsg, sizeof(oomMsg), "out of memory (need %u, free %u, largest %u)",
+               (unsigned)imgPixelBufSize, (unsigned)esp_get_free_heap_size(),
+               (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
       ESP_LOGE(TAG, "Image: %s", oomMsg);
       binSendResponse(BIN_CMD_IMAGE, oomMsg, false);
-      imgFailed = true;
+  
       return;
     }
     ESP_LOGI(TAG, "Image: buffer mode port=%u bpp=%u %ux%u (%u bytes)",
@@ -1388,12 +1429,14 @@ void onSerialDataReceived(){
           ESP_LOGW(TAG, "Binary: unsupported version %u", version);
           binSendResponse(binCmd, "unsupported version", false);
           binReset();
+          binFlushPendingResponse();
           break;
         }
         if (binPayloadLen > BIN_MAX_PAYLOAD) {
           ESP_LOGW(TAG, "Binary: payload too large %u", binPayloadLen);
           binSendResponse(binCmd, "payload too large", false);
           binReset();
+          binFlushPendingResponse();
           break;
         }
 
@@ -1403,12 +1446,27 @@ void onSerialDataReceived(){
         binActiveHandler = binFindHandler(binCmd);
         if (!binActiveHandler) {
           binSendResponse(binCmd, "unknown command", false);
-          binReset();
+          // Continue to drain payload+checksum so they don't corrupt text stream
+          if (binPayloadLen == 0) {
+            parseState = PARSE_BIN_CHECKSUM;
+            binChecksumIndex = 0;
+          } else {
+            parseState = PARSE_BIN_PAYLOAD;
+          }
           break;
         }
         if (!binActiveHandler->begin(binCmd, binFlags, binPayloadLen)) {
-          // Handler rejected — it sent its own error response
-          binReset();
+          // Handler rejected — it sent its own error response.
+          // Null out handler so payload bytes are drained silently,
+          // and continue to consume payload+checksum so they don't
+          // get misinterpreted as JSON text.
+          binActiveHandler = nullptr;
+          if (binPayloadLen == 0) {
+            parseState = PARSE_BIN_CHECKSUM;
+            binChecksumIndex = 0;
+          } else {
+            parseState = PARSE_BIN_PAYLOAD;
+          }
           break;
         }
 
@@ -1431,13 +1489,18 @@ void onSerialDataReceived(){
       // CRC over the block
       binRunningCRC = esp_crc32_le(binRunningCRC, (const uint8_t*)&rawBuffer[i], chunk);
 
-      // Copy block into payload buffer (image, echo, etc.)
-      if (binActiveHandler->payloadBlock) {
-        binActiveHandler->payloadBlock((const uint8_t*)&rawBuffer[i], chunk);
-      } else {
-        // Fallback to per-byte for handlers without block support
-        for (size_t j = 0; j < chunk; j++) {
-          binActiveHandler->payloadByte((uint8_t)rawBuffer[i + j]);
+      // Forward payload to handler — unless the frame has been marked as failed
+      // (handler called binSendResponse with ok=false) or handler is null
+      // (unknown command or begin() returned false).  In those cases, bytes are
+      // silently drained; the deferred error response is sent after checksum.
+      if (binActiveHandler && !binFrameFailed) {
+        if (binActiveHandler->payloadBlock) {
+          binActiveHandler->payloadBlock((const uint8_t*)&rawBuffer[i], chunk);
+        } else {
+          // Fallback to per-byte for handlers without block support
+          for (size_t j = 0; j < chunk; j++) {
+            binActiveHandler->payloadByte((uint8_t)rawBuffer[i + j]);
+          }
         }
       }
 
@@ -1462,10 +1525,17 @@ void onSerialDataReceived(){
           ESP_LOGW(TAG, "Binary: checksum mismatch (expected 0x%08X, got 0x%08X)",
                    expected, binRunningCRC);
           binSendResponse(binCmd, "checksum mismatch", false);
-        } else {
+        } else if (binFrameFailed) {
+          // Handler already signaled failure — deferred error response is pending.
+          // Skip dispatch; the response will be flushed below.
+        } else if (binActiveHandler) {
           binActiveHandler->dispatch();
         }
+        // Switch back to text mode BEFORE flushing response — this ensures
+        // binSendResponse (called from dispatch or deferred) sees PARSE_TEXT
+        // and sends immediately rather than deferring again.
         binReset();
+        binFlushPendingResponse();
       }
       break;
     }
@@ -1643,7 +1713,7 @@ void processJsonRpcMessage(const char* jsonString) {
    
   }  
 
-  if(action == "get") {  
+  else if(action == "get") {
     JsonArray params = doc["params"].as<JsonArray>();
     JsonDocument responseDoc;
     JsonObject result = responseDoc.to<JsonObject>();
@@ -1723,6 +1793,10 @@ void processJsonRpcMessage(const char* jsonString) {
         result["pacRev"]      = String(gloState->system.pacRevisionID);
       if(pName == "uptime"    || all || state)
         result["uptime"]      = millis();
+      if(pName == "freeHeap"  || all || state) {
+        result["freeHeap"]    = esp_get_free_heap_size();
+        result["largestBlock"] = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+      }
       if(pName == "screenLock" || all || state) {
         JsonObject lo = result["screenLock"].to<JsonObject>();
         for (int i = 0; i < 3; i++)
@@ -1780,6 +1854,11 @@ void processJsonRpcMessage(const char* jsonString) {
     usbSerial.flush();
     delay(100);
     enterBootloader();
+  }
+
+  else {
+    String err = "{\"status\": \"error\", \"data\": {\"code\": -32601, \"message\": \"Unknown action: " + action + "\"}}";
+    printErr(err);
   }
 
 }

@@ -147,10 +147,10 @@ class TestPowerToggle:
 
 
 def test_invalid_action(hub):
-    """Invalid action returns without hanging."""
+    """Invalid action returns an error response without hanging."""
     resp = hub.send({"action": "bogus", "params": {}})
-    # if we get here it didn't hang — that's the main assertion
-    assert resp is None or isinstance(resp, dict)
+    assert resp is not None, "No response for unknown action (firmware should return error)"
+    assert resp.get("status") == "error"
 
 
 def test_first_start_flag(hub):

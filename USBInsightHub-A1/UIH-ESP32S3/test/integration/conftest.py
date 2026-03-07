@@ -127,13 +127,11 @@ def hub(request):
 @pytest.fixture(autouse=True)
 def _flush_serial(request):
     """Flush residual data between tests so binary leftovers don't corrupt JSON."""
-    import time
     hub = getattr(request.config, "_hub_instance", None)
     if not hub or not hub.ser or not hub.ser.is_open:
         return
 
-    # Send a bare newline — breaks any partial JSON buffering on the hub
-    # without triggering the binary parser (newline is 0x0A, not SOH).
-    hub.ser.write(b"\n")
-    time.sleep(0.05)
+    # Just clear the host-side input buffer without sending anything to the hub.
+    # Sending \n forces the hub to parse an empty JSON message and respond; over
+    # many tests this can cause CDC TX buffer pressure.  A simple clear is safer.
     hub.ser.reset_input_buffer()
