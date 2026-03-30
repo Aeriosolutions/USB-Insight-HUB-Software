@@ -81,7 +81,8 @@ Menu generalConfig = {
         },{},"",{H_SCREEN}},
         {TYPE_SELECT, "HUB Mode",{},{"USB2 & USB3", "USB2 Only", "USB3 Only"},"",
         {H_USBTYP,H_USBTYP23,H_USBTYP2,H_USBTYP3}},
-        {TYPE_SELECT,"Restore Default",{},{"No Action", "Restore Def"},"",{H_DEF,H_DEFxNA,H_DEFRES}}        
+        {TYPE_SELECT,"USB Reboot",{},{"Disable", "Enable"},"",{H_USBRBT,H_USBRBTNO,H_USBRBTYES}},
+        {TYPE_SELECT,"Restore Default",{},{"No Action", "Restore Def"},"",{H_DEF,H_DEFxNA,H_DEFRES}}
     },
     {"0"},"", {H_GLOCONF}
 };
@@ -464,8 +465,11 @@ uint16_t getParamValue(String param, String channel){
     if(param =="Brightness") {    
         return ((uint16_t)(gCon->screen[channel.toInt()].brightness));
     }
-    if(param =="HUB Mode") {    
+    if(param =="HUB Mode") {
         return ((uint16_t)(gCon->features.hubMode));
+    }
+    if(param =="USB Reboot") {
+        return ((uint16_t)(gCon->features.reboot_enabled));
     }
     if(param =="Restore Default") {            
         return ((uint16_t)(gSte->system.resetToDefault));
@@ -523,8 +527,12 @@ void setParamValue(String param, uint16_t value, String channel){
         gCon->screen[2].brightness = value;
         return;
     }
-    if(param =="HUB Mode") {    
+    if(param =="HUB Mode") {
         gCon->features.hubMode = (uint8_t)(value);
+        return;
+    }
+    if(param =="USB Reboot") {
+        gCon->features.reboot_enabled = (uint8_t)(value);
         return;
     }
     if(param =="Restore Default") {    

@@ -27,6 +27,7 @@ static const char *jsonDefault = R"rawliteral(
   "features_conf_hubMode": 0,
   "features_conf_filterType": 1,
   "features_conf_refreshRate": 0,
+  "features_conf_reboot_enabled": 0,
   "features_startUpActive": 0,
   "features_pcConnected": false,
   "features_vbusVoltage": 0,
@@ -216,6 +217,7 @@ void MasterStateService::copyBackendToGlobal(JsonObject &root){
   gConfig->features.hubMode       = root["features_conf_hubMode"].as<uint8_t>();
   gConfig->features.filterType    = root["features_conf_filterType"].as<uint8_t>();
   gConfig->features.refreshRate   = root["features_conf_refreshRate"].as<uint8_t>();
+  gConfig->features.reboot_enabled = root["features_conf_reboot_enabled"].as<uint8_t>();
   gState->system.resetToDefault   = root["system_resetToDefault"].as<uint8_t>();
   //gState->features.startUpActive = root["features_startUpActive"] | false;
   //gState->features.pcConnected  = root["features_pcConnected"] | false;
@@ -264,6 +266,7 @@ void MasterStateService::copyGlobalToBackend(JsonObject &root){
   root["features_conf_hubMode"]     = gConfig->features.hubMode;
   root["features_conf_filterType"]  = gConfig->features.filterType;
   root["features_conf_refreshRate"] = gConfig->features.refreshRate;
+  root["features_conf_reboot_enabled"] = gConfig->features.reboot_enabled;
   root["features_startUpActive"]    = gState->features.startUpActive;
   root["features_pcConnected"]      = gState->features.pcConnected;
   root["features_vbusVoltage"]      = gState->features.vbus;

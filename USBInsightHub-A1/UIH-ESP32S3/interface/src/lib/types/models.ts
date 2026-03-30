@@ -152,6 +152,7 @@ export type MasterState = {
 	features_conf_hubMode: number;
 	features_conf_filterType: number;
 	features_conf_refreshRate: number;
+	features_conf_reboot_enabled: number;
 	features_startUpActive: boolean;
 	features_pcConnected: boolean;
 	features_vbusVoltage: number;

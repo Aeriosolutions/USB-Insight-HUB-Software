@@ -100,25 +100,31 @@ class Screen{
   public:
     //void start(TFT_eSPI *r_tft, TFT_eSprite *r_img);
     void start();
-    void screenDefaultRender(chScreenData Screen);
+    void screenDefaultRender(chScreenData Screen, bool chromeOnly = false);
     void screenSetBackLight(int pwm);
     void screenSetBackLight(int pwm, uint8_t ch);
     void usbIconDraw(uint8_t type, bool active,bool com);
     void flexDevicePrint(String jsonStr, bool pcCon);
     void imagePrint(uint16_t* imgBuffer, uint8_t bpp, uint32_t color_border);
 
+    // Direct-to-display pixel streaming (bypasses sprite framebuffer)
+    void streamBegin(uint8_t cs_pin, int32_t x, int32_t y, int32_t w, int32_t h);
+    void streamPixels(const uint16_t* data, uint32_t pixelCount);
+    void streamPixelsRGB332(const uint8_t* data, uint32_t pixelCount);
+    void streamEnd();
+
     displayProp dProp[3];
     TFT_eSPI tft       = TFT_eSPI();       // Invoke custom library
     TFT_eSprite img    = TFT_eSprite(&tft);
+    uint16_t palette[256]; // RGB332→RGB565 lookup table (public for binary transport)
 
-  private:    
+  private:
 
     TFT_eSprite pcimg  = TFT_eSprite(&tft);
     TFT_eSprite ibuff  = TFT_eSprite(&tft);
     TFT_eSprite udata = TFT_eSprite(&tft);
 
     uint16_t* imgPtr;
-    uint16_t palette[256];
     uint16_t RGB332_to_RGB565(uint8_t rgb332);
     void setCSPins(uint8_t state);
 };

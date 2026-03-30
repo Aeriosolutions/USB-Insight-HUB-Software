@@ -66,7 +66,10 @@ const char* helpArr[] = {
 /*44*/"",
 /*45*/"Restore UIH to\nfactory default",
 /*46*/"No action",
-/*47*/"Restore to\nfactory\ndefaults.\nWi-Fi credentials\nare preserved"
+/*47*/"Restore to\nfactory\ndefaults.\nWi-Fi credentials\nare preserved",
+/*48*/"Allow remote\nreboot via USB\nserial.\n\nRequires reboot.",
+/*49*/"USB reboot is\ndisabled.\nOnly power cycle\nor restart cmd\ncan reset.",
+/*50*/"USB reboot is\nenabled.\nDevice can be\nreset via USB\nserial."
 };
 
 

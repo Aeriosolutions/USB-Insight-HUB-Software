@@ -23,6 +23,7 @@
 	let rotation = writable('0');
 	let brightness = writable(80);
 	let hubMode = writable('USB2 & USB3');
+	let rebootEnabled = writable('Disable');
 
 	let prevGlobalConf = {};
 	
@@ -40,7 +41,8 @@
 		filterType.set('Median');
 		rotation.set('0');
 		brightness.set(80);
-		hubMode.set('USB2 & USB3');		
+		hubMode.set('USB2 & USB3');
+		rebootEnabled.set('Disable');
 		
 	});
 
@@ -95,7 +97,14 @@
 				case 2: hubMode.set('USB3 Only'); break;
 			}
 			prevGlobalConf['hubMode'] = masterState['features_conf_hubMode'];
-		}		
+		}
+		if(prevGlobalConf['rebootEnabled'] !== masterState['features_conf_reboot_enabled']){
+			switch (masterState['features_conf_reboot_enabled']){
+				case 0: rebootEnabled.set('Disable'); break;
+				case 1: rebootEnabled.set('Enable'); break;
+			}
+			prevGlobalConf['rebootEnabled'] = masterState['features_conf_reboot_enabled'];
+		}
 
 	}
 
@@ -156,6 +165,16 @@
 			case 'USB3 Only'	: indx = 2; break;
 		}
 		masterState['features_conf_hubMode'] = indx;
+		socket.sendEvent('master', masterState);
+	}
+
+	function setRebootEnabled(){
+		let indx = 0;
+		switch ($rebootEnabled) {
+			case 'Disable' : indx = 0; break;
+			case 'Enable'  : indx = 1; break;
+		}
+		masterState['features_conf_reboot_enabled'] = indx;
 		socket.sendEvent('master', masterState);
 	}
 
@@ -252,6 +271,23 @@
 			<input 
 				type="radio" bind:group={$hubMode} value={mode} class="accent-blue-600"
 				on:change={()=>{setHubMode()}}	 
+			/>
+			{mode}
+		  </label>
+		{/each}
+	  </div>
+	</div>
+
+	<!-- USB Reboot -->
+	<div class="bg-gray-200 p-4 rounded-lg shadow-md">
+	  <h2 class="font-bold inline-block">USB Reboot</h2>
+	  <span class="text-sm cursor-help inline-block" title="Enable 1200-baud bootloader entry via USB serial. When disabled, only the restart serial command and power cycle can reset the device.">ℹ️</span>
+	  <div class="flex gap-4 mt-2 ml-6">
+		{#each ['Disable', 'Enable'] as mode}
+		  <label class="flex items-center gap-2">
+			<input
+				type="radio" bind:group={$rebootEnabled} value={mode} class="accent-blue-600"
+				on:change={()=>{setRebootEnabled()}}
 			/>
 			{mode}
 		  </label>

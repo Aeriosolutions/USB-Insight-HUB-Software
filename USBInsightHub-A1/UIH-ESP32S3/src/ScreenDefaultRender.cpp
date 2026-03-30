@@ -15,7 +15,7 @@
 
 #include "Screen.h"
 
-void Screen::screenDefaultRender(chScreenData Screen){
+void Screen::screenDefaultRender(chScreenData Screen, bool chromeOnly){
   int cval = 0;
   String aux = "";
   long cbarmax = 2000;
@@ -224,47 +224,50 @@ void Screen::screenDefaultRender(chScreenData Screen){
   // HWSerial.println(cval);
   img.fillRect(65, 222, cval, 18, TFT_CYAN) ;
 
-  //Device name box
-  if (Screen.tProp.numDev == 11) {
-    imagePrint(Screen.tProp.imgBuffer, Screen.tProp.imgBPP, color_border);
-  } else {
+  // Power border — always drawn (chrome)
+  if (Screen.tProp.numDev != 11) {
     img.fillSmoothRoundRect(0, 33, 240, 104, 10, color_border, TFT_BLACK);
-    img.fillSmoothRoundRect(7, 40, 226, 90, 10, DARKGREY, color_border);
+    if (!chromeOnly)
+      img.fillSmoothRoundRect(7, 40, 226, 90, 10, DARKGREY, color_border);
   }
 
-  //Device text print
-  //img.setTextSize(2);
-  img.unloadFont();
-  img.loadFont(modenine50); 
+  if(!chromeOnly) {
+    //Device name box
+    if (Screen.tProp.numDev == 11) {
+      imagePrint(Screen.tProp.imgBuffer, Screen.tProp.imgBPP, color_border);
+    }
 
-  //Screen.tProp.numDev=10;
-  bool colorText = true;
-  Screen.autoTxtClear==true ? colorText = Screen.pconnected: colorText = true; 
+    //Device text print
+    img.unloadFont();
+    img.loadFont(modenine50);
 
-  if(Screen.tProp.numDev==0){
-    img.setTextColor(TFT_LIGHTGREY);
-    device = "----";
-    img.drawCentreString(device, 120, 65, 4); //**
-  } 
-  else if(Screen.tProp.numDev == 1){
-    colorText == true ? img.setTextColor(TFT_YELLOW) : img.setTextColor(TFT_LIGHTGREY);
-    //img.setTextColor(TFT_YELLOW);
-    device = Screen.tProp.Dev1_Name;
-    img.drawCentreString(device, 120, 65, 4); //**
-  } 
-  else if(Screen.tProp.numDev == 2){
-    colorText == true ? img.setTextColor(TFT_YELLOW) : img.setTextColor(TFT_LIGHTGREY);
-    //img.setTextColor(TFT_YELLOW);   
-    img.drawCentreString(Screen.tProp.Dev1_Name,120,45,4);
-    colorText == true ? img.setTextColor(TFT_WHITE) : img.setTextColor(TFT_LIGHTGREY);
-    //img.setTextColor(TFT_ORANGE);
-    img.drawCentreString(Screen.tProp.Dev2_Name,120,85,4); //**
+    bool colorText = true;
+    Screen.autoTxtClear==true ? colorText = Screen.pconnected: colorText = true;
+
+    if(Screen.tProp.numDev==0){
+      img.setTextColor(TFT_LIGHTGREY);
+      device = "----";
+      img.drawCentreString(device, 120, 65, 4); //**
+    }
+    else if(Screen.tProp.numDev == 1){
+      colorText == true ? img.setTextColor(TFT_YELLOW) : img.setTextColor(TFT_LIGHTGREY);
+      device = Screen.tProp.Dev1_Name;
+      img.drawCentreString(device, 120, 65, 4); //**
+    }
+    else if(Screen.tProp.numDev == 2){
+      colorText == true ? img.setTextColor(TFT_YELLOW) : img.setTextColor(TFT_LIGHTGREY);
+      img.drawCentreString(Screen.tProp.Dev1_Name,120,45,4);
+      colorText == true ? img.setTextColor(TFT_WHITE) : img.setTextColor(TFT_LIGHTGREY);
+      img.drawCentreString(Screen.tProp.Dev2_Name,120,85,4); //**
+    }
+    img.unloadFont();
+
+
+    if(Screen.tProp.numDev == 10) flexDevicePrint(Screen.tProp.Dev1_Name,colorText);
+  } else {
+    // chromeOnly: unload SMALLFONT (loaded at line 199) since we skip the device name block
+    img.unloadFont();
   }
-  img.unloadFont();
-
-
-  if(Screen.tProp.numDev == 10) flexDevicePrint(Screen.tProp.Dev1_Name,colorText);
-
 
   //ESP_LOGI("3","%u",millis()-timers); //----------------------------------------
 
@@ -320,7 +323,7 @@ void Screen::screenDefaultRender(chScreenData Screen){
   }
 
   //startup counter
-  if(Screen.startup_cnt > 0){
+  if(!chromeOnly && Screen.startup_cnt > 0){
     img.loadFont(aptossb52l);  
     img.setTextSize(2);
     img.setTextColor(TFT_GREEN);
@@ -335,47 +338,48 @@ void Screen::screenDefaultRender(chScreenData Screen){
 
 
 
-  //Menu access information splash
-
-  if(Screen.dProp.cs_pin == DISPLAY_CS_3 && Screen.showMenuInfoSplash){
-    img.loadFont(SMALLFONT);
-    img.fillRoundRect(5, 40, 235, 80, 5, TFT_BLUE);
-    img.fillRoundRect(9, 44, 229, 76, 5, TFT_WHITE);
-    img.setTextColor(TFT_BLACK);
-    img.drawString("Long press to",10,50,4);
-    img.drawString("enter Setup",10,80,4);
-    img.fillTriangle(204,45,204,75,230,60,TFT_BLACK);
-    img.unloadFont();
-  }
-
-  //Version update splash
-  if(Screen.dProp.cs_pin == DISPLAY_CS_2 && Screen.showVersionChangeSplash){
-    img.loadFont(SMALLFONT);
-    img.fillRoundRect(5, 40, 235, 80, 5, TFT_BLUE);
-    img.fillRoundRect(9, 44, 229, 76, 5, TFT_WHITE);
-    img.setTextColor(TFT_BLACK);
-    img.drawString("Updated to ver.",10,50,4);
-    aux= String(APP_VERSION);
-    aux.concat(" !");
-    img.drawString(aux,10,80,4);
-    img.unloadFont();
-  }
-
-  //Update in progress splash
-  if(Screen.dProp.cs_pin == DISPLAY_CS_2 && Screen.updateState != 0){
-    img.loadFont(SMALLFONT);
-    img.fillRoundRect(5, 40, 235, 80, 5, TFT_BLUE);
-    img.fillRoundRect(9, 44, 229, 76, 5, TFT_WHITE);
-    img.setTextColor(TFT_BLACK);
-    if(Screen.updateState == 3)
-    {
-      img.drawString("   DONE!",10,62,4);
+  if(!chromeOnly) {
+    //Menu access information splash
+    if(Screen.dProp.cs_pin == DISPLAY_CS_3 && Screen.showMenuInfoSplash){
+      img.loadFont(SMALLFONT);
+      img.fillRoundRect(5, 40, 235, 80, 5, TFT_BLUE);
+      img.fillRoundRect(9, 44, 229, 76, 5, TFT_WHITE);
+      img.setTextColor(TFT_BLACK);
+      img.drawString("Long press to",10,50,4);
+      img.drawString("enter Setup",10,80,4);
+      img.fillTriangle(204,45,204,75,230,60,TFT_BLACK);
+      img.unloadFont();
     }
-    else{
-      img.drawString("Downloading",10,50,4);
-      img.drawString("Firmware ...",10,80,4);        
+
+    //Version update splash
+    if(Screen.dProp.cs_pin == DISPLAY_CS_2 && Screen.showVersionChangeSplash){
+      img.loadFont(SMALLFONT);
+      img.fillRoundRect(5, 40, 235, 80, 5, TFT_BLUE);
+      img.fillRoundRect(9, 44, 229, 76, 5, TFT_WHITE);
+      img.setTextColor(TFT_BLACK);
+      img.drawString("Updated to ver.",10,50,4);
+      aux= String(APP_VERSION);
+      aux.concat(" !");
+      img.drawString(aux,10,80,4);
+      img.unloadFont();
     }
-    img.unloadFont();
+
+    //Update in progress splash
+    if(Screen.dProp.cs_pin == DISPLAY_CS_2 && Screen.updateState != 0){
+      img.loadFont(SMALLFONT);
+      img.fillRoundRect(5, 40, 235, 80, 5, TFT_BLUE);
+      img.fillRoundRect(9, 44, 229, 76, 5, TFT_WHITE);
+      img.setTextColor(TFT_BLACK);
+      if(Screen.updateState == 3)
+      {
+        img.drawString("   DONE!",10,62,4);
+      }
+      else{
+        img.drawString("Downloading",10,50,4);
+        img.drawString("Firmware ...",10,80,4);
+      }
+      img.unloadFont();
+    }
   }
 
   /*
@@ -399,7 +403,9 @@ void Screen::screenDefaultRender(chScreenData Screen){
   //ESP_LOGI("4","%u",millis()-timers); //---------------------------------------- 
   
   //timers=millis();
-  img.pushSprite(0, 0);
+  if (!chromeOnly) {
+    img.pushSprite(0, 0);
+  }
   //tft.pushImageDMA(0,0,240,240,imgPtr); // use only with 16bit color depth
   //timere=millis();
   //ESP_LOGI("P","%u",millis()-timers); //----------------------------------------- 

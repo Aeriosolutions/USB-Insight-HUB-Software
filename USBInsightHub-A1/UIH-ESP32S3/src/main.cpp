@@ -59,8 +59,9 @@ void setup()
     ESP_LOGI("Main","Running Firmware Version: %s", APP_VERSION);
     //ESP_LOGI("Main","Previous Firmware Version: %s\n", globalState.system.prevESPVersion.c_str());
 
-    iniButtons();    
+    iniButtons();
     iniDefaultView(&globalState,&globalConfig, &screen);
+    iniExtercommsBinaryTransport(&screen);
     //delay(10); //to give time to print
     
     // start ESP32-SvelteKit if WiFi is enabled

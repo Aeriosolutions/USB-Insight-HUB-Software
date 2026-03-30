@@ -5,12 +5,13 @@ from pathlib import Path
 import pytest
 import serial
 
-from hub import Hub, HubConnectionError, find_hub
+from hub import Hub, HubConnectionError, find_bootloader, find_hub
 
 LOGS_DIR = Path(__file__).parent / "logs"
 
 
 PROJECT_DIR = Path(__file__).parent.parent.parent  # UIH-ESP32S3/
+
 
 
 def pytest_addoption(parser):
@@ -64,14 +65,49 @@ def pytest_terminal_summary(terminalreporter, config):
         terminalreporter.write_sep("-", f"serial log: {logfile}")
 
 
+def _recover_from_bootloader():
+    """If the hub is in ROM bootloader, try to recover via esptool hard reset."""
+    bl_port = find_bootloader()
+    if not bl_port:
+        return
+
+    log = logging.getLogger("hub")
+    log.warning("Hub detected in ROM bootloader on %s — recovering", bl_port)
+
+    # Create a temporary Hub just for bootloader recovery
+    tmp = Hub.__new__(Hub)
+    tmp.port = bl_port
+    tmp.hub_serial = None
+    tmp.ser = None
+    try:
+        tmp.boot_from_bootloader()
+    except Exception as e:
+        pytest.exit(
+            f"Hub is in ROM bootloader and recovery failed: {e}\n"
+            f"Power-cycle the hub manually (unplug/replug USB).",
+            returncode=1,
+        )
+
+
 def pytest_collection_modifyitems(session, config, items):
     """Connect to the hub before any tests run. Abort early on failure."""
-    port = config.getoption("--port") or find_hub()
+    explicit_port = config.getoption("--port")
+    hub_serial = None
+
+    if explicit_port:
+        port = explicit_port
+    else:
+        port, hub_serial = find_hub()
+
+    if not port:
+        # No hub found — check if it's stuck in bootloader
+        _recover_from_bootloader()
+        port, hub_serial = find_hub()
     if not port:
         pytest.exit("No Insight Hub found. Pass --port or connect a hub.", returncode=1)
     try:
-        config._hub_instance = Hub(port)
-    except (HubConnectionError, serial.SerialException) as e:
+        config._hub_instance = Hub(port, hub_serial=hub_serial)
+    except (HubConnectionError, serial.SerialException, OSError) as e:
         pytest.exit(f"ERROR: {e}", returncode=1)
 
     if config.getoption("--quick"):
@@ -86,3 +122,16 @@ def hub(request):
     h = request.config._hub_instance
     yield h
     h.close()
+
+
+@pytest.fixture(autouse=True)
+def _flush_serial(request):
+    """Flush residual data between tests so binary leftovers don't corrupt JSON."""
+    hub = getattr(request.config, "_hub_instance", None)
+    if not hub or not hub.ser or not hub.ser.is_open:
+        return
+
+    # Just clear the host-side input buffer without sending anything to the hub.
+    # Sending \n forces the hub to parse an empty JSON message and respond; over
+    # many tests this can cause CDC TX buffer pressure.  A simple clear is safer.
+    hub.ser.reset_input_buffer()
