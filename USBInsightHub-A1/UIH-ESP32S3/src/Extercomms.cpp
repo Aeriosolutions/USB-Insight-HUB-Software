@@ -26,6 +26,9 @@ USBCDC usbSerial;
 
 static const char* TAG = "Extercoms";
 
+#define IMAGE_SIZE_PIXELS (226*90) //Width*Height*1bpp
+#define SERIAL_BUFFER_TIMEOUT_MS 1000
+
 GlobalState *gloState;
 GlobalConfig *gloConfig;
 
@@ -37,6 +40,10 @@ char rawBuffer[80];
 size_t rawBufIndex = 0;
 char inputBuffer[MAX_BUFFER_SIZE];   //working array JSON-RPC
 size_t bufferIndex = 0;
+int8_t imgPortIndex = -1;
+uint8_t imgBufBpp = 0;
+size_t imgBufLen = 0;
+unsigned long long lastSerialTime = 0;
 
 //Internal functions
 void parseDataPC();
@@ -104,15 +111,71 @@ void taskExterCheckActivity(void *pvParameters){
 
 }
 
+static inline void serialReset() {
+  imgPortIndex = -1;
+  bufferIndex = 0;
+  imgBufBpp = 0;
+  imgBufLen = 0;
+}
+
 //void onSerialDataReceived(const uint8_t* data, size_t length){
 void onSerialDataReceived(){
+  if (millis() - lastSerialTime > SERIAL_BUFFER_TIMEOUT_MS) {
+    serialReset();
+  }
+  lastSerialTime = millis();
+
   // Process each byte
   for (size_t i = 0; i < rawBufIndex; i++) {
     char c = (char)rawBuffer[i];
 
+    if (imgPortIndex >= 0) {
+      char* imgBufferRaw = (char*)gloState->usbInfo[imgPortIndex].imgBuffer;
+
+      if (imgBufBpp == 0) {
+        // First byte indicates bits per pixel
+        if (c == 0) {
+          gloState->usbInfo[imgPortIndex].imgBPP = 0;
+          free(gloState->usbInfo[imgPortIndex].imgBuffer);
+          gloState->usbInfo[imgPortIndex].imgBuffer = nullptr;
+          serialReset();
+          usbSerial.println("{\"status\": \"ok\", \"data\": {\"message\": \"image complete\"}}");
+          continue;
+        }
+
+        imgBufBpp = c;
+        const unsigned long long imageBits = IMAGE_SIZE_PIXELS * imgBufBpp;
+        imgBufLen = (imageBits / 8) + (imageBits % 8 ? 1 : 0);
+
+        const uint8_t oldBPP = gloState->usbInfo[imgPortIndex].imgBPP;
+        gloState->usbInfo[imgPortIndex].imgBPP = 0;
+        if (imgBufferRaw == nullptr || oldBPP != imgBufBpp) {
+          free(imgBufferRaw); // Free previous buffer if any
+          imgBufferRaw = (char*)malloc(imgBufLen);
+          gloState->usbInfo[imgPortIndex].imgBuffer = (uint16_t*)imgBufferRaw;
+        }
+        continue;
+      }
+
+      imgBufferRaw[bufferIndex++] = c;
+
+      if (bufferIndex >= imgBufLen) {
+        gloState->usbInfo[imgPortIndex].imgBPP = imgBufBpp;
+        serialReset();
+        usbSerial.println("{\"status\": \"ok\", \"data\": {\"message\": \"image complete\"}}");
+      }
+      continue;
+    }
+
+    if (c >= 1 && c <= 3) {
+      serialReset();
+      imgPortIndex = c - 1;
+      continue;
+    }
+
     // Prevent buffer overflow
     if (bufferIndex >= MAX_BUFFER_SIZE - 1) {
-        bufferIndex = 0;  // Reset buffer on overflow
+        serialReset();
         Serial.println("{\"jsonrpc\": \"2.0\", \"error\": {\"code\": -32700, \"message\": \"Buffer overflow\"}}");
         return;
     }
@@ -125,7 +188,7 @@ void onSerialDataReceived(){
         inputBuffer[bufferIndex] = '\0';  // Null-terminate string
         dataReceived = true;        
         //ESP_LOGI(TAG,"%s",inputBuffer);
-        bufferIndex = 0;  // Reset buffer for next message
+        serialReset();
     }
   }  
 }
@@ -243,7 +306,7 @@ void processJsonRpcMessage(const char* jsonString) {
       
       if(params["CH"+String(i+1)]["numDev"]){
         uint8_t inx = params["CH"+String(i+1)]["numDev"].as<unsigned int>();
-        (inx >= 0 && inx <= 10) ? gloState->usbInfo[i].numDev = inx : result["CH"+String(i+1)]["numDev"] = "out of range";
+        (inx >= 0 && inx <= 11) ? gloState->usbInfo[i].numDev = inx : result["CH"+String(i+1)]["numDev"] = "out of range";
       }
       if(params["CH"+String(i+1)]["Dev1_name"]){
         gloState->usbInfo[i].Dev1_Name = params["CH"+String(i+1)]["Dev1_name"].as<String>();        

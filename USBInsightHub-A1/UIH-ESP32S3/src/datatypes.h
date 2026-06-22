@@ -242,6 +242,8 @@ struct USBInfoState {
   String Dev1_Name;
   String Dev2_Name;
   int usbType;
+  uint8_t imgBPP;
+  uint16_t* imgBuffer;
 };
 
 struct BaseMCUStateIn {

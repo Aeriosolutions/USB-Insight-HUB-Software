@@ -21,12 +21,17 @@ void Screen::screenDefaultRender(chScreenData Screen){
   long cbarmax = 2000;
   String device = "*";
   uint32_t color;
+  uint32_t color_border;
   int faultType = 0;
   
   unsigned long timers=0;
   unsigned long timere=0;
   //Fault classification
   timers=millis();
+
+  if (Screen.tProp.numDev == 11 && Screen.tProp.imgBPP == 0) {
+    return; // incomplete image, do not render
+  }
 
   if(Screen.pwr_en && Screen.fault) faultType = 1;
   else if (Screen.mProp.fwdAlertSet||Screen.mProp.backAlertSet) faultType = 2;
@@ -53,15 +58,14 @@ void Screen::screenDefaultRender(chScreenData Screen){
   else{
     //Screen.fault == true ? color=TFT_RED:color=TFT_GREEN;
     switch(faultType){
-      case 0: color = TFT_GREEN;  break;
-      case 1: color = TFT_RED;    break;
-      case 2: color = TFT_YELLOW; break;
-      default : break;
+      case 0:  color_border = TFT_GREEN;  break;
+      case 1:  color_border = TFT_RED;    break;
+      case 2:  color_border = TFT_YELLOW; break;
+      default: color_border = TFT_BLUE;   break;
     } 
-    img.setTextColor(color);
+    img.setTextColor(color_border);
     //img.fillRect(60,0,45,20,color);
     img.drawString("ON", 2, 2, 4);
-    img.fillRoundRect(0, 33, 240, 104, 10, color);
   }
   
   //PC image  
@@ -220,8 +224,13 @@ void Screen::screenDefaultRender(chScreenData Screen){
   img.fillRect(65, 222, cval, 18, TFT_CYAN) ;
 
   //Device name box
-  img.fillRoundRect(7, 40, 226, 90, 10, DARKGREY); //**
-  
+  if (Screen.tProp.numDev == 11) {
+    imagePrint(Screen.tProp.imgBuffer, Screen.tProp.imgBPP, color_border);
+  } else {
+    img.fillSmoothRoundRect(0, 33, 240, 104, 18, color_border, TFT_BLACK);
+    img.fillSmoothRoundRect(7, 40, 226, 90, 10, DARKGREY, color_border);
+  }
+
   //Device text print
   //img.setTextSize(2);
   img.unloadFont();
@@ -253,7 +262,7 @@ void Screen::screenDefaultRender(chScreenData Screen){
 
   if(Screen.tProp.numDev == 10) flexDevicePrint(Screen.tProp.Dev1_Name,Screen.pconnected);
 
-  
+
   //ESP_LOGI("3","%u",millis()-timers); //----------------------------------------
 
   //USB type info
@@ -263,16 +272,16 @@ void Screen::screenDefaultRender(chScreenData Screen){
   int32_t tiw = 40;
   int32_t tit = 20;
   
-  if(Screen.tProp.numDev == 10) {tiw = 20; tit = 10;}
+  if(Screen.tProp.numDev >= 10) {tiw = 20; tit = 10;}
 
   if(Screen.tProp.usbType == 2) {    
     img.fillRoundRect(0, 33, tiw, 22, 5, TFT_RED);
-    img.drawCentreString(Screen.tProp.numDev==10 ? "2":"2.0", tit, 32, 4);
+    img.drawCentreString(Screen.tProp.numDev>=10 ? "2":"2.0", tit, 32, 4);
   }
 
   if(Screen.tProp.usbType == 3) {
-    img.fillRoundRect(0, 33, tiw, 22, 5, TFT_BLUE); 
-    img.drawCentreString(Screen.tProp.numDev==10 ? "3":"3.0", tit, 32, 4);
+    img.fillRoundRect(0, 33, tiw, 22, 5, TFT_BLUE);
+    img.drawCentreString(Screen.tProp.numDev>=10 ? "3":"3.0", tit, 32, 4);
   }
 
 
@@ -459,7 +468,7 @@ void Screen::flexDevicePrint(String jsonStr, bool pcCon){
 
   JsonDocument doc;
 
-  
+
   u_int16_t color = TFT_WHITE;
   int ty[3]= {70,0,0};
 
@@ -509,4 +518,13 @@ void Screen::flexDevicePrint(String jsonStr, bool pcCon){
     }
   }
 
+}
+
+
+void Screen::imagePrint(uint16_t* imgBuffer, uint8_t bpp, uint32_t borderColor) {
+  if (imgBuffer == nullptr || bpp == 0) {
+    return;
+  }
+  img.pushImage(7, 40, 226, 90, imgBuffer, bpp);
+  img.drawSmoothRoundRect(0, 33, 18, 11, 240, 104, borderColor, TFT_BLACK);
 }
